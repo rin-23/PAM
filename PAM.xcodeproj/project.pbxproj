@@ -7,6 +7,30 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		153B4E3618206CC200962DB2 /* PlateStartPoint.m in Sources */ = {isa = PBXBuildFile; fileRef = 153B4E0A18206CC100962DB2 /* PlateStartPoint.m */; };
+		153B4E3718206CC200962DB2 /* AGLKContext.m in Sources */ = {isa = PBXBuildFile; fileRef = 153B4E0E18206CC100962DB2 /* AGLKContext.m */; };
+		153B4E3818206CC200962DB2 /* AGLKVertexAttribArrayBuffer.m in Sources */ = {isa = PBXBuildFile; fileRef = 153B4E1018206CC100962DB2 /* AGLKVertexAttribArrayBuffer.m */; };
+		153B4E3918206CC200962DB2 /* Mesh.m in Sources */ = {isa = PBXBuildFile; fileRef = 153B4E1218206CC100962DB2 /* Mesh.m */; };
+		153B4E3B18206CC200962DB2 /* PolygonMesh.m in Sources */ = {isa = PBXBuildFile; fileRef = 153B4E1618206CC100962DB2 /* PolygonMesh.m */; };
+		153B4E3C18206CC200962DB2 /* ShaderProgram.m in Sources */ = {isa = PBXBuildFile; fileRef = 153B4E1918206CC100962DB2 /* ShaderProgram.m */; };
+		153B4E3D18206CC200962DB2 /* GyroRotationManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 153B4E1C18206CC100962DB2 /* GyroRotationManager.m */; };
+		153B4E3E18206CC200962DB2 /* RotationManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 153B4E1E18206CC100962DB2 /* RotationManager.m */; };
+		153B4E3F18206CC200962DB2 /* TranslationManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 153B4E2018206CC100962DB2 /* TranslationManager.m */; };
+		153B4E4018206CC200962DB2 /* ZoomManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 153B4E2218206CC100962DB2 /* ZoomManager.m */; };
+		153B4E4118206CC200962DB2 /* EulerAngles.c in Sources */ = {isa = PBXBuildFile; fileRef = 153B4E2418206CC100962DB2 /* EulerAngles.c */; };
+		153B4E4218206CC200962DB2 /* Utilities.m in Sources */ = {isa = PBXBuildFile; fileRef = 153B4E2818206CC100962DB2 /* Utilities.m */; };
+		153B4E4F18206CF400962DB2 /* DirectionalLight.fsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E2A18206CC100962DB2 /* DirectionalLight.fsh */; };
+		153B4E5018206CF400962DB2 /* DirectionalLight.vsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E2B18206CC100962DB2 /* DirectionalLight.vsh */; };
+		153B4E5118206CF400962DB2 /* PlateShader.fsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E2C18206CC100962DB2 /* PlateShader.fsh */; };
+		153B4E5218206CF400962DB2 /* PlateShader.vsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E2D18206CC100962DB2 /* PlateShader.vsh */; };
+		153B4E5318206CF400962DB2 /* PointCloudDepthShader.fsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E2E18206CC200962DB2 /* PointCloudDepthShader.fsh */; };
+		153B4E5418206CF400962DB2 /* PointCloudDepthShader.vsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E2F18206CC200962DB2 /* PointCloudDepthShader.vsh */; };
+		153B4E5518206CF400962DB2 /* PointCloudMonochromeShader.fsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E3018206CC200962DB2 /* PointCloudMonochromeShader.fsh */; };
+		153B4E5618206CF400962DB2 /* PointCloudMonochromeShader.vsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E3118206CC200962DB2 /* PointCloudMonochromeShader.vsh */; };
+		153B4E5718206CF400962DB2 /* PointCloudRGBAShader.fsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E3218206CC200962DB2 /* PointCloudRGBAShader.fsh */; };
+		153B4E5818206CF400962DB2 /* PointCloudRGBAShader.vsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E3318206CC200962DB2 /* PointCloudRGBAShader.vsh */; };
+		153B4E5918206CF400962DB2 /* TextureShader.fsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E3418206CC200962DB2 /* TextureShader.fsh */; };
+		153B4E5A18206CF400962DB2 /* TextureShader.vsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E3518206CC200962DB2 /* TextureShader.vsh */; };
 		156463EB1820266E0000B985 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 156463EA1820266E0000B985 /* Foundation.framework */; };
 		156463ED1820266E0000B985 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 156463EC1820266E0000B985 /* CoreGraphics.framework */; };
 		156463EF1820266E0000B985 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 156463EE1820266E0000B985 /* UIKit.framework */; };
@@ -19,6 +43,20 @@
 		156464061820266E0000B985 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 156463EE1820266E0000B985 /* UIKit.framework */; };
 		1564640E1820266E0000B985 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 1564640C1820266E0000B985 /* InfoPlist.strings */; };
 		156464101820266E0000B985 /* PAMTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 1564640F1820266E0000B985 /* PAMTests.m */; };
+		156465F4182031EB0000B985 /* libGEL-iOS Static Library.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 156465ED182031D80000B985 /* libGEL-iOS Static Library.a */; };
+		156465F8182032270000B985 /* libstdc++.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 156465F7182032270000B985 /* libstdc++.dylib */; };
+		156465FA182032840000B985 /* GLKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 156465F9182032840000B985 /* GLKit.framework */; };
+		156465FC182032870000B985 /* OpenGLES.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 156465FB182032870000B985 /* OpenGLES.framework */; };
+		1564660E182033920000B985 /* BaseQuadMeshViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 156465FF182033920000B985 /* BaseQuadMeshViewController.m */; };
+		1564660F182033920000B985 /* MeshLoader.mm in Sources */ = {isa = PBXBuildFile; fileRef = 15646601182033920000B985 /* MeshLoader.mm */; };
+		15646610182033920000B985 /* 3DFile.obj in Resources */ = {isa = PBXBuildFile; fileRef = 15646603182033920000B985 /* 3DFile.obj */; };
+		15646611182033920000B985 /* mesh.obj in Resources */ = {isa = PBXBuildFile; fileRef = 15646604182033920000B985 /* mesh.obj */; };
+		15646612182033920000B985 /* newPolars.obj in Resources */ = {isa = PBXBuildFile; fileRef = 15646605182033920000B985 /* newPolars.obj */; };
+		15646613182033920000B985 /* newTEST.obj in Resources */ = {isa = PBXBuildFile; fileRef = 15646606182033920000B985 /* newTEST.obj */; };
+		15646614182033920000B985 /* teapot.obj in Resources */ = {isa = PBXBuildFile; fileRef = 15646607182033920000B985 /* teapot.obj */; };
+		15646615182033920000B985 /* QuadMeshViewController.mm in Sources */ = {isa = PBXBuildFile; fileRef = 15646609182033920000B985 /* QuadMeshViewController.mm */; };
+		15646616182033920000B985 /* QuadPolygonMesh.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1564660B182033920000B985 /* QuadPolygonMesh.mm */; };
+		15646617182033920000B985 /* WireFrame.m in Sources */ = {isa = PBXBuildFile; fileRef = 1564660D182033920000B985 /* WireFrame.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -29,9 +67,81 @@
 			remoteGlobalIDString = 156463E61820266E0000B985;
 			remoteInfo = PAM;
 		};
+		156465EA182031D80000B985 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 156465E3182031D70000B985 /* GEL-iOS.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = 1AAD577B17F4DAE80064BA71;
+			remoteInfo = "GEL-iOS";
+		};
+		156465EC182031D80000B985 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 156465E3182031D70000B985 /* GEL-iOS.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = 1A9433DE17F4E7A3007FAC88;
+			remoteInfo = "GEL-iOS Static Library";
+		};
+		156465EE182031D80000B985 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 156465E3182031D70000B985 /* GEL-iOS.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = 1AAD579617F4DAE80064BA71;
+			remoteInfo = "GEL-iOSTests";
+		};
+		156465F0182031D80000B985 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 156465E3182031D70000B985 /* GEL-iOS.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = 1A9433EB17F4E7A3007FAC88;
+			remoteInfo = "GEL-iOS Static LibraryTests";
+		};
+		156465F2182031E90000B985 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 156465E3182031D70000B985 /* GEL-iOS.xcodeproj */;
+			proxyType = 1;
+			remoteGlobalIDString = 1A9433DD17F4E7A3007FAC88;
+			remoteInfo = "GEL-iOS Static Library";
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		153B4E0918206CC100962DB2 /* PlateStartPoint.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PlateStartPoint.h; sourceTree = "<group>"; };
+		153B4E0A18206CC100962DB2 /* PlateStartPoint.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PlateStartPoint.m; sourceTree = "<group>"; };
+		153B4E0D18206CC100962DB2 /* AGLKContext.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AGLKContext.h; sourceTree = "<group>"; };
+		153B4E0E18206CC100962DB2 /* AGLKContext.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AGLKContext.m; sourceTree = "<group>"; };
+		153B4E0F18206CC100962DB2 /* AGLKVertexAttribArrayBuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AGLKVertexAttribArrayBuffer.h; sourceTree = "<group>"; };
+		153B4E1018206CC100962DB2 /* AGLKVertexAttribArrayBuffer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AGLKVertexAttribArrayBuffer.m; sourceTree = "<group>"; };
+		153B4E1118206CC100962DB2 /* Mesh.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Mesh.h; sourceTree = "<group>"; };
+		153B4E1218206CC100962DB2 /* Mesh.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = Mesh.m; sourceTree = "<group>"; };
+		153B4E1518206CC100962DB2 /* PolygonMesh.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PolygonMesh.h; sourceTree = "<group>"; };
+		153B4E1618206CC100962DB2 /* PolygonMesh.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PolygonMesh.m; sourceTree = "<group>"; };
+		153B4E1818206CC100962DB2 /* ShaderProgram.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ShaderProgram.h; sourceTree = "<group>"; };
+		153B4E1918206CC100962DB2 /* ShaderProgram.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ShaderProgram.m; sourceTree = "<group>"; };
+		153B4E1B18206CC100962DB2 /* GyroRotationManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GyroRotationManager.h; sourceTree = "<group>"; };
+		153B4E1C18206CC100962DB2 /* GyroRotationManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GyroRotationManager.m; sourceTree = "<group>"; };
+		153B4E1D18206CC100962DB2 /* RotationManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RotationManager.h; sourceTree = "<group>"; };
+		153B4E1E18206CC100962DB2 /* RotationManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = RotationManager.m; sourceTree = "<group>"; };
+		153B4E1F18206CC100962DB2 /* TranslationManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TranslationManager.h; sourceTree = "<group>"; };
+		153B4E2018206CC100962DB2 /* TranslationManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TranslationManager.m; sourceTree = "<group>"; };
+		153B4E2118206CC100962DB2 /* ZoomManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ZoomManager.h; sourceTree = "<group>"; };
+		153B4E2218206CC100962DB2 /* ZoomManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ZoomManager.m; sourceTree = "<group>"; };
+		153B4E2418206CC100962DB2 /* EulerAngles.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = EulerAngles.c; sourceTree = "<group>"; };
+		153B4E2518206CC100962DB2 /* EulerAngles.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = EulerAngles.h; sourceTree = "<group>"; };
+		153B4E2618206CC100962DB2 /* GLStructures.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GLStructures.h; sourceTree = "<group>"; };
+		153B4E2718206CC100962DB2 /* Utilities.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Utilities.h; sourceTree = "<group>"; };
+		153B4E2818206CC100962DB2 /* Utilities.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = Utilities.m; sourceTree = "<group>"; };
+		153B4E2A18206CC100962DB2 /* DirectionalLight.fsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = DirectionalLight.fsh; sourceTree = "<group>"; };
+		153B4E2B18206CC100962DB2 /* DirectionalLight.vsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = DirectionalLight.vsh; sourceTree = "<group>"; };
+		153B4E2C18206CC100962DB2 /* PlateShader.fsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = PlateShader.fsh; sourceTree = "<group>"; };
+		153B4E2D18206CC100962DB2 /* PlateShader.vsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = PlateShader.vsh; sourceTree = "<group>"; };
+		153B4E2E18206CC200962DB2 /* PointCloudDepthShader.fsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = PointCloudDepthShader.fsh; sourceTree = "<group>"; };
+		153B4E2F18206CC200962DB2 /* PointCloudDepthShader.vsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = PointCloudDepthShader.vsh; sourceTree = "<group>"; };
+		153B4E3018206CC200962DB2 /* PointCloudMonochromeShader.fsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = PointCloudMonochromeShader.fsh; sourceTree = "<group>"; };
+		153B4E3118206CC200962DB2 /* PointCloudMonochromeShader.vsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = PointCloudMonochromeShader.vsh; sourceTree = "<group>"; };
+		153B4E3218206CC200962DB2 /* PointCloudRGBAShader.fsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = PointCloudRGBAShader.fsh; sourceTree = "<group>"; };
+		153B4E3318206CC200962DB2 /* PointCloudRGBAShader.vsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = PointCloudRGBAShader.vsh; sourceTree = "<group>"; };
+		153B4E3418206CC200962DB2 /* TextureShader.fsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = TextureShader.fsh; sourceTree = "<group>"; };
+		153B4E3518206CC200962DB2 /* TextureShader.vsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = TextureShader.vsh; sourceTree = "<group>"; };
 		156463E71820266E0000B985 /* PAM.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PAM.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		156463EA1820266E0000B985 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		156463EC1820266E0000B985 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
@@ -48,6 +158,26 @@
 		1564640B1820266E0000B985 /* PAMTests-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "PAMTests-Info.plist"; sourceTree = "<group>"; };
 		1564640D1820266E0000B985 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		1564640F1820266E0000B985 /* PAMTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PAMTests.m; sourceTree = "<group>"; };
+		156465E3182031D70000B985 /* GEL-iOS.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = "GEL-iOS.xcodeproj"; path = "GEL-iOS/GEL-iOS/GEL-iOS.xcodeproj"; sourceTree = "<group>"; };
+		156465F7182032270000B985 /* libstdc++.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = "libstdc++.dylib"; path = "usr/lib/libstdc++.dylib"; sourceTree = SDKROOT; };
+		156465F9182032840000B985 /* GLKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = GLKit.framework; path = System/Library/Frameworks/GLKit.framework; sourceTree = SDKROOT; };
+		156465FB182032870000B985 /* OpenGLES.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGLES.framework; path = System/Library/Frameworks/OpenGLES.framework; sourceTree = SDKROOT; };
+		156465FE182033920000B985 /* BaseQuadMeshViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BaseQuadMeshViewController.h; sourceTree = "<group>"; };
+		156465FF182033920000B985 /* BaseQuadMeshViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = BaseQuadMeshViewController.m; sourceTree = "<group>"; };
+		15646600182033920000B985 /* MeshLoader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MeshLoader.h; sourceTree = "<group>"; };
+		15646601182033920000B985 /* MeshLoader.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MeshLoader.mm; sourceTree = "<group>"; };
+		15646603182033920000B985 /* 3DFile.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = 3DFile.obj; sourceTree = "<group>"; };
+		15646604182033920000B985 /* mesh.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = mesh.obj; sourceTree = "<group>"; };
+		15646605182033920000B985 /* newPolars.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = newPolars.obj; sourceTree = "<group>"; };
+		15646606182033920000B985 /* newTEST.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = newTEST.obj; sourceTree = "<group>"; };
+		15646607182033920000B985 /* teapot.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = teapot.obj; sourceTree = "<group>"; };
+		15646608182033920000B985 /* QuadMeshViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = QuadMeshViewController.h; sourceTree = "<group>"; };
+		15646609182033920000B985 /* QuadMeshViewController.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = QuadMeshViewController.mm; sourceTree = "<group>"; };
+		1564660A182033920000B985 /* QuadPolygonMesh.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = QuadPolygonMesh.h; sourceTree = "<group>"; };
+		1564660B182033920000B985 /* QuadPolygonMesh.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = QuadPolygonMesh.mm; sourceTree = "<group>"; };
+		1564660C182033920000B985 /* WireFrame.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WireFrame.h; sourceTree = "<group>"; };
+		1564660D182033920000B985 /* WireFrame.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WireFrame.m; sourceTree = "<group>"; };
+		156466AB18204AC10000B985 /* libc++.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = "libc++.dylib"; path = "usr/lib/libc++.dylib"; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -55,6 +185,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				156465FC182032870000B985 /* OpenGLES.framework in Frameworks */,
+				156465FA182032840000B985 /* GLKit.framework in Frameworks */,
+				156465F8182032270000B985 /* libstdc++.dylib in Frameworks */,
+				156465F4182031EB0000B985 /* libGEL-iOS Static Library.a in Frameworks */,
 				156463ED1820266E0000B985 /* CoreGraphics.framework in Frameworks */,
 				156463EF1820266E0000B985 /* UIKit.framework in Frameworks */,
 				156463EB1820266E0000B985 /* Foundation.framework in Frameworks */,
@@ -74,9 +208,103 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		153B4E0818206CC100962DB2 /* 3DModels */ = {
+			isa = PBXGroup;
+			children = (
+				153B4E0918206CC100962DB2 /* PlateStartPoint.h */,
+				153B4E0A18206CC100962DB2 /* PlateStartPoint.m */,
+			);
+			name = 3DModels;
+			path = Classes/3DModels;
+			sourceTree = "<group>";
+		};
+		153B4E0B18206CC100962DB2 /* GLEngine */ = {
+			isa = PBXGroup;
+			children = (
+				153B4E0C18206CC100962DB2 /* AGLKit */,
+				153B4E1118206CC100962DB2 /* Mesh.h */,
+				153B4E1218206CC100962DB2 /* Mesh.m */,
+				153B4E1518206CC100962DB2 /* PolygonMesh.h */,
+				153B4E1618206CC100962DB2 /* PolygonMesh.m */,
+				153B4E1718206CC100962DB2 /* Shaders */,
+				153B4E1A18206CC100962DB2 /* Transformations */,
+				153B4E2318206CC100962DB2 /* Utilities */,
+			);
+			name = GLEngine;
+			path = Classes/GLEngine;
+			sourceTree = "<group>";
+		};
+		153B4E0C18206CC100962DB2 /* AGLKit */ = {
+			isa = PBXGroup;
+			children = (
+				153B4E0D18206CC100962DB2 /* AGLKContext.h */,
+				153B4E0E18206CC100962DB2 /* AGLKContext.m */,
+				153B4E0F18206CC100962DB2 /* AGLKVertexAttribArrayBuffer.h */,
+				153B4E1018206CC100962DB2 /* AGLKVertexAttribArrayBuffer.m */,
+			);
+			path = AGLKit;
+			sourceTree = "<group>";
+		};
+		153B4E1718206CC100962DB2 /* Shaders */ = {
+			isa = PBXGroup;
+			children = (
+				153B4E1818206CC100962DB2 /* ShaderProgram.h */,
+				153B4E1918206CC100962DB2 /* ShaderProgram.m */,
+			);
+			path = Shaders;
+			sourceTree = "<group>";
+		};
+		153B4E1A18206CC100962DB2 /* Transformations */ = {
+			isa = PBXGroup;
+			children = (
+				153B4E1B18206CC100962DB2 /* GyroRotationManager.h */,
+				153B4E1C18206CC100962DB2 /* GyroRotationManager.m */,
+				153B4E1D18206CC100962DB2 /* RotationManager.h */,
+				153B4E1E18206CC100962DB2 /* RotationManager.m */,
+				153B4E1F18206CC100962DB2 /* TranslationManager.h */,
+				153B4E2018206CC100962DB2 /* TranslationManager.m */,
+				153B4E2118206CC100962DB2 /* ZoomManager.h */,
+				153B4E2218206CC100962DB2 /* ZoomManager.m */,
+			);
+			path = Transformations;
+			sourceTree = "<group>";
+		};
+		153B4E2318206CC100962DB2 /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				153B4E2418206CC100962DB2 /* EulerAngles.c */,
+				153B4E2518206CC100962DB2 /* EulerAngles.h */,
+				153B4E2618206CC100962DB2 /* GLStructures.h */,
+				153B4E2718206CC100962DB2 /* Utilities.h */,
+				153B4E2818206CC100962DB2 /* Utilities.m */,
+			);
+			path = Utilities;
+			sourceTree = "<group>";
+		};
+		153B4E2918206CC100962DB2 /* Shaders */ = {
+			isa = PBXGroup;
+			children = (
+				153B4E2A18206CC100962DB2 /* DirectionalLight.fsh */,
+				153B4E2B18206CC100962DB2 /* DirectionalLight.vsh */,
+				153B4E2C18206CC100962DB2 /* PlateShader.fsh */,
+				153B4E2D18206CC100962DB2 /* PlateShader.vsh */,
+				153B4E2E18206CC200962DB2 /* PointCloudDepthShader.fsh */,
+				153B4E2F18206CC200962DB2 /* PointCloudDepthShader.vsh */,
+				153B4E3018206CC200962DB2 /* PointCloudMonochromeShader.fsh */,
+				153B4E3118206CC200962DB2 /* PointCloudMonochromeShader.vsh */,
+				153B4E3218206CC200962DB2 /* PointCloudRGBAShader.fsh */,
+				153B4E3318206CC200962DB2 /* PointCloudRGBAShader.vsh */,
+				153B4E3418206CC200962DB2 /* TextureShader.fsh */,
+				153B4E3518206CC200962DB2 /* TextureShader.vsh */,
+			);
+			name = Shaders;
+			path = Classes/Shaders;
+			sourceTree = "<group>";
+		};
 		156463DE1820266E0000B985 = {
 			isa = PBXGroup;
 			children = (
+				156465E3182031D70000B985 /* GEL-iOS.xcodeproj */,
 				156463F01820266E0000B985 /* PAM */,
 				156464091820266E0000B985 /* PAMTests */,
 				156463E91820266E0000B985 /* Frameworks */,
@@ -96,6 +324,10 @@
 		156463E91820266E0000B985 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				156466AB18204AC10000B985 /* libc++.dylib */,
+				156465FB182032870000B985 /* OpenGLES.framework */,
+				156465F9182032840000B985 /* GLKit.framework */,
+				156465F7182032270000B985 /* libstdc++.dylib */,
 				156463EA1820266E0000B985 /* Foundation.framework */,
 				156463EC1820266E0000B985 /* CoreGraphics.framework */,
 				156463EE1820266E0000B985 /* UIKit.framework */,
@@ -107,6 +339,10 @@
 		156463F01820266E0000B985 /* PAM */ = {
 			isa = PBXGroup;
 			children = (
+				153B4E0818206CC100962DB2 /* 3DModels */,
+				153B4E0B18206CC100962DB2 /* GLEngine */,
+				153B4E2918206CC100962DB2 /* Shaders */,
+				156465FD182033920000B985 /* QuadMeshProject */,
 				156463F91820266E0000B985 /* AppDelegate.h */,
 				156463FA1820266E0000B985 /* AppDelegate.m */,
 				156463FC1820266E0000B985 /* Images.xcassets */,
@@ -144,6 +380,48 @@
 			name = "Supporting Files";
 			sourceTree = "<group>";
 		};
+		156465E4182031D70000B985 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				156465EB182031D80000B985 /* GEL-iOS.app */,
+				156465ED182031D80000B985 /* libGEL-iOS Static Library.a */,
+				156465EF182031D80000B985 /* GEL-iOSTests.xctest */,
+				156465F1182031D80000B985 /* GEL-iOS Static LibraryTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		156465FD182033920000B985 /* QuadMeshProject */ = {
+			isa = PBXGroup;
+			children = (
+				156465FE182033920000B985 /* BaseQuadMeshViewController.h */,
+				156465FF182033920000B985 /* BaseQuadMeshViewController.m */,
+				15646600182033920000B985 /* MeshLoader.h */,
+				15646601182033920000B985 /* MeshLoader.mm */,
+				15646602182033920000B985 /* ObjFiles */,
+				15646608182033920000B985 /* QuadMeshViewController.h */,
+				15646609182033920000B985 /* QuadMeshViewController.mm */,
+				1564660A182033920000B985 /* QuadPolygonMesh.h */,
+				1564660B182033920000B985 /* QuadPolygonMesh.mm */,
+				1564660C182033920000B985 /* WireFrame.h */,
+				1564660D182033920000B985 /* WireFrame.m */,
+			);
+			name = QuadMeshProject;
+			path = Classes/QuadMeshProject;
+			sourceTree = "<group>";
+		};
+		15646602182033920000B985 /* ObjFiles */ = {
+			isa = PBXGroup;
+			children = (
+				15646603182033920000B985 /* 3DFile.obj */,
+				15646604182033920000B985 /* mesh.obj */,
+				15646605182033920000B985 /* newPolars.obj */,
+				15646606182033920000B985 /* newTEST.obj */,
+				15646607182033920000B985 /* teapot.obj */,
+			);
+			path = ObjFiles;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -158,6 +436,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				156465F3182031E90000B985 /* PBXTargetDependency */,
 			);
 			name = PAM;
 			productName = PAM;
@@ -206,6 +485,12 @@
 			mainGroup = 156463DE1820266E0000B985;
 			productRefGroup = 156463E81820266E0000B985 /* Products */;
 			projectDirPath = "";
+			projectReferences = (
+				{
+					ProductGroup = 156465E4182031D70000B985 /* Products */;
+					ProjectRef = 156465E3182031D70000B985 /* GEL-iOS.xcodeproj */;
+				},
+			);
 			projectRoot = "";
 			targets = (
 				156463E61820266E0000B985 /* PAM */,
@@ -214,12 +499,60 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXReferenceProxy section */
+		156465EB182031D80000B985 /* GEL-iOS.app */ = {
+			isa = PBXReferenceProxy;
+			fileType = wrapper.application;
+			path = "GEL-iOS.app";
+			remoteRef = 156465EA182031D80000B985 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		156465ED182031D80000B985 /* libGEL-iOS Static Library.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = "libGEL-iOS Static Library.a";
+			remoteRef = 156465EC182031D80000B985 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		156465EF182031D80000B985 /* GEL-iOSTests.xctest */ = {
+			isa = PBXReferenceProxy;
+			fileType = wrapper.cfbundle;
+			path = "GEL-iOSTests.xctest";
+			remoteRef = 156465EE182031D80000B985 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		156465F1182031D80000B985 /* GEL-iOS Static LibraryTests.xctest */ = {
+			isa = PBXReferenceProxy;
+			fileType = wrapper.cfbundle;
+			path = "GEL-iOS Static LibraryTests.xctest";
+			remoteRef = 156465F0182031D80000B985 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+/* End PBXReferenceProxy section */
+
 /* Begin PBXResourcesBuildPhase section */
 		156463E51820266E0000B985 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				153B4E4F18206CF400962DB2 /* DirectionalLight.fsh in Resources */,
+				153B4E5018206CF400962DB2 /* DirectionalLight.vsh in Resources */,
+				153B4E5118206CF400962DB2 /* PlateShader.fsh in Resources */,
+				153B4E5218206CF400962DB2 /* PlateShader.vsh in Resources */,
+				153B4E5318206CF400962DB2 /* PointCloudDepthShader.fsh in Resources */,
+				153B4E5418206CF400962DB2 /* PointCloudDepthShader.vsh in Resources */,
+				153B4E5518206CF400962DB2 /* PointCloudMonochromeShader.fsh in Resources */,
+				153B4E5618206CF400962DB2 /* PointCloudMonochromeShader.vsh in Resources */,
+				153B4E5718206CF400962DB2 /* PointCloudRGBAShader.fsh in Resources */,
+				153B4E5818206CF400962DB2 /* PointCloudRGBAShader.vsh in Resources */,
+				153B4E5918206CF400962DB2 /* TextureShader.fsh in Resources */,
+				153B4E5A18206CF400962DB2 /* TextureShader.vsh in Resources */,
+				15646613182033920000B985 /* newTEST.obj in Resources */,
 				156463F51820266E0000B985 /* InfoPlist.strings in Resources */,
+				15646610182033920000B985 /* 3DFile.obj in Resources */,
+				15646611182033920000B985 /* mesh.obj in Resources */,
+				15646614182033920000B985 /* teapot.obj in Resources */,
+				15646612182033920000B985 /* newPolars.obj in Resources */,
 				156463FD1820266E0000B985 /* Images.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -239,8 +572,25 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				15646616182033920000B985 /* QuadPolygonMesh.mm in Sources */,
+				153B4E4118206CC200962DB2 /* EulerAngles.c in Sources */,
+				15646617182033920000B985 /* WireFrame.m in Sources */,
+				153B4E3D18206CC200962DB2 /* GyroRotationManager.m in Sources */,
+				153B4E3918206CC200962DB2 /* Mesh.m in Sources */,
+				153B4E3C18206CC200962DB2 /* ShaderProgram.m in Sources */,
+				153B4E3818206CC200962DB2 /* AGLKVertexAttribArrayBuffer.m in Sources */,
+				153B4E4018206CC200962DB2 /* ZoomManager.m in Sources */,
+				153B4E3B18206CC200962DB2 /* PolygonMesh.m in Sources */,
+				153B4E3F18206CC200962DB2 /* TranslationManager.m in Sources */,
+				153B4E3E18206CC200962DB2 /* RotationManager.m in Sources */,
+				153B4E3618206CC200962DB2 /* PlateStartPoint.m in Sources */,
 				156463FB1820266E0000B985 /* AppDelegate.m in Sources */,
+				153B4E3718206CC200962DB2 /* AGLKContext.m in Sources */,
+				153B4E4218206CC200962DB2 /* Utilities.m in Sources */,
+				1564660F182033920000B985 /* MeshLoader.mm in Sources */,
 				156463F71820266E0000B985 /* main.m in Sources */,
+				15646615182033920000B985 /* QuadMeshViewController.mm in Sources */,
+				1564660E182033920000B985 /* BaseQuadMeshViewController.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -259,6 +609,11 @@
 			isa = PBXTargetDependency;
 			target = 156463E61820266E0000B985 /* PAM */;
 			targetProxy = 156464071820266E0000B985 /* PBXContainerItemProxy */;
+		};
+		156465F3182031E90000B985 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = "GEL-iOS Static Library";
+			targetProxy = 156465F2182031E90000B985 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -365,6 +720,7 @@
 				GCC_PREFIX_HEADER = "PAM/PAM-Prefix.pch";
 				INFOPLIST_FILE = "PAM/PAM-Info.plist";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/GEL-iOS/**";
 				WRAPPER_EXTENSION = app;
 			};
 			name = Debug;
@@ -378,6 +734,7 @@
 				GCC_PREFIX_HEADER = "PAM/PAM-Prefix.pch";
 				INFOPLIST_FILE = "PAM/PAM-Info.plist";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/GEL-iOS/**";
 				WRAPPER_EXTENSION = app;
 			};
 			name = Release;
@@ -443,6 +800,7 @@
 				156464151820266E0000B985 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		156464161820266E0000B985 /* Build configuration list for PBXNativeTarget "PAMTests" */ = {
 			isa = XCConfigurationList;
@@ -451,6 +809,7 @@
 				156464181820266E0000B985 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};

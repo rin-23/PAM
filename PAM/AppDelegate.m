@@ -7,14 +7,18 @@
 //
 
 #import "AppDelegate.h"
+#import "QuadMeshViewController.h"
 
 @implementation AppDelegate
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
+    QuadMeshViewController* quadMeshViewController = [[QuadMeshViewController alloc] init];
+    self.viewController = [[UINavigationController alloc] initWithRootViewController:quadMeshViewController];;
+    
     self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
-    // Override point for customization after application launch.
-    self.window.backgroundColor = [UIColor whiteColor];
+    
+    self.window.rootViewController = self.viewController;
     [self.window makeKeyAndVisible];
     return YES;
 }

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>IDESourceControlProjectFavoriteDictionaryKey</key>
+	<false/>
+	<key>IDESourceControlProjectIdentifier</key>
+	<string>6DBC5D11-55F2-4E57-AA91-345E6D6F584B</string>
+	<key>IDESourceControlProjectName</key>
+	<string>PAM</string>
+	<key>IDESourceControlProjectOriginsDictionary</key>
+	<dict>
+		<key>63D34193-50C3-4EC2-98E6-DFCAAE27F6EF</key>
+		<string>https://github.com/rin-23/PAM.git</string>
+		<key>6BA377C1-33C8-4F99-A8A0-F5F8DFAE47A7</key>
+		<string>https://github.com/rin-23/GEL-iOS.git</string>
+	</dict>
+	<key>IDESourceControlProjectPath</key>
+	<string>PAM.xcodeproj/project.xcworkspace</string>
+	<key>IDESourceControlProjectRelativeInstallPathDictionary</key>
+	<dict>
+		<key>63D34193-50C3-4EC2-98E6-DFCAAE27F6EF</key>
+		<string>../..</string>
+		<key>6BA377C1-33C8-4F99-A8A0-F5F8DFAE47A7</key>
+		<string>../../GEL-iOS</string>
+	</dict>
+	<key>IDESourceControlProjectURL</key>
+	<string>https://github.com/rin-23/PAM.git</string>
+	<key>IDESourceControlProjectVersion</key>
+	<integer>110</integer>
+	<key>IDESourceControlProjectWCCIdentifier</key>
+	<string>63D34193-50C3-4EC2-98E6-DFCAAE27F6EF</string>
+	<key>IDESourceControlProjectWCConfigurations</key>
+	<array>
+		<dict>
+			<key>IDESourceControlRepositoryExtensionIdentifierKey</key>
+			<string>public.vcs.git</string>
+			<key>IDESourceControlWCCIdentifierKey</key>
+			<string>6BA377C1-33C8-4F99-A8A0-F5F8DFAE47A7</string>
+			<key>IDESourceControlWCCName</key>
+			<string>GEL-iOS</string>
+		</dict>
+		<dict>
+			<key>IDESourceControlRepositoryExtensionIdentifierKey</key>
+			<string>public.vcs.git</string>
+			<key>IDESourceControlWCCIdentifierKey</key>
+			<string>63D34193-50C3-4EC2-98E6-DFCAAE27F6EF</string>
+			<key>IDESourceControlWCCName</key>
+			<string>PAM</string>
+		</dict>
+	</array>
+</dict>
+</plist>

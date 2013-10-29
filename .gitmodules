@@ -1,0 +1,3 @@
+[submodule "GEL-iOS"]
+	path = GEL-iOS
+	url = https://github.com/rin-23/GEL-iOS.git

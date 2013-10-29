@@ -21,12 +21,8 @@
 		153B4E4218206CC200962DB2 /* Utilities.m in Sources */ = {isa = PBXBuildFile; fileRef = 153B4E2818206CC100962DB2 /* Utilities.m */; };
 		153B4E4F18206CF400962DB2 /* DirectionalLight.fsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E2A18206CC100962DB2 /* DirectionalLight.fsh */; };
 		153B4E5018206CF400962DB2 /* DirectionalLight.vsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E2B18206CC100962DB2 /* DirectionalLight.vsh */; };
-		153B4E5118206CF400962DB2 /* PlateShader.fsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E2C18206CC100962DB2 /* PlateShader.fsh */; };
-		153B4E5218206CF400962DB2 /* PlateShader.vsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E2D18206CC100962DB2 /* PlateShader.vsh */; };
-		153B4E5318206CF400962DB2 /* PointCloudDepthShader.fsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E2E18206CC200962DB2 /* PointCloudDepthShader.fsh */; };
-		153B4E5418206CF400962DB2 /* PointCloudDepthShader.vsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E2F18206CC200962DB2 /* PointCloudDepthShader.vsh */; };
-		153B4E5518206CF400962DB2 /* PointCloudMonochromeShader.fsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E3018206CC200962DB2 /* PointCloudMonochromeShader.fsh */; };
-		153B4E5618206CF400962DB2 /* PointCloudMonochromeShader.vsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E3118206CC200962DB2 /* PointCloudMonochromeShader.vsh */; };
+		153B4E5318206CF400962DB2 /* DepthShader.fsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E2E18206CC200962DB2 /* DepthShader.fsh */; };
+		153B4E5418206CF400962DB2 /* DepthShader.vsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E2F18206CC200962DB2 /* DepthShader.vsh */; };
 		153B4E5718206CF400962DB2 /* PointCloudRGBAShader.fsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E3218206CC200962DB2 /* PointCloudRGBAShader.fsh */; };
 		153B4E5818206CF400962DB2 /* PointCloudRGBAShader.vsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E3318206CC200962DB2 /* PointCloudRGBAShader.vsh */; };
 		153B4E5918206CF400962DB2 /* TextureShader.fsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E3418206CC200962DB2 /* TextureShader.fsh */; };
@@ -132,12 +128,8 @@
 		153B4E2818206CC100962DB2 /* Utilities.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = Utilities.m; sourceTree = "<group>"; };
 		153B4E2A18206CC100962DB2 /* DirectionalLight.fsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = DirectionalLight.fsh; sourceTree = "<group>"; };
 		153B4E2B18206CC100962DB2 /* DirectionalLight.vsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = DirectionalLight.vsh; sourceTree = "<group>"; };
-		153B4E2C18206CC100962DB2 /* PlateShader.fsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = PlateShader.fsh; sourceTree = "<group>"; };
-		153B4E2D18206CC100962DB2 /* PlateShader.vsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = PlateShader.vsh; sourceTree = "<group>"; };
-		153B4E2E18206CC200962DB2 /* PointCloudDepthShader.fsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = PointCloudDepthShader.fsh; sourceTree = "<group>"; };
-		153B4E2F18206CC200962DB2 /* PointCloudDepthShader.vsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = PointCloudDepthShader.vsh; sourceTree = "<group>"; };
-		153B4E3018206CC200962DB2 /* PointCloudMonochromeShader.fsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = PointCloudMonochromeShader.fsh; sourceTree = "<group>"; };
-		153B4E3118206CC200962DB2 /* PointCloudMonochromeShader.vsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = PointCloudMonochromeShader.vsh; sourceTree = "<group>"; };
+		153B4E2E18206CC200962DB2 /* DepthShader.fsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = DepthShader.fsh; sourceTree = "<group>"; };
+		153B4E2F18206CC200962DB2 /* DepthShader.vsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = DepthShader.vsh; sourceTree = "<group>"; };
 		153B4E3218206CC200962DB2 /* PointCloudRGBAShader.fsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = PointCloudRGBAShader.fsh; sourceTree = "<group>"; };
 		153B4E3318206CC200962DB2 /* PointCloudRGBAShader.vsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = PointCloudRGBAShader.vsh; sourceTree = "<group>"; };
 		153B4E3418206CC200962DB2 /* TextureShader.fsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = TextureShader.fsh; sourceTree = "<group>"; };
@@ -286,12 +278,8 @@
 			children = (
 				153B4E2A18206CC100962DB2 /* DirectionalLight.fsh */,
 				153B4E2B18206CC100962DB2 /* DirectionalLight.vsh */,
-				153B4E2C18206CC100962DB2 /* PlateShader.fsh */,
-				153B4E2D18206CC100962DB2 /* PlateShader.vsh */,
-				153B4E2E18206CC200962DB2 /* PointCloudDepthShader.fsh */,
-				153B4E2F18206CC200962DB2 /* PointCloudDepthShader.vsh */,
-				153B4E3018206CC200962DB2 /* PointCloudMonochromeShader.fsh */,
-				153B4E3118206CC200962DB2 /* PointCloudMonochromeShader.vsh */,
+				153B4E2E18206CC200962DB2 /* DepthShader.fsh */,
+				153B4E2F18206CC200962DB2 /* DepthShader.vsh */,
 				153B4E3218206CC200962DB2 /* PointCloudRGBAShader.fsh */,
 				153B4E3318206CC200962DB2 /* PointCloudRGBAShader.vsh */,
 				153B4E3418206CC200962DB2 /* TextureShader.fsh */,
@@ -537,12 +525,8 @@
 			files = (
 				153B4E4F18206CF400962DB2 /* DirectionalLight.fsh in Resources */,
 				153B4E5018206CF400962DB2 /* DirectionalLight.vsh in Resources */,
-				153B4E5118206CF400962DB2 /* PlateShader.fsh in Resources */,
-				153B4E5218206CF400962DB2 /* PlateShader.vsh in Resources */,
-				153B4E5318206CF400962DB2 /* PointCloudDepthShader.fsh in Resources */,
-				153B4E5418206CF400962DB2 /* PointCloudDepthShader.vsh in Resources */,
-				153B4E5518206CF400962DB2 /* PointCloudMonochromeShader.fsh in Resources */,
-				153B4E5618206CF400962DB2 /* PointCloudMonochromeShader.vsh in Resources */,
+				153B4E5318206CF400962DB2 /* DepthShader.fsh in Resources */,
+				153B4E5418206CF400962DB2 /* DepthShader.vsh in Resources */,
 				153B4E5718206CF400962DB2 /* PointCloudRGBAShader.fsh in Resources */,
 				153B4E5818206CF400962DB2 /* PointCloudRGBAShader.vsh in Resources */,
 				153B4E5918206CF400962DB2 /* TextureShader.fsh in Resources */,

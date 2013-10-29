@@ -65,8 +65,8 @@
 
 -(void)drawToDepthBuffer {
     if (self.depthShaderProgram == nil) {
-        NSString* vShader = [[NSBundle mainBundle] pathForResource:@"PointCloudDepthShader" ofType:@"vsh"];
-        NSString* fShader = [[NSBundle mainBundle] pathForResource:@"PointCloudDepthShader" ofType:@"fsh"];
+        NSString* vShader = [[NSBundle mainBundle] pathForResource:@"DepthShader" ofType:@"vsh"];
+        NSString* fShader = [[NSBundle mainBundle] pathForResource:@"DepthShader" ofType:@"fsh"];
         
         self.depthShaderProgram = [[ShaderProgram alloc] initWithVertexShader:vShader fragmentShader:fShader];
         attribDepth[ATTRIB_POSITION] = [self.depthShaderProgram attributeLocation:"position"];

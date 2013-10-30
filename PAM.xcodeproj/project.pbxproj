@@ -40,7 +40,6 @@
 		1564640E1820266E0000B985 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 1564640C1820266E0000B985 /* InfoPlist.strings */; };
 		156464101820266E0000B985 /* PAMTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 1564640F1820266E0000B985 /* PAMTests.m */; };
 		156465F4182031EB0000B985 /* libGEL-iOS Static Library.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 156465ED182031D80000B985 /* libGEL-iOS Static Library.a */; };
-		156465F8182032270000B985 /* libstdc++.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 156465F7182032270000B985 /* libstdc++.dylib */; };
 		156465FA182032840000B985 /* GLKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 156465F9182032840000B985 /* GLKit.framework */; };
 		156465FC182032870000B985 /* OpenGLES.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 156465FB182032870000B985 /* OpenGLES.framework */; };
 		1564660E182033920000B985 /* BaseQuadMeshViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 156465FF182033920000B985 /* BaseQuadMeshViewController.m */; };
@@ -151,7 +150,6 @@
 		1564640D1820266E0000B985 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		1564640F1820266E0000B985 /* PAMTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PAMTests.m; sourceTree = "<group>"; };
 		156465E3182031D70000B985 /* GEL-iOS.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = "GEL-iOS.xcodeproj"; path = "GEL-iOS/GEL-iOS/GEL-iOS.xcodeproj"; sourceTree = "<group>"; };
-		156465F7182032270000B985 /* libstdc++.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = "libstdc++.dylib"; path = "usr/lib/libstdc++.dylib"; sourceTree = SDKROOT; };
 		156465F9182032840000B985 /* GLKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = GLKit.framework; path = System/Library/Frameworks/GLKit.framework; sourceTree = SDKROOT; };
 		156465FB182032870000B985 /* OpenGLES.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGLES.framework; path = System/Library/Frameworks/OpenGLES.framework; sourceTree = SDKROOT; };
 		156465FE182033920000B985 /* BaseQuadMeshViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BaseQuadMeshViewController.h; sourceTree = "<group>"; };
@@ -169,7 +167,6 @@
 		1564660B182033920000B985 /* QuadPolygonMesh.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = QuadPolygonMesh.mm; sourceTree = "<group>"; };
 		1564660C182033920000B985 /* WireFrame.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WireFrame.h; sourceTree = "<group>"; };
 		1564660D182033920000B985 /* WireFrame.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WireFrame.m; sourceTree = "<group>"; };
-		156466AB18204AC10000B985 /* libc++.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = "libc++.dylib"; path = "usr/lib/libc++.dylib"; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -179,7 +176,6 @@
 			files = (
 				156465FC182032870000B985 /* OpenGLES.framework in Frameworks */,
 				156465FA182032840000B985 /* GLKit.framework in Frameworks */,
-				156465F8182032270000B985 /* libstdc++.dylib in Frameworks */,
 				156465F4182031EB0000B985 /* libGEL-iOS Static Library.a in Frameworks */,
 				156463ED1820266E0000B985 /* CoreGraphics.framework in Frameworks */,
 				156463EF1820266E0000B985 /* UIKit.framework in Frameworks */,
@@ -312,10 +308,8 @@
 		156463E91820266E0000B985 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				156466AB18204AC10000B985 /* libc++.dylib */,
 				156465FB182032870000B985 /* OpenGLES.framework */,
 				156465F9182032840000B985 /* GLKit.framework */,
-				156465F7182032270000B985 /* libstdc++.dylib */,
 				156463EA1820266E0000B985 /* Foundation.framework */,
 				156463EC1820266E0000B985 /* CoreGraphics.framework */,
 				156463EE1820266E0000B985 /* UIKit.framework */,
@@ -654,7 +648,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 6.0;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -688,7 +682,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 6.0;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALIDATE_PRODUCT = YES;
@@ -700,6 +694,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = LaunchImage;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "PAM/PAM-Prefix.pch";
 				INFOPLIST_FILE = "PAM/PAM-Info.plist";
@@ -714,6 +709,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = LaunchImage;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "PAM/PAM-Prefix.pch";
 				INFOPLIST_FILE = "PAM/PAM-Info.plist";

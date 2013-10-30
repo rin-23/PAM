@@ -16,6 +16,8 @@
 #import <GLKit/GLKit.h>
 #import "WireFrame.h"
 #import "Utilities.h"
+//#import "polarize.h"
+#import "Walker.h"
 
 @interface QuadPolygonMesh() {
     HMesh::Manifold _manifold;
@@ -114,11 +116,61 @@ using namespace HMesh;
 //    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_COLOR]];
 //}
 
--(GLKVector3)closestVertexToMeshPoint:(GLKVector3)touchPoint {
+-(void)createBranchAtPoints:(NSMutableData*)pointData {
+    GLKVector3* points = (GLKVector3*)pointData.bytes;
+    int numOfPoints = pointData.length / sizeof(GLKVector3);
+    
+    int size = _manifold.no_vertices();
+    VertexAttributeVector<int> vs(size, 0);
+    
+    for (int i = 0; i < numOfPoints; i++) {
+        GLKVector3 ptn = points[i];
+        VertexID pointID = [self closestVertexID:ptn];
+        vs[pointID] = 1;
+    }
+
+    polar_add_branch(_manifold, vs);
+    
+    NSMutableData* vertexData = [[NSMutableData alloc] init];
+    NSMutableData* wireframeData = [[NSMutableData alloc] init];
+    [self triangulateManifold:_manifold trianglMeshData:&vertexData wireframeData:&wireframeData];
+    
+    self.numVertices = vertexData.length / sizeof(VertexNormRGBA);
+    
+    self.vertexDataBuffer = [[AGLKVertexAttribArrayBuffer alloc] initWithAttribStride:sizeof(VertexNormRGBA)
+                                                                     numberOfVertices:self.numVertices
+                                                                                bytes:vertexData.bytes
+                                                                                usage:GL_DYNAMIC_DRAW];
+    
+    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_POSITION]];
+    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_NORMAL]];
+    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_COLOR]];
+    
+    [_wireFrame setVertexData:wireframeData vertexNum:wireframeData.length/sizeof(VertexNormRGBA)];
+}
+
+void polar_add_branch(HMesh::Manifold& m, HMesh::VertexAttributeVector<int>& vs) {
+    HalfEdgeID h = m.slit_edges(vs);
+    FaceID f = m.close_hole(h);
+    vector<Vec3d> npos;
+    for(Walker w = m.walker(f); !w.full_circle(); w = w.next())
+    {
+        Vec3d p(0);
+        p /= circulate_vertex_ccw(m, w.vertex(), [&](VertexID v) {
+            p += m.pos(v);
+        });
+        npos.push_back(p);
+    }
+    int i=0;
+    circulate_face_ccw(m, f, [&](VertexID v) {m.pos(v) = npos[i++];});
+    m.split_face_by_vertex(f);
+}
+
+-(VertexID)closestVertexID:(GLKVector3)touchPoint {
     //iterate over every face
     float distance = FLT_MAX;
     HMesh::VertexID closestVertex;
-
+    
     touchPoint = [Utilities invertVector3:touchPoint withMatrix:self.modelMatrix];
     
     for(FaceIDIterator fid = _manifold.faces_begin(); fid != _manifold.faces_end(); ++fid) {
@@ -133,8 +185,11 @@ using namespace HMesh;
             }
         }
     }
-    
-    _curSelectedVertexID = closestVertex;
+    return closestVertex;
+}
+
+-(GLKVector3)closestVertexToMeshPoint:(GLKVector3)touchPoint {
+    _curSelectedVertexID = [self closestVertexID:touchPoint];
     CGLA::Vec3d vertexPos = _manifold.pos(_curSelectedVertexID);
     GLKVector4 glkVertextPos = GLKVector4Make(vertexPos[0], vertexPos[1], vertexPos[2], 1.0);
     glkVertextPos = GLKMatrix4MultiplyVector4(self.modelMatrix, glkVertextPos);
@@ -158,7 +213,7 @@ using namespace HMesh;
     return NO;
 }
 
--(void)translateCurrentSelectedVertex:(GLKVector3)newPosition {
+-(GLKVector3)translateCurrentSelectedVertex:(GLKVector3)newPosition {
     
     newPosition = [Utilities invertVector3:newPosition withMatrix:self.modelMatrix];
     
@@ -171,8 +226,7 @@ using namespace HMesh;
     
     bool isInvertible;
     GLKVector4 axis = GLKMatrix4MultiplyVector4(GLKMatrix4Invert(self.modelViewMatrix, &isInvertible), GLKVector4MakeWithVector3(point3, 1.0));
-    
-    
+        
     GLKVector3 vk = GLKVector3Make(axis.x, axis.y, axis.z);
 
     CGLA::Vec3d newPos = CGLA::Vec3d(vk.x, vk.y, vk.z);
@@ -194,6 +248,11 @@ using namespace HMesh;
 
 
     [_wireFrame setVertexData:wireframeData vertexNum:wireframeData.length/sizeof(VertexNormRGBA)];
+    
+    GLKVector4 glkVertextPos = GLKVector4MakeWithVector3(vk, 1.0f);
+    glkVertextPos = GLKMatrix4MultiplyVector4(self.modelMatrix, glkVertextPos);
+    return  GLKVector3Make(glkVertextPos.x, glkVertextPos.y, glkVertextPos.z);
+
 }
 
 //Triangulate manifold for display in case it has quads. GLES doesnt handle quads.

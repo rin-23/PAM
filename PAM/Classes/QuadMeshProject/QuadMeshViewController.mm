@@ -157,13 +157,15 @@
         if (sender.state == UIGestureRecognizerStateBegan) {
             isMovingPoint = [_pMesh touchedCloseToTheCurrentVertex:rayOrigin];
             if (isMovingPoint) {
-                [_pMesh translateCurrentSelectedVertex:rayOrigin];
+                GLKVector3 newPosition = [_pMesh translateCurrentSelectedVertex:rayOrigin];
+                _meshTouchPoint = [[PlateStartPoint alloc] initWithPoint:newPosition];
             } else {
                 [_rotationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity isOrthogonal:NO];
             }
         } else if (sender.state == UIGestureRecognizerStateChanged) {
             if (isMovingPoint) {
-                [_pMesh translateCurrentSelectedVertex:rayOrigin];
+                GLKVector3 newPosition = [_pMesh translateCurrentSelectedVertex:rayOrigin];
+                _meshTouchPoint = [[PlateStartPoint alloc] initWithPoint:newPosition];
             } else {
                 [_rotationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity isOrthogonal:NO];
             }
@@ -198,6 +200,11 @@
             NSLog(@"[WARNING] Couldn determine touch area");
             return;
         }
+        
+//        NSMutableData* data = [[NSMutableData alloc] init];
+//        [data appendBytes:&startPoint length:sizeof(GLKVector3)];
+//        [_pMesh createBranchAtPoints:data];
+        
         GLKVector3 selectedVertex = [_pMesh closestVertexToMeshPoint:startPoint];
         _meshTouchPoint = [[PlateStartPoint alloc] initWithPoint:selectedVertex];
     } else {
@@ -267,10 +274,9 @@
     }
 
     //Load obj file
-    NSString* objPath = [[NSBundle mainBundle] pathForResource:@"newPolars" ofType:@"obj"];
+    NSString* objPath = [[NSBundle mainBundle] pathForResource:@"mesh" ofType:@"obj"];
     [_pMesh setMeshFromObjFile:objPath];
     _translationManager.scaleFactor = _pMesh.boundingBox.radius;
-
     
     //Read vertex data from the file
 //    dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0ul);

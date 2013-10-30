@@ -13,10 +13,10 @@
 
 #pragma mark - Surface Mesh Data
 
--(void)setMeshDataWithNorm:(NSMutableData *)meshData numVertices:(unsigned long)vertexNum {
+-(void)setMeshDataWithNorm:(NSMutableData *)meshData {
     
     self.meshData = meshData;
-    self.numVertices = vertexNum;
+    self.numVertices = meshData.length/sizeof(VertexNormRGBA);
 
     NSString* vShader = [[NSBundle mainBundle] pathForResource:@"DirectionalLight" ofType:@"vsh"];
     NSString* fShader = [[NSBundle mainBundle] pathForResource:@"DirectionalLight" ofType:@"fsh"];

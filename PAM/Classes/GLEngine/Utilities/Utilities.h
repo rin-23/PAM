@@ -48,4 +48,6 @@ double triangleAngleWithSides(double a, double b, double c);
              inscribedTriangle:(GLKVector3*)triangle
                   withRayStart:(GLKVector3)rayStartPoint
                   rayDirection:(GLKVector3)ray;
+
++(GLKVector3)invertVector3:(GLKVector3)vector3 withMatrix:(GLKMatrix4)matrix4;
 @end

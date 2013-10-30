@@ -222,9 +222,12 @@
 
 - (void)update {
     //Projection
-    const GLfloat  aspectRatio = (GLfloat)_glHeight / (GLfloat)_glWidth;
-    //    projectionMatrix = GLKMatrix4MakeScale(1.0f, aspectRatio, 1.0f);
-    projectionMatrix = GLKMatrix4MakeOrtho(-1, 1, -1*aspectRatio, 1*aspectRatio, -10, 10);
+    const GLfloat aspectRatio = (GLfloat)_glHeight / (GLfloat)_glWidth;
+    
+    BoundingBox bbox = _pMesh.boundingBox;
+    projectionMatrix = GLKMatrix4MakeOrtho(-bbox.width/2, bbox.width/2,
+                                           -(bbox.height/2)*aspectRatio, (bbox.height/2)*aspectRatio,
+                                           -bbox.depth*4, bbox.depth);
     
     viewMatrix = GLKMatrix4Identity;
     
@@ -242,7 +245,7 @@
 
 - (void)glkView:(GLKView *)view drawInRect:(CGRect)rect {
     [(AGLKContext *)view.context clear:GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT];
-
+    
     _pMesh.viewMatrix = viewMatrix;
     _pMesh.projectionMatrix = projectionMatrix;
     [_pMesh draw];
@@ -266,6 +269,8 @@
     //Load obj file
     NSString* objPath = [[NSBundle mainBundle] pathForResource:@"newPolars" ofType:@"obj"];
     [_pMesh setMeshFromObjFile:objPath];
+    _translationManager.scaleFactor = _pMesh.boundingBox.radius;
+
     
     //Read vertex data from the file
 //    dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0ul);

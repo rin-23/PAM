@@ -11,8 +11,9 @@
 @interface QuadPolygonMesh : PolygonMesh
 
 -(void)setMeshFromObjFile:(NSString*)objFile;
--(void)setVertexData:(NSMutableData*)vertexData numOfVerticies:(uint32_t)vertexNum;
+//-(void)setVertexData:(NSMutableData*)vertexData numOfVerticies:(uint32_t)vertexNum;
 -(GLKVector3)closestVertexToMeshPoint:(GLKVector3)touchPoint;
 -(void)translateCurrentSelectedVertex:(GLKVector3)newPosition;
 -(BOOL)touchedCloseToTheCurrentVertex:(GLKVector3)touchPoint;
+
 @end

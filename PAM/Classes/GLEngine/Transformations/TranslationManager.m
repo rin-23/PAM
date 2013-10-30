@@ -21,11 +21,12 @@
     if (self) {
         self.translationMatrix = GLKMatrix4Identity;
         accumulatedTranslation = GLKMatrix4Identity;
+        _scaleFactor = 1.0;
     }
     return self;
 } 
 
-- (void)handlePanGesture:(UIGestureRecognizer *)sender withViewMatrix:(GLKMatrix4)viewMatrix{
+- (void)handlePanGesture:(UIGestureRecognizer *)sender withViewMatrix:(GLKMatrix4)viewMatrix {
     UIPanGestureRecognizer* pan = (UIPanGestureRecognizer*)sender;
 
     CGPoint point = [pan translationInView:pan.view];
@@ -40,7 +41,7 @@
 //        NSLog(@"Pan Changed");
         bool isInvertible;
         GLKVector3 axis = GLKMatrix4MultiplyVector3(GLKMatrix4Invert(viewMatrix, &isInvertible),
-                                                     GLKVector3Make(x_ndc, y_ndc, 0));
+                                                     GLKVector3Make(x_ndc*_scaleFactor, y_ndc*_scaleFactor, 0));
         
         self.translationMatrix = GLKMatrix4TranslateWithVector3(accumulatedTranslation, axis);
     } else if (sender.state == UIGestureRecognizerStateEnded) {

@@ -12,6 +12,7 @@
 @interface TranslationManager : NSObject
 
 @property (nonatomic, assign) GLKMatrix4 translationMatrix;
+@property (nonatomic, assign) float scaleFactor;
 
 - (void)handlePanGesture:(UIGestureRecognizer *)sender withViewMatrix:(GLKMatrix4)viewMatrix;
 

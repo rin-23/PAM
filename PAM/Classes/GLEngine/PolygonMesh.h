@@ -10,6 +10,6 @@
 
 @interface PolygonMesh : Mesh
 
--(void)setMeshDataWithNorm:(NSMutableData *)meshData numVertices:(unsigned long)vertexNum;
+-(void)setMeshDataWithNorm:(NSMutableData *)meshData;
 
 @end

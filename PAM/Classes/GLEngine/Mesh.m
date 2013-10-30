@@ -24,6 +24,7 @@
         _rotationManager = [[RotationManager alloc] init];
         _translationManager = [[TranslationManager alloc] init];
         _centroid = GLKVector3Make(0, 0, 0);
+        _centerAtBoundingBox = NO;
     }
     return self;
 }
@@ -46,6 +47,10 @@
 
 -(GLKMatrix4)modelMatrix {
     GLKMatrix4 modelMatrix = GLKMatrix4Identity;
+    
+    if (_centerAtBoundingBox) {
+         modelMatrix = GLKMatrix4TranslateWithVector3(modelMatrix, GLKVector3MultiplyScalar(self.boundingBox.center, -1.0f));
+    }
     
     modelMatrix = GLKMatrix4Multiply(modelMatrix, self.translationManager.translationMatrix);
     

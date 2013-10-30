@@ -15,13 +15,13 @@
 #import "../HMesh/obj_load.h"
 #import <GLKit/GLKit.h>
 #import "WireFrame.h"
-
-
+#import "Utilities.h"
 
 @interface QuadPolygonMesh() {
     HMesh::Manifold _manifold;
     WireFrame* _wireFrame;
     HMesh::VertexID _curSelectedVertexID;
+    BoundingBox _boundingBox;
 }
 
 @property (nonatomic) AGLKVertexAttribArrayBuffer* wireframeVertexBuffer;
@@ -32,9 +32,27 @@
 using namespace HMesh;
 
 -(void)setMeshFromObjFile:(NSString*)objFilePath {
+    //Load manifold
     _manifold = HMesh::Manifold();
     HMesh::obj_load(objFilePath.UTF8String, _manifold);
     
+    //Calculate Bounding Box
+    Manifold::Vec pmin = Manifold::Vec();
+    Manifold::Vec pmax = Manifold::Vec();
+    HMesh::bbox(_manifold, pmin, pmax);
+    
+    self.centerAtBoundingBox = YES;
+    _boundingBox.minBound = GLKVector3Make(pmin[0], pmin[1], pmin[2]);
+    _boundingBox.maxBound = GLKVector3Make(pmax[0], pmax[1], pmax[2]);
+    _boundingBox.center = GLKVector3MultiplyScalar(GLKVector3Add(_boundingBox.minBound, _boundingBox.maxBound), 0.5f);
+    
+    GLKVector3 mid = GLKVector3MultiplyScalar(GLKVector3Subtract(_boundingBox.maxBound, _boundingBox.minBound), 0.5f);
+    _boundingBox.radius = GLKVector3Length(mid);
+    _boundingBox.width = fabsf(_boundingBox.maxBound.x - _boundingBox.minBound.x);
+    _boundingBox.height = fabsf(_boundingBox.maxBound.y - _boundingBox.minBound.y);
+    _boundingBox.depth = fabsf(_boundingBox.maxBound.z - _boundingBox.minBound.z);
+    
+    //Load shader
     NSString* vShader = [[NSBundle mainBundle] pathForResource:@"DirectionalLight" ofType:@"vsh"];
     NSString* fShader = [[NSBundle mainBundle] pathForResource:@"DirectionalLight" ofType:@"fsh"];
     self.drawShaderProgram = [[ShaderProgram alloc] initWithVertexShader:vShader fragmentShader:fShader];
@@ -47,6 +65,7 @@ using namespace HMesh;
     uniforms[UNIFORM_LIGHT_DIRECTION] = [self.drawShaderProgram uniformLocation:"lightDirection"];
     uniforms[UNIFORM_LIGHT_COLOR] = [self.drawShaderProgram uniformLocation:"lightDiffuseColor"];
 
+    //Load data
     NSMutableData* vertexData = [[NSMutableData alloc] init];
     NSMutableData* wireframeData = [[NSMutableData alloc] init];
     [self triangulateManifold:_manifold trianglMeshData:&vertexData wireframeData:&wireframeData];
@@ -57,88 +76,75 @@ using namespace HMesh;
                                                                      numberOfVertices:self.numVertices
                                                                                 bytes:vertexData.bytes
                                                                                 usage:GL_DYNAMIC_DRAW];
-    glEnableVertexAttribArray(attrib[ATTRIB_POSITION]);
-    glEnableVertexAttribArray(attrib[ATTRIB_NORMAL]);
-    glEnableVertexAttribArray(attrib[ATTRIB_COLOR]);
+    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_POSITION]];
+    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_NORMAL]];
+    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_COLOR]];
     
+    
+    //Create Wireframe Object
     _wireFrame = [[WireFrame alloc]  init];
+    _wireFrame.centerAtBoundingBox = YES;
+    _wireFrame.boundingBox = _boundingBox;
     [_wireFrame setVertexData:wireframeData vertexNum:wireframeData.length/sizeof(VertexNormRGBA)];
 }
 
--(void)setVertexData:(NSMutableData*)vertexData numOfVerticies:(uint32_t)vertexNum {
-    
-    NSString* vShader = [[NSBundle mainBundle] pathForResource:@"DirectionalLight" ofType:@"vsh"];
-    NSString* fShader = [[NSBundle mainBundle] pathForResource:@"DirectionalLight" ofType:@"fsh"];
-    self.drawShaderProgram = [[ShaderProgram alloc] initWithVertexShader:vShader fragmentShader:fShader];
-    
-    attrib[ATTRIB_POSITION] = [self.drawShaderProgram attributeLocation:"position"];
-    attrib[ATTRIB_NORMAL] = [self.drawShaderProgram attributeLocation:"normal"];
-    attrib[ATTRIB_COLOR] = [self.drawShaderProgram attributeLocation:"color"];
-    
-    uniforms[UNIFORM_MODELVIEWPROJECTION_MATRIX] = [self.drawShaderProgram uniformLocation:"matrix"];
-    uniforms[UNIFORM_LIGHT_DIRECTION] = [self.drawShaderProgram uniformLocation:"lightDirection"];
-    uniforms[UNIFORM_LIGHT_COLOR] = [self.drawShaderProgram uniformLocation:"lightDiffuseColor"];
-    
-    self.numVertices = vertexData.length / sizeof(VertexNormRGBA);
-    
-    self.vertexDataBuffer = [[AGLKVertexAttribArrayBuffer alloc] initWithAttribStride:sizeof(VertexNormRGBA)
-                                                                     numberOfVertices:self.numVertices
-                                                                                bytes:vertexData.bytes
-                                                                                usage:GL_STATIC_DRAW];
-    glEnableVertexAttribArray(attrib[ATTRIB_POSITION]);
-    glEnableVertexAttribArray(attrib[ATTRIB_NORMAL]);
-    glEnableVertexAttribArray(attrib[ATTRIB_COLOR]);
-}
+
+//-(void)setVertexData:(NSMutableData*)vertexData numOfVerticies:(uint32_t)vertexNum {
+//    
+//    NSString* vShader = [[NSBundle mainBundle] pathForResource:@"DirectionalLight" ofType:@"vsh"];
+//    NSString* fShader = [[NSBundle mainBundle] pathForResource:@"DirectionalLight" ofType:@"fsh"];
+//    self.drawShaderProgram = [[ShaderProgram alloc] initWithVertexShader:vShader fragmentShader:fShader];
+//    
+//    attrib[ATTRIB_POSITION] = [self.drawShaderProgram attributeLocation:"position"];
+//    attrib[ATTRIB_NORMAL] = [self.drawShaderProgram attributeLocation:"normal"];
+//    attrib[ATTRIB_COLOR] = [self.drawShaderProgram attributeLocation:"color"];
+//    
+//    uniforms[UNIFORM_MODELVIEWPROJECTION_MATRIX] = [self.drawShaderProgram uniformLocation:"matrix"];
+//    uniforms[UNIFORM_LIGHT_DIRECTION] = [self.drawShaderProgram uniformLocation:"lightDirection"];
+//    uniforms[UNIFORM_LIGHT_COLOR] = [self.drawShaderProgram uniformLocation:"lightDiffuseColor"];
+//    
+//    self.numVertices = vertexData.length / sizeof(VertexNormRGBA);
+//    
+//    self.vertexDataBuffer = [[AGLKVertexAttribArrayBuffer alloc] initWithAttribStride:sizeof(VertexNormRGBA)
+//                                                                     numberOfVertices:self.numVertices
+//                                                                                bytes:vertexData.bytes
+//                                                                                usage:GL_DYNAMIC_DRAW];
+//    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_POSITION]];
+//    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_NORMAL]];
+//    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_COLOR]];
+//}
 
 -(GLKVector3)closestVertexToMeshPoint:(GLKVector3)touchPoint {
     //iterate over every face
     float distance = FLT_MAX;
     HMesh::VertexID closestVertex;
 
-    HMesh::Manifold::Vec pmin = HMesh::Manifold::Vec();
-    HMesh::Manifold::Vec pmax = HMesh::Manifold::Vec();
-    HMesh::bbox(_manifold, pmin, pmax);
-    GLKVector3 minBound = GLKVector3Make(pmin[0], pmin[1], pmin[2]);
-    GLKVector3 maxBound = GLKVector3Make(pmax[0], pmax[1], pmax[2]);
-    
-    GLKVector3 mid = GLKVector3MultiplyScalar(GLKVector3Subtract(maxBound, minBound), 0.5f);
-    float rad = GLKVector3Length(mid);
+    touchPoint = [Utilities invertVector3:touchPoint withMatrix:self.modelMatrix];
     
     for(FaceIDIterator fid = _manifold.faces_begin(); fid != _manifold.faces_end(); ++fid) {
         //iterate over every vertex of the face
         for (Walker w = _manifold.walker(*fid); !w.full_circle(); w = w.circulate_face_ccw()) {
             CGLA::Vec3d vertexPos = _manifold.pos(w.vertex());
             GLKVector3 glkVertextPos = GLKVector3Make(vertexPos[0], vertexPos[1], vertexPos[2]);
-            GLKVector3 clippedVector3 = GLKVector3DivideScalar(GLKVector3Subtract(GLKVector3Subtract(glkVertextPos, minBound), mid), rad);
-            float cur_distance = GLKVector3Distance(touchPoint, clippedVector3);
+            float cur_distance = GLKVector3Distance(touchPoint, glkVertextPos);
             if (cur_distance < distance) {
                 distance = cur_distance;
                 closestVertex = w.vertex();
             }
         }
     }
-
+    
     _curSelectedVertexID = closestVertex;
     CGLA::Vec3d vertexPos = _manifold.pos(_curSelectedVertexID);
-    GLKVector3 glkVertextPos = GLKVector3Make(vertexPos[0], vertexPos[1], vertexPos[2]);
-    return GLKVector3DivideScalar(GLKVector3Subtract(GLKVector3Subtract(glkVertextPos, minBound), mid), rad);
+    GLKVector4 glkVertextPos = GLKVector4Make(vertexPos[0], vertexPos[1], vertexPos[2], 1.0);
+    glkVertextPos = GLKMatrix4MultiplyVector4(self.modelMatrix, glkVertextPos);
+    return  GLKVector3Make(glkVertextPos.x, glkVertextPos.y, glkVertextPos.z);
 }
 
 -(BOOL)touchedCloseToTheCurrentVertex:(GLKVector3)touchPoint {
-    Manifold::Vec pmin = Manifold::Vec();
-    Manifold::Vec pmax = Manifold::Vec();
-    HMesh::bbox(_manifold, pmin, pmax);
-    GLKVector3 minBound = GLKVector3Make(pmin[0], pmin[1], pmin[2]);
-    GLKVector3 maxBound = GLKVector3Make(pmax[0], pmax[1], pmax[2]);
-
-    GLKVector3 mid = GLKVector3MultiplyScalar(GLKVector3Subtract(maxBound, minBound), 0.5f);
-    float rad = GLKVector3Length(mid);
+    touchPoint = [Utilities invertVector3:touchPoint withMatrix:self.modelMatrix];
+    float threshold = _boundingBox.radius * 0.1;
     
-    GLKVector3 diag =  GLKVector3Subtract(maxBound, minBound);
-    float threshold = GLKVector3Length(diag)* 0.05;
-    
-
-    touchPoint = GLKVector3Add(GLKVector3Add(GLKVector3MultiplyScalar(touchPoint, rad), mid), minBound);
     CGLA::Vec3d vertexPos = _manifold.pos(_curSelectedVertexID);
     GLKVector3 glkPos = GLKVector3Make(vertexPos[0], vertexPos[1], vertexPos[2]);
     
@@ -153,19 +159,11 @@ using namespace HMesh;
 }
 
 -(void)translateCurrentSelectedVertex:(GLKVector3)newPosition {
-    Manifold::Vec pmin = Manifold::Vec();
-    Manifold::Vec pmax = Manifold::Vec();
-    HMesh::bbox(_manifold, pmin, pmax);
-    GLKVector3 minBound = GLKVector3Make(pmin[0], pmin[1], pmin[2]);
-    GLKVector3 maxBound = GLKVector3Make(pmax[0], pmax[1], pmax[2]);
     
-    GLKVector3 mid = GLKVector3MultiplyScalar(GLKVector3Subtract(maxBound, minBound), 0.5f);
-    float rad = GLKVector3Length(mid);
-    
+    newPosition = [Utilities invertVector3:newPosition withMatrix:self.modelMatrix];
     
     CGLA::Vec3d vertexPos = _manifold.pos(_curSelectedVertexID);
     GLKVector3 currePosition = GLKVector3Make(vertexPos[0], vertexPos[1], vertexPos[2]);
-    currePosition = GLKVector3DivideScalar(GLKVector3Subtract(GLKVector3Subtract(currePosition, minBound), mid), rad);
     
     GLKVector4 currentPosition4 = GLKMatrix4MultiplyVector4(self.modelViewMatrix, GLKVector4MakeWithVector3(currePosition, 1.0));
     GLKVector4 newPosition4 = GLKMatrix4MultiplyVector4(self.modelViewMatrix, GLKVector4MakeWithVector3(newPosition, 1.0));
@@ -174,11 +172,10 @@ using namespace HMesh;
     bool isInvertible;
     GLKVector4 axis = GLKMatrix4MultiplyVector4(GLKMatrix4Invert(self.modelViewMatrix, &isInvertible), GLKVector4MakeWithVector3(point3, 1.0));
     
-    //Redraw Length Texture
     
     GLKVector3 vk = GLKVector3Make(axis.x, axis.y, axis.z);
-    GLKVector3 clippedVectorInverse = GLKVector3Add(GLKVector3Add(GLKVector3MultiplyScalar(vk, rad), mid), minBound);
-    CGLA::Vec3d newPos = CGLA::Vec3d(clippedVectorInverse.x, clippedVectorInverse.y, clippedVectorInverse.z);
+
+    CGLA::Vec3d newPos = CGLA::Vec3d(vk.x, vk.y, vk.z);
     _manifold.setPos(_curSelectedVertexID, newPos);
     NSMutableData* vertexData = [[NSMutableData alloc] init];
     NSMutableData* wireframeData = [[NSMutableData alloc] init];
@@ -204,15 +201,6 @@ using namespace HMesh;
            trianglMeshData:(NSMutableData**)verticies
              wireframeData:(NSMutableData**)wireframe
 {
-    Manifold::Vec pmin = Manifold::Vec();
-    Manifold::Vec pmax = Manifold::Vec();
-    HMesh::bbox(mani, pmin, pmax);
-    
-    GLKVector3 minBound = GLKVector3Make(pmin[0], pmin[1], pmin[2]);
-    GLKVector3 maxBound = GLKVector3Make(pmax[0], pmax[1], pmax[2]);
-    
-    GLKVector3 mid = GLKVector3MultiplyScalar(GLKVector3Subtract(maxBound, minBound), 0.5f);
-    float rad = GLKVector3Length(mid);
     
     if (*verticies == nil) {
         *verticies = [[NSMutableData alloc] init];
@@ -241,13 +229,7 @@ using namespace HMesh;
             //add vertex to the data array
             CGLA::Vec3d c = mani.pos(w.vertex());
             PositionXYZ positionDCM = {(GLfloat)c[0], (GLfloat)c[1], (GLfloat)c[2]};
-            
-            GLKVector3 positionDCMVector3 = GLKVector3Make(positionDCM.x, positionDCM.y, positionDCM.z);
-            GLKVector3 positionGLVector3 = GLKVector3DivideScalar(GLKVector3Subtract(GLKVector3Subtract(positionDCMVector3, minBound), mid), rad);
-
-            PositionXYZ positionGL = {positionGLVector3.x, positionGLVector3.y, positionGLVector3.z};
-            
-            VertexNormRGBA vertexMono = {positionGL, normGL, vertexColor};
+            VertexNormRGBA vertexMono = {positionDCM, normGL, vertexColor};
 
             vertexNum++;
             
@@ -298,6 +280,10 @@ using namespace HMesh;
             }
         }
     }
+}
+
+-(BoundingBox)boundingBox {
+    return _boundingBox;
 }
 
 -(void)draw {

@@ -43,6 +43,17 @@ enum {
     NUM_ATTRIB
 };
 
+typedef struct _BoundingBox {
+    GLKVector3 minBound;
+    GLKVector3 maxBound;
+    GLKVector3 center;
+
+    float radius;
+    float width;
+    float height;
+    float depth;
+} BoundingBox;
+
 @interface Mesh : NSObject {
     //Display Shader Variables
     GLint attrib[NUM_ATTRIB];
@@ -78,5 +89,7 @@ enum {
 @property (nonatomic, assign) GLKMatrix4 viewMatrix;
 @property (nonatomic, assign) GLKMatrix4 projectionMatrix;
 @property (nonatomic, assign, readonly) GLKMatrix3 normalMatrix;
+@property (nonatomic, assign) BoundingBox boundingBox;
+@property (nonatomic, assign) BOOL centerAtBoundingBox; //default is NO
 
 @end

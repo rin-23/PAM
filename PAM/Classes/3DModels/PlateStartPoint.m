@@ -10,9 +10,10 @@
 
 @implementation PlateStartPoint
 
--(id)initWithPoint:(GLKVector3)point {
+-(id)initWithPoint:(GLKVector3)point color:(GLKVector3)color {
     self = [super init];
     if (self) {
+        self.point = point;
         NSString* vShader = [[NSBundle mainBundle] pathForResource:@"PointCloudRGBAShader" ofType:@"vsh"];
         NSString* fShader = [[NSBundle mainBundle] pathForResource:@"PointCloudRGBAShader" ofType:@"fsh"];
         self.drawShaderProgram = [[ShaderProgram alloc] initWithVertexShader:vShader fragmentShader:fShader];
@@ -22,7 +23,7 @@
         uniforms[UNIFORM_MODELVIEWPROJECTION_MATRIX] = [self.drawShaderProgram uniformLocation:"modelViewProjectionMatrix"];
         uniforms[UNIFORM_POINT_SIZE] = [self.drawShaderProgram uniformLocation:"u_PointSize"];
 
-        VertexRGBA vertex = {{point.x,point.y,point.z}, {0, 255, 0, 255}};
+        VertexRGBA vertex = {{point.x,point.y,point.z}, {color.r, color.g, color.b, 255}};
         self.meshData = [NSMutableData dataWithBytes:&vertex length:sizeof(VertexRGBA)];
         self.numVertices = 1;
         

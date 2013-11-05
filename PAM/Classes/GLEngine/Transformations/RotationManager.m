@@ -40,11 +40,11 @@
 #pragma mark - ARCBALL ROTATION
 - (void)handlePanGesture:(UIGestureRecognizer*)sender withViewMatrix:(GLKMatrix4)viewMatrix isOrthogonal:(BOOL)isOrtho {
     UIPanGestureRecognizer* pan = (UIPanGestureRecognizer*)sender;
-    
+
     if (pan.state == UIGestureRecognizerStateBegan) {
-        lastLoc = [Utilities invertY:[pan locationInView:pan.view] forGLKView:(GLKView*)pan.view];
+        lastLoc = [Utilities invertY:[pan locationOfTouch:0 inView:pan.view] forGLKView:(GLKView*)pan.view];
     } else if (pan.state == UIGestureRecognizerStateChanged) {
-        CGPoint location = [Utilities invertY:[pan locationInView:pan.view] forGLKView:(GLKView*)pan.view];
+        CGPoint location = [Utilities invertY:[pan locationOfTouch:0 inView:pan.view] forGLKView:(GLKView*)pan.view];
         CGPoint diff = CGPointMake(location.x - lastLoc.x, location.y - lastLoc.y);
         float rotX =  -1*GLKMathDegreesToRadians(diff.y / 2.0f); //because positive angle is clockwise
         float rotY =  GLKMathDegreesToRadians(diff.x / 2.0f);

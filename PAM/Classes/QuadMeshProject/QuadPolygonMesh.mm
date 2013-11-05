@@ -16,8 +16,8 @@
 #import <GLKit/GLKit.h>
 #import "WireFrame.h"
 #import "Utilities.h"
-//#import "polarize.h"
 #import "Walker.h"
+#include "polarize.h"
 
 @interface QuadPolygonMesh() {
     HMesh::Manifold _manifold;
@@ -91,30 +91,53 @@ using namespace HMesh;
 }
 
 
-//-(void)setVertexData:(NSMutableData*)vertexData numOfVerticies:(uint32_t)vertexNum {
-//    
-//    NSString* vShader = [[NSBundle mainBundle] pathForResource:@"DirectionalLight" ofType:@"vsh"];
-//    NSString* fShader = [[NSBundle mainBundle] pathForResource:@"DirectionalLight" ofType:@"fsh"];
-//    self.drawShaderProgram = [[ShaderProgram alloc] initWithVertexShader:vShader fragmentShader:fShader];
-//    
-//    attrib[ATTRIB_POSITION] = [self.drawShaderProgram attributeLocation:"position"];
-//    attrib[ATTRIB_NORMAL] = [self.drawShaderProgram attributeLocation:"normal"];
-//    attrib[ATTRIB_COLOR] = [self.drawShaderProgram attributeLocation:"color"];
-//    
-//    uniforms[UNIFORM_MODELVIEWPROJECTION_MATRIX] = [self.drawShaderProgram uniformLocation:"matrix"];
-//    uniforms[UNIFORM_LIGHT_DIRECTION] = [self.drawShaderProgram uniformLocation:"lightDirection"];
-//    uniforms[UNIFORM_LIGHT_COLOR] = [self.drawShaderProgram uniformLocation:"lightDiffuseColor"];
-//    
-//    self.numVertices = vertexData.length / sizeof(VertexNormRGBA);
-//    
-//    self.vertexDataBuffer = [[AGLKVertexAttribArrayBuffer alloc] initWithAttribStride:sizeof(VertexNormRGBA)
-//                                                                     numberOfVertices:self.numVertices
-//                                                                                bytes:vertexData.bytes
-//                                                                                usage:GL_DYNAMIC_DRAW];
-//    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_POSITION]];
-//    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_NORMAL]];
-//    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_COLOR]];
-//}
+-(NSMutableData*)createBranchAtPoint:(GLKVector3)touchPoint {
+    VertexID vID = [self closestVertexID:touchPoint];
+    Walker walker = _manifold.walker(vID);
+    
+    VertexID r_vID = walker.prev().opp().prev().prev().vertex();
+    VertexID l_vID = walker.vertex();
+ 
+    Vec3d vec = _manifold.pos(vID);
+    Vec3d r_vec = _manifold.pos(r_vID);
+    Vec3d l_vec = _manifold.pos(l_vID);
+    
+    GLKVector3 vecGL = [self convertModel:GLKVector3Make(vec[0], vec[1], vec[2])];
+    GLKVector3 r_vecGL = [self convertModel:GLKVector3Make(r_vec[0], r_vec[1], r_vec[2])];
+    GLKVector3 l_vecGL = [self convertModel:GLKVector3Make(l_vec[0], l_vec[1], l_vec[2])];
+    
+    NSMutableData* data = [[NSMutableData alloc] init];
+    [data appendBytes:&vecGL length:sizeof(GLKVector3)];
+    [data appendBytes:&r_vecGL length:sizeof(GLKVector3)];
+    [data appendBytes:&l_vecGL length:sizeof(GLKVector3)];
+    
+    int size = _manifold.no_vertices();
+    VertexAttributeVector<int> vs(size, 0);
+    vs[vID] = 1;
+    vs[r_vID] = 1;
+    vs[l_vID] = 1;
+    
+    polar_add_branch(_manifold, vs);
+    
+    NSMutableData* vertexData = [[NSMutableData alloc] init];
+    NSMutableData* wireframeData = [[NSMutableData alloc] init];
+    [self triangulateManifold:_manifold trianglMeshData:&vertexData wireframeData:&wireframeData];
+    
+    self.numVertices = vertexData.length / sizeof(VertexNormRGBA);
+    
+    self.vertexDataBuffer = [[AGLKVertexAttribArrayBuffer alloc] initWithAttribStride:sizeof(VertexNormRGBA)
+                                                                     numberOfVertices:self.numVertices
+                                                                                bytes:vertexData.bytes
+                                                                                usage:GL_DYNAMIC_DRAW];
+    
+    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_POSITION]];
+    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_NORMAL]];
+    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_COLOR]];
+    
+    [_wireFrame setVertexData:wireframeData vertexNum:wireframeData.length/sizeof(VertexNormRGBA)];
+     
+    return data;
+}
 
 -(void)createBranchAtPoints:(NSMutableData*)pointData {
     GLKVector3* points = (GLKVector3*)pointData.bytes;
@@ -149,23 +172,6 @@ using namespace HMesh;
     [_wireFrame setVertexData:wireframeData vertexNum:wireframeData.length/sizeof(VertexNormRGBA)];
 }
 
-void polar_add_branch(HMesh::Manifold& m, HMesh::VertexAttributeVector<int>& vs) {
-    HalfEdgeID h = m.slit_edges(vs);
-    FaceID f = m.close_hole(h);
-    vector<Vec3d> npos;
-    for(Walker w = m.walker(f); !w.full_circle(); w = w.next())
-    {
-        Vec3d p(0);
-        p /= circulate_vertex_ccw(m, w.vertex(), [&](VertexID v) {
-            p += m.pos(v);
-        });
-        npos.push_back(p);
-    }
-    int i=0;
-    circulate_face_ccw(m, f, [&](VertexID v) {m.pos(v) = npos[i++];});
-    m.split_face_by_vertex(f);
-}
-
 -(VertexID)closestVertexID:(GLKVector3)touchPoint {
     //iterate over every face
     float distance = FLT_MAX;
@@ -188,10 +194,20 @@ void polar_add_branch(HMesh::Manifold& m, HMesh::VertexAttributeVector<int>& vs)
     return closestVertex;
 }
 
--(GLKVector3)closestVertexToMeshPoint:(GLKVector3)touchPoint {
-    _curSelectedVertexID = [self closestVertexID:touchPoint];
-    CGLA::Vec3d vertexPos = _manifold.pos(_curSelectedVertexID);
+-(GLKVector3)closestVertexToMeshPoint:(GLKVector3)touchPoint setAsCurrentID:(BOOL)setAsCurrentID {
+    
+    VertexID vID = [self closestVertexID:touchPoint];
+    if (setAsCurrentID) {
+        _curSelectedVertexID = vID;
+    }
+    CGLA::Vec3d vertexPos = _manifold.pos(vID);
     GLKVector4 glkVertextPos = GLKVector4Make(vertexPos[0], vertexPos[1], vertexPos[2], 1.0);
+    glkVertextPos = GLKMatrix4MultiplyVector4(self.modelMatrix, glkVertextPos);
+    return  GLKVector3Make(glkVertextPos.x, glkVertextPos.y, glkVertextPos.z);
+}
+
+-(GLKVector3)convertModel:(GLKVector3)vertexPos {
+    GLKVector4 glkVertextPos = GLKVector4MakeWithVector3(vertexPos, 1.0f);
     glkVertextPos = GLKMatrix4MultiplyVector4(self.modelMatrix, glkVertextPos);
     return  GLKVector3Make(glkVertextPos.x, glkVertextPos.y, glkVertextPos.z);
 }
@@ -213,7 +229,7 @@ void polar_add_branch(HMesh::Manifold& m, HMesh::VertexAttributeVector<int>& vs)
     return NO;
 }
 
--(GLKVector3)translateCurrentSelectedVertex:(GLKVector3)newPosition {
+-(GLKVector3)translateCurrentSelectedVertex:(GLKVector3)newPosition  {
     
     newPosition = [Utilities invertVector3:newPosition withMatrix:self.modelMatrix];
     
@@ -230,37 +246,39 @@ void polar_add_branch(HMesh::Manifold& m, HMesh::VertexAttributeVector<int>& vs)
     GLKVector3 vk = GLKVector3Make(axis.x, axis.y, axis.z);
 
     CGLA::Vec3d newPos = CGLA::Vec3d(vk.x, vk.y, vk.z);
-    _manifold.setPos(_curSelectedVertexID, newPos);
-    NSMutableData* vertexData = [[NSMutableData alloc] init];
-    NSMutableData* wireframeData = [[NSMutableData alloc] init];
-    [self triangulateManifold:_manifold trianglMeshData:&vertexData wireframeData:&wireframeData];
-
-    self.numVertices = vertexData.length / sizeof(VertexNormRGBA);
-
-    self.vertexDataBuffer = [[AGLKVertexAttribArrayBuffer alloc] initWithAttribStride:sizeof(VertexNormRGBA)
-                                                                     numberOfVertices:self.numVertices
-                                                                                bytes:vertexData.bytes
-                                                                                usage:GL_DYNAMIC_DRAW];
-
-    glEnableVertexAttribArray(attrib[ATTRIB_POSITION]);
-    glEnableVertexAttribArray(attrib[ATTRIB_NORMAL]);
-    glEnableVertexAttribArray(attrib[ATTRIB_COLOR]);
-
-
-    [_wireFrame setVertexData:wireframeData vertexNum:wireframeData.length/sizeof(VertexNormRGBA)];
+    _manifold.pos(_curSelectedVertexID) = newPos;
     
     GLKVector4 glkVertextPos = GLKVector4MakeWithVector3(vk, 1.0f);
     glkVertextPos = GLKMatrix4MultiplyVector4(self.modelMatrix, glkVertextPos);
     return  GLKVector3Make(glkVertextPos.x, glkVertextPos.y, glkVertextPos.z);
-
 }
 
+-(void)rebuffer {
+    NSMutableData* vertexData = [[NSMutableData alloc] init];
+    NSMutableData* wireframeData = [[NSMutableData alloc] init];
+    [self triangulateManifold:_manifold trianglMeshData:&vertexData wireframeData:&wireframeData];
+    
+    self.numVertices = vertexData.length / sizeof(VertexNormRGBA);
+    
+    self.vertexDataBuffer = [[AGLKVertexAttribArrayBuffer alloc] initWithAttribStride:sizeof(VertexNormRGBA)
+                                                                     numberOfVertices:self.numVertices
+                                                                                bytes:vertexData.bytes
+                                                                                            usage:GL_DYNAMIC_DRAW];
+    
+    glEnableVertexAttribArray(attrib[ATTRIB_POSITION]);
+    glEnableVertexAttribArray(attrib[ATTRIB_NORMAL]);
+    glEnableVertexAttribArray(attrib[ATTRIB_COLOR]);
+    
+    
+    [_wireFrame setVertexData:wireframeData vertexNum:wireframeData.length/sizeof(VertexNormRGBA)];
+}
+
+
 //Triangulate manifold for display in case it has quads. GLES doesnt handle quads.
--(void)triangulateManifold:(const HMesh::Manifold&)mani
+-(void)triangulateManifold:(HMesh::Manifold&)mani
            trianglMeshData:(NSMutableData**)verticies
              wireframeData:(NSMutableData**)wireframe
 {
-    
     if (*verticies == nil) {
         *verticies = [[NSMutableData alloc] init];
     }
@@ -317,7 +335,7 @@ void polar_add_branch(HMesh::Manifold& m, HMesh::VertexAttributeVector<int>& vs)
         }
         
         //add wireframe data
-        ColorRGBA wireframeColor = {200,0,0,255};
+        ColorRGBA wireframeColor = {0,0,0,255};
         if (vertexNum == 3 || vertexNum == 4) {
             firstVertex.color = wireframeColor;
             secondVertex.color = wireframeColor;
@@ -370,11 +388,14 @@ void polar_add_branch(HMesh::Manifold& m, HMesh::VertexAttributeVector<int>& vs)
                                           dataType:GL_UNSIGNED_BYTE
                                          normalize:GL_TRUE];
 
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glPolygonOffset(2.0f, 2.0f);
     
     [AGLKVertexAttribArrayBuffer drawPreparedArraysWithMode:GL_TRIANGLES
                                            startVertexIndex:0
                                            numberOfVertices:self.numVertices];
 
+    glDisable(GL_POLYGON_OFFSET_FILL);
     _wireFrame.rotationManager.rotationMatrix = self.rotationManager.rotationMatrix;
     _wireFrame.translationManager.translationMatrix = self.translationManager.translationMatrix;
     _wireFrame.viewMatrix = self.viewMatrix;

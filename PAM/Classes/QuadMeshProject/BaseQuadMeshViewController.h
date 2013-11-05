@@ -12,6 +12,7 @@
     UIActivityIndicatorView* _activity;
     GLsizei _glWidth;
     GLsizei _glHeight;
+    UISwitch* _transformSwitch;
 }
 
 -(void)showLoadingIndicator;

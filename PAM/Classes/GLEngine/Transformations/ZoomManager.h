@@ -10,10 +10,10 @@
 #import <GLKit/GLKit.h>
 
 @interface ZoomManager : NSObject {
-        GLfloat _scaleFactor;
+    GLfloat _scaleFactor;
 }
 
-@property (nonatomic, assign) CGFloat scaleFactor;
+@property (nonatomic, assign) GLfloat scaleFactor;
 @property (nonatomic, assign) GLKMatrix4 scaleMatrix;
 @property (nonatomic, assign) GLKVector3 doubleTapZoomLocation;
 @property (nonatomic, assign) BOOL isDoubleTapZoomed;

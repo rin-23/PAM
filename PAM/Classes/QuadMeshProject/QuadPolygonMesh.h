@@ -12,10 +12,12 @@
 
 -(void)setMeshFromObjFile:(NSString*)objFile;
 //-(void)setVertexData:(NSMutableData*)vertexData numOfVerticies:(uint32_t)vertexNum;
--(GLKVector3)closestVertexToMeshPoint:(GLKVector3)touchPoint;
+-(GLKVector3)closestVertexToMeshPoint:(GLKVector3)touchPoint setAsCurrentID:(BOOL)setAsCurrentID;
 -(GLKVector3)translateCurrentSelectedVertex:(GLKVector3)newPosition;
 -(BOOL)touchedCloseToTheCurrentVertex:(GLKVector3)touchPoint;
 
--(void)createBranchAtPoints:(NSMutableData*)pointData;
 
+-(NSMutableData*)createBranchAtPoint:(GLKVector3)touchPoint;
+-(void)createBranchAtPoints:(NSMutableData*)pointData;
+-(void)rebuffer;
 @end

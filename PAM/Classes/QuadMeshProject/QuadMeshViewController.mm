@@ -32,6 +32,8 @@
     PlateStartPoint* _meshTouchPoint;
     
     BOOL isMovingPoint;
+    
+    NSMutableArray* _branchPoints;
 }
 
 @end
@@ -47,8 +49,8 @@
         _rotationManager = [[RotationManager alloc] init];
         _zoomManager = [[ZoomManager alloc] init];
         isMovingPoint = NO;
+        _branchPoints = [[NSMutableArray alloc] init];
         
-
     }
     return self;
 }
@@ -116,7 +118,7 @@
 -(void)setupGL {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
-    glLineWidth(2.0f);
+    glLineWidth(1.0f);
 }
 
 -(void)addGestureRecognizersToView:(UIView*)view {
@@ -137,47 +139,65 @@
     
     //ArcBall Rotation
     UIPanGestureRecognizer* onFingerRotation = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleOneFingerPanGesture:)];
+    onFingerRotation.minimumNumberOfTouches = 1;
     onFingerRotation.maximumNumberOfTouches = 1;
     [view addGestureRecognizer:onFingerRotation];
     
-    UITapGestureRecognizer* tapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTapGesture:)];
-    tapGesture.numberOfTapsRequired = 1;
-    [view addGestureRecognizer:tapGesture];
+    UITapGestureRecognizer* doubleTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleDoubleTapGesture:)];
+    doubleTap.numberOfTouchesRequired = 1;
+    doubleTap.numberOfTapsRequired = 2;
+    [view addGestureRecognizer:doubleTap];
+    
+//    UITapGestureRecognizer* singleTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleSingleTapGesture:)];
+//    singleTap.numberOfTapsRequired = 1;
+//    singleTap.numberOfTouchesRequired = 1;
+//    [singleTap requireGestureRecognizerToFail:doubleTap];
+//    [view addGestureRecognizer:singleTap];
+    
+    UITapGestureRecognizer* tapWithTwoFingers = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTwoFingerTapGesture:)];
+    tapWithTwoFingers.numberOfTapsRequired = 1;
+    tapWithTwoFingers.numberOfTouchesRequired = 2;
+    [view addGestureRecognizer:tapWithTwoFingers];
+    
 }
 
 #pragma mark - Gesture recognizer selectors
 
 -(void)handleOneFingerPanGesture:(UIGestureRecognizer*)sender {
-    if (_meshTouchPoint != nil) {
-        GLKVector3 rayOrigin, rayDir;
-        BOOL result = [self rayOrigin:&rayOrigin rayDirection:&rayDir forGesture:sender];
-        if (!result) {
-            return;
-        }
-        if (sender.state == UIGestureRecognizerStateBegan) {
-            isMovingPoint = [_pMesh touchedCloseToTheCurrentVertex:rayOrigin];
-            if (isMovingPoint) {
-                GLKVector3 newPosition = [_pMesh translateCurrentSelectedVertex:rayOrigin];
-                _meshTouchPoint = [[PlateStartPoint alloc] initWithPoint:newPosition];
-            } else {
-                [_rotationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity isOrthogonal:NO];
-            }
-        } else if (sender.state == UIGestureRecognizerStateChanged) {
-            if (isMovingPoint) {
-                GLKVector3 newPosition = [_pMesh translateCurrentSelectedVertex:rayOrigin];
-                _meshTouchPoint = [[PlateStartPoint alloc] initWithPoint:newPosition];
-            } else {
-                [_rotationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity isOrthogonal:NO];
-            }
-        } else  {
-            if (isMovingPoint) {
-                isMovingPoint = NO;
-            } else {
-                [_rotationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity isOrthogonal:NO];
-            }
-        }
-    } else {
+    if (!_transformSwitch.isOn) {
         [_rotationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity isOrthogonal:NO];
+    } else {
+        if (sender.state == UIGestureRecognizerStateBegan) {
+            NSMutableData* pixelData = [self renderToOffscreenDepthBuffer:@[_pMesh]];
+            CGPoint touchPoint = [self scaleTouchPoint:[sender locationInView:sender.view]
+                                                inView:(GLKView*)sender.view];
+            GLKVector3 startPoint;
+            BOOL result = [self modelCoordinates:&startPoint forTouchPoint:touchPoint depthBuffer:pixelData];
+            
+            if (!result) {
+                NSLog(@"[WARNING] Couldn determine touch area");
+                return;
+            }
+                        
+            GLKVector3 selectedVertex = [_pMesh closestVertexToMeshPoint:startPoint setAsCurrentID:YES];
+            _meshTouchPoint = [[PlateStartPoint alloc] initWithPoint:selectedVertex color:GLKVector3Make(0, 255, 0)];
+        } else if (sender.state == UIGestureRecognizerStateChanged) {
+            if (_meshTouchPoint) {
+                GLKVector3 rayOrigin, rayDir;
+                BOOL result = [self rayOrigin:&rayOrigin rayDirection:&rayDir forGesture:sender];
+                if (!result) {
+                    return;
+                }
+
+                GLKVector3 newPosition = [_pMesh translateCurrentSelectedVertex:rayOrigin];
+                _meshTouchPoint = [[PlateStartPoint alloc] initWithPoint:newPosition color:GLKVector3Make(0, 255, 0)];
+            }
+        } else if (sender.state == UIGestureRecognizerStateEnded) {
+            if (_meshTouchPoint) {
+                [_pMesh rebuffer];
+                _meshTouchPoint = nil;
+            }
+        }
     }
 }
 
@@ -189,29 +209,45 @@
     [_rotationManager handleRotationGesture:sender withViewMatrix:GLKMatrix4Identity];
 }
 
--(void)handleTapGesture:(UIGestureRecognizer*)sender {
-    if (_meshTouchPoint == nil) {
-        NSMutableData* pixelData = [self renderToOffscreenDepthBuffer:@[_pMesh]];
-        CGPoint touchPoint = [self scaleTouchPoint:[sender locationInView:sender.view] inView:(GLKView*)sender.view];
-        GLKVector3 startPoint;
-        BOOL result = [self modelCoordinates:&startPoint forTouchPoint:touchPoint depthBuffer:pixelData];
-        
-        if (!result) {
-            NSLog(@"[WARNING] Couldn determine touch area");
-            return;
-        }
-        
-//        NSMutableData* data = [[NSMutableData alloc] init];
-//        [data appendBytes:&startPoint length:sizeof(GLKVector3)];
-//        [_pMesh createBranchAtPoints:data];
-        
-        GLKVector3 selectedVertex = [_pMesh closestVertexToMeshPoint:startPoint];
-        _meshTouchPoint = [[PlateStartPoint alloc] initWithPoint:selectedVertex];
-    } else {
-        _meshTouchPoint = nil;
+-(void)handleDoubleTapGesture:(UIGestureRecognizer*)sender {
+    NSMutableData* pixelData = [self renderToOffscreenDepthBuffer:@[_pMesh]];
+    CGPoint touchPoint = [self scaleTouchPoint:[sender locationInView:sender.view] inView:(GLKView*)sender.view];
+    GLKVector3 startPoint;
+    BOOL result = [self modelCoordinates:&startPoint forTouchPoint:touchPoint depthBuffer:pixelData];
+    
+    if (!result) {
+        NSLog(@"[WARNING] Couldn determine touch area");
+        return;
     }
+   
+    NSMutableData* data = [_pMesh createBranchAtPoint:startPoint];
+
+//    GLKVector3* dataBytes = (GLKVector3*)data.bytes;
+//    
+//    for(int i = 0; i < data.length/sizeof(GLKVector3); i++) {
+//        PlateStartPoint* chosenPoint = [[PlateStartPoint alloc] initWithPoint:dataBytes[i] color:GLKVector3Make(0, 0, 255)];
+//        [_branchPoints addObject:chosenPoint];
+//    }
+    
+//    GLKVector3 selectedVertex = [_pMesh closestVertexToMeshPoint:startPoint setAsCurrentID:NO];
+//    PlateStartPoint* chosenPoint = [[PlateStartPoint alloc] initWithPoint:selectedVertex color:GLKVector3Make(0, 0, 255)];
+//    [_branchPoints addObject:chosenPoint];
 }
 
+-(void)handleTwoFingerTapGesture:(UIGestureRecognizer*)sender {
+    if (_branchPoints.count<3) {
+        [[[UIAlertView alloc] initWithTitle:@"Warning" message:@"Need at least 3 points to branch" delegate:Nil cancelButtonTitle:@"OK" otherButtonTitles:nil] show];
+        return;
+    }
+
+    NSMutableData* data = [[NSMutableData alloc] init];
+    for (PlateStartPoint* plate in _branchPoints) {
+        GLKVector3 vec = plate.point;
+        [data appendBytes:&vec length:sizeof(GLKVector3)];
+    }
+    [_pMesh createBranchAtPoints:data];
+    [_branchPoints removeAllObjects];
+}
 
 #pragma mark - Helpers
 
@@ -260,6 +296,12 @@
     _meshTouchPoint.viewMatrix = viewMatrix;
     _meshTouchPoint.projectionMatrix = projectionMatrix;
     [_meshTouchPoint draw];
+    
+    for (Mesh* bPoint in _branchPoints) {
+        bPoint.viewMatrix = viewMatrix;
+        bPoint.projectionMatrix = projectionMatrix;
+        [bPoint draw];
+    }
 }
 
 -(void)loadMeshData {
@@ -274,18 +316,13 @@
     }
 
     //Load obj file
-    NSString* objPath = [[NSBundle mainBundle] pathForResource:@"mesh" ofType:@"obj"];
+    NSString* objPath = [[NSBundle mainBundle] pathForResource:@"newPolars" ofType:@"obj"];
     [_pMesh setMeshFromObjFile:objPath];
     _translationManager.scaleFactor = _pMesh.boundingBox.radius;
     
     //Read vertex data from the file
-//    dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0ul);
-//    dispatch_async(queue, ^{
-//        dispatch_sync(dispatch_get_main_queue(), ^{
-                [self hideLoadingIndicator];
-                [self setPaused:NO];
-//        });
-//    });
+    [self hideLoadingIndicator];
+    [self setPaused:NO];
 }
 
 #pragma mark - OffScreen depth buffer 
@@ -301,6 +338,9 @@
     GLboolean wasDepthEnabled;
     glGetBooleanv(GL_DEPTH_TEST, &wasDepthEnabled);
     
+    GLfloat clearColor[4];
+    glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
+    
     glBindFramebuffer(GL_FRAMEBUFFER, _offScreenFrameBuffer);
     
     NSMutableData* pixelData = nil;
@@ -308,7 +348,7 @@
     glViewport(0, 0, _glWidth, _glHeight);
     glEnable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
-//    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
     
     for (Mesh* mesh in meshesArray) {
@@ -332,6 +372,8 @@
     } else {
         glDisable(GL_DEPTH_TEST);
     }
+    
+    glClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
     
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     
@@ -402,6 +444,7 @@
     viewMatrix = GLKMatrix4Identity;
     _translationManager.translationMatrix = GLKMatrix4Identity;
     _zoomManager.scaleMatrix = GLKMatrix4Identity;
+    [_branchPoints removeAllObjects];
 }
 
 

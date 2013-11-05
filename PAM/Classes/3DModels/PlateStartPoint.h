@@ -10,6 +10,6 @@
 
 @interface PlateStartPoint : Mesh
 
--(id)initWithPoint:(GLKVector3)point;
-
+-(id)initWithPoint:(GLKVector3)point color:(GLKVector3)color;
+@property(nonatomic, assign) GLKVector3 point;
 @end

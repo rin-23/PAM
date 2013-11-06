@@ -48,9 +48,9 @@
 -(GLKMatrix4)modelMatrix {
     GLKMatrix4 modelMatrix = GLKMatrix4Identity;
     
-    if (_centerAtBoundingBox) {
-         modelMatrix = GLKMatrix4TranslateWithVector3(modelMatrix, GLKVector3MultiplyScalar(self.boundingBox.center, -1.0f));
-    }
+//    if (_centerAtBoundingBox) {
+//         modelMatrix = GLKMatrix4TranslateWithVector3(modelMatrix, GLKVector3MultiplyScalar(self.boundingBox.center, -1.0f));
+//    }
     
     modelMatrix = GLKMatrix4Multiply(modelMatrix, self.translationManager.translationMatrix);
     

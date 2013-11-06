@@ -34,9 +34,14 @@
     BOOL isMovingPoint;
     
     NSMutableArray* _branchPoints;
+    
+    //Gaussian transformations
+    float _gaussianDepth;
+    BOOL _gaussianDraging;
 }
-
 @end
+
+
 
 @implementation QuadMeshViewController
 
@@ -154,10 +159,10 @@
 //    [singleTap requireGestureRecognizerToFail:doubleTap];
 //    [view addGestureRecognizer:singleTap];
     
-    UITapGestureRecognizer* tapWithTwoFingers = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTwoFingerTapGesture:)];
-    tapWithTwoFingers.numberOfTapsRequired = 1;
-    tapWithTwoFingers.numberOfTouchesRequired = 2;
-    [view addGestureRecognizer:tapWithTwoFingers];
+//    UITapGestureRecognizer* tapWithTwoFingers = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTwoFingerTapGesture:)];
+//    tapWithTwoFingers.numberOfTapsRequired = 1;
+//    tapWithTwoFingers.numberOfTouchesRequired = 2;
+//    [view addGestureRecognizer:tapWithTwoFingers];
     
 }
 
@@ -168,38 +173,54 @@
         [_rotationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity isOrthogonal:NO];
     } else {
         if (sender.state == UIGestureRecognizerStateBegan) {
+            CGPoint touchPoint = [self scaleTouchPoint:[sender locationInView:sender.view] inView:(GLKView*)sender.view];
             NSMutableData* pixelData = [self renderToOffscreenDepthBuffer:@[_pMesh]];
-            CGPoint touchPoint = [self scaleTouchPoint:[sender locationInView:sender.view]
-                                                inView:(GLKView*)sender.view];
-            GLKVector3 startPoint;
-            BOOL result = [self modelCoordinates:&startPoint forTouchPoint:touchPoint depthBuffer:pixelData];
+            _gaussianDepth = [self depthForPoint:touchPoint depthBuffer:pixelData];
+            
+            GLKVector3 modelCoord;
+            BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:touchPoint depthBuffer:pixelData];
             
             if (!result) {
                 NSLog(@"[WARNING] Couldn determine touch area");
                 return;
             }
-                        
-            GLKVector3 selectedVertex = [_pMesh closestVertexToMeshPoint:startPoint setAsCurrentID:YES];
-            _meshTouchPoint = [[PlateStartPoint alloc] initWithPoint:selectedVertex color:GLKVector3Make(0, 255, 0)];
+            
+            [_pMesh gaussianStart:modelCoord];
+            _gaussianDraging = YES;
+
+//            GLKVector3 selectedVertex = [_pMesh closestVertexToMeshPoint:startPoint setAsCurrentID:YES];
+//            _meshTouchPoint = [[PlateStartPoint alloc] initWithPoint:selectedVertex color:GLKVector3Make(0, 255, 0)];
+            
         } else if (sender.state == UIGestureRecognizerStateChanged) {
-            if (_meshTouchPoint) {
-                GLKVector3 rayOrigin, rayDir;
-                BOOL result = [self rayOrigin:&rayOrigin rayDirection:&rayDir forGesture:sender];
+            
+//                GLKVector3 rayOrigin, rayDir;
+//                BOOL result = [self rayOrigin:&rayOrigin rayDirection:&rayDir forGesture:sender];
+//                GLKVector3 newPosition = [_pMesh translateCurrentSelectedVertex:rayOrigin];
+//                _meshTouchPoint = [[PlateStartPoint alloc] initWithPoint:newPosition color:GLKVector3Make(0, 255, 0)];
+            
+        } else if (sender.state == UIGestureRecognizerStateEnded) {
+            if (_gaussianDraging) {
+                CGPoint screenCoord = [self scaleTouchPoint:[sender locationInView:sender.view] inView:(GLKView*)sender.view];
+                GLKVector3 screenCoord3D = GLKVector3Make(screenCoord.x, screenCoord.y, _gaussianDepth);
+                GLKVector3 modelCoord;
+                BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:screenCoord3D];
                 if (!result) {
+                    NSLog(@"[WARNING] Couldn determine touch area");
                     return;
                 }
-
-                GLKVector3 newPosition = [_pMesh translateCurrentSelectedVertex:rayOrigin];
-                _meshTouchPoint = [[PlateStartPoint alloc] initWithPoint:newPosition color:GLKVector3Make(0, 255, 0)];
-            }
-        } else if (sender.state == UIGestureRecognizerStateEnded) {
-            if (_meshTouchPoint) {
+                [_pMesh gaussianMove:modelCoord];
                 [_pMesh rebuffer];
-                _meshTouchPoint = nil;
             }
+            _gaussianDraging = NO;
+//            if (_meshTouchPoint) {
+//                [_pMesh rebuffer];
+//                _meshTouchPoint = nil;
+//            }
         }
     }
 }
+
+
 
 -(void)handleTwoFingerPanGesture:(UIGestureRecognizer*)sender {
     [_translationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity];
@@ -220,7 +241,7 @@
         return;
     }
    
-    NSMutableData* data = [_pMesh createBranchAtPoint:startPoint];
+    [_pMesh createBranchAtPointAndRefine:startPoint];
 
 //    GLKVector3* dataBytes = (GLKVector3*)data.bytes;
 //    
@@ -234,20 +255,20 @@
 //    [_branchPoints addObject:chosenPoint];
 }
 
--(void)handleTwoFingerTapGesture:(UIGestureRecognizer*)sender {
-    if (_branchPoints.count<3) {
-        [[[UIAlertView alloc] initWithTitle:@"Warning" message:@"Need at least 3 points to branch" delegate:Nil cancelButtonTitle:@"OK" otherButtonTitles:nil] show];
-        return;
-    }
-
-    NSMutableData* data = [[NSMutableData alloc] init];
-    for (PlateStartPoint* plate in _branchPoints) {
-        GLKVector3 vec = plate.point;
-        [data appendBytes:&vec length:sizeof(GLKVector3)];
-    }
-    [_pMesh createBranchAtPoints:data];
-    [_branchPoints removeAllObjects];
-}
+//-(void)handleTwoFingerTapGesture:(UIGestureRecognizer*)sender {
+//    if (_branchPoints.count<3) {
+//        [[[UIAlertView alloc] initWithTitle:@"Warning" message:@"Need at least 3 points to branch" delegate:Nil cancelButtonTitle:@"OK" otherButtonTitles:nil] show];
+//        return;
+//    }
+//
+//    NSMutableData* data = [[NSMutableData alloc] init];
+//    for (PlateStartPoint* plate in _branchPoints) {
+//        GLKVector3 vec = plate.point;
+//        [data appendBytes:&vec length:sizeof(GLKVector3)];
+//    }
+////    [_pMesh createBranchAtPoints:data];
+//    [_branchPoints removeAllObjects];
+//}
 
 #pragma mark - Helpers
 
@@ -260,6 +281,8 @@
     
     return touchPoint;
 }
+
+
 
 #pragma mark - OpenGL Drawing
 
@@ -403,6 +426,15 @@
     return -1;
 }
 
+-(BOOL)modelCoordinates:(GLKVector3*)objectCoord3 forTouchPoint:(GLKVector3)touchPoint {
+    GLKVector4 viewport = GLKVector4Make(0, 0, _glWidth, _glHeight);
+    int result = [Utilities gluUnProjectf:touchPoint :modelViewProjectionMatrix :viewport :objectCoord3];
+    if (result != 0) {
+        return YES;
+    }
+    return NO;
+}
+
 -(BOOL)modelCoordinates:(GLKVector3*)objectCoord3 forTouchPoint:(CGPoint)touchPoint depthBuffer:(NSData*)pixelData {
     float depth = [self depthForPoint:touchPoint depthBuffer:pixelData];
     
@@ -410,14 +442,13 @@
         GLKVector3 windowCoord3 = GLKVector3Make(touchPoint.x, touchPoint.y, depth);
         GLKVector4 viewport = GLKVector4Make(0, 0, _glWidth, _glHeight);
         int result = [Utilities gluUnProjectf:windowCoord3 :modelViewProjectionMatrix :viewport :objectCoord3];
-        GLKVector3 testWindow;
-        [Utilities glhProjectf:*objectCoord3 :modelViewProjectionMatrix :viewport :&testWindow];
         if (result != 0) {
             return YES;
         }
     }
     return NO;
 }
+
 -(BOOL)rayOrigin:(GLKVector3*)rayOrigin rayDirection:(GLKVector3*)rayDirection forTouchPoint:(CGPoint)touchPoint {
     GLKVector3 rayStartWindow = GLKVector3Make(touchPoint.x, touchPoint.y, 0);
     GLKVector4 viewport = GLKVector4Make(0, 0, _glWidth, _glHeight);

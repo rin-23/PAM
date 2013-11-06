@@ -24,6 +24,12 @@
     WireFrame* _wireFrame;
     HMesh::VertexID _curSelectedVertexID;
     BoundingBox _boundingBox;
+
+    //Gaussian
+    HMesh::Manifold old_mani;
+    GLKVector3 mousePoint;
+    
+    HMesh::VertexAttributeVector<float> weight_vector;
 }
 
 @property (nonatomic) AGLKVertexAttribArrayBuffer* wireframeVertexBuffer;
@@ -90,87 +96,131 @@ using namespace HMesh;
     [_wireFrame setVertexData:wireframeData vertexNum:wireframeData.length/sizeof(VertexNormRGBA)];
 }
 
-
--(NSMutableData*)createBranchAtPoint:(GLKVector3)touchPoint {
-    VertexID vID = [self closestVertexID:touchPoint];
-    Walker walker = _manifold.walker(vID);
+//Create branch at a point near touch point.
+-(BOOL)createBranchAtPointAndRefine:(GLKVector3)touchPoint {
+    VertexID newPoleID;
+    BOOL result = [self createBranchAtPoint:touchPoint width:1 vertexID:&newPoleID];
+    if (result) {
+        HMesh::VertexAttributeVector<int> poles(_manifold.no_vertices(), 0);
+        poles[newPoleID] = 1;
+        refine_poles(_manifold, poles);
+        [self rebuffer];
+    }
     
-    VertexID r_vID = walker.prev().opp().prev().prev().vertex();
-    VertexID l_vID = walker.vertex();
- 
-    Vec3d vec = _manifold.pos(vID);
-    Vec3d r_vec = _manifold.pos(r_vID);
-    Vec3d l_vec = _manifold.pos(l_vID);
-    
-    GLKVector3 vecGL = [self convertModel:GLKVector3Make(vec[0], vec[1], vec[2])];
-    GLKVector3 r_vecGL = [self convertModel:GLKVector3Make(r_vec[0], r_vec[1], r_vec[2])];
-    GLKVector3 l_vecGL = [self convertModel:GLKVector3Make(l_vec[0], l_vec[1], l_vec[2])];
-    
-    NSMutableData* data = [[NSMutableData alloc] init];
-    [data appendBytes:&vecGL length:sizeof(GLKVector3)];
-    [data appendBytes:&r_vecGL length:sizeof(GLKVector3)];
-    [data appendBytes:&l_vecGL length:sizeof(GLKVector3)];
-    
-    int size = _manifold.no_vertices();
-    VertexAttributeVector<int> vs(size, 0);
-    vs[vID] = 1;
-    vs[r_vID] = 1;
-    vs[l_vID] = 1;
-    
-    polar_add_branch(_manifold, vs);
-    
-    NSMutableData* vertexData = [[NSMutableData alloc] init];
-    NSMutableData* wireframeData = [[NSMutableData alloc] init];
-    [self triangulateManifold:_manifold trianglMeshData:&vertexData wireframeData:&wireframeData];
-    
-    self.numVertices = vertexData.length / sizeof(VertexNormRGBA);
-    
-    self.vertexDataBuffer = [[AGLKVertexAttribArrayBuffer alloc] initWithAttribStride:sizeof(VertexNormRGBA)
-                                                                     numberOfVertices:self.numVertices
-                                                                                bytes:vertexData.bytes
-                                                                                usage:GL_DYNAMIC_DRAW];
-    
-    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_POSITION]];
-    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_NORMAL]];
-    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_COLOR]];
-    
-    [_wireFrame setVertexData:wireframeData vertexNum:wireframeData.length/sizeof(VertexNormRGBA)];
-     
-    return data;
+    return result;
 }
 
--(void)createBranchAtPoints:(NSMutableData*)pointData {
-    GLKVector3* points = (GLKVector3*)pointData.bytes;
-    int numOfPoints = pointData.length / sizeof(GLKVector3);
-    
-    int size = _manifold.no_vertices();
-    VertexAttributeVector<int> vs(size, 0);
-    
-    for (int i = 0; i < numOfPoints; i++) {
-        GLKVector3 ptn = points[i];
-        VertexID pointID = [self closestVertexID:ptn];
-        vs[pointID] = 1;
+//Create branch at a point near touch point. Return VertexID of newly created pole. -1 is returned if failed.
+-(BOOL)createBranchAtPoint:(GLKVector3)touchPoint width:(int)width vertexID:(VertexID*)newPoleID {
+    VertexID vID = [self closestVertexID:touchPoint];
+    if (is_pole(_manifold, vID)) {
+        NSLog(@"Tried to create a branch at a pole");
+        return NO;
     }
 
-    polar_add_branch(_manifold, vs);
+    HMesh::HalfEdgeAttributeVector<EdgeInfo> edgeInfo = trace_spine_edges(_manifold);
+
+    Walker walker = _manifold.walker(vID);
+    HalfEdgeID endHalfEdge = walker.opp().halfedge();
     
-    NSMutableData* vertexData = [[NSMutableData alloc] init];
-    NSMutableData* wireframeData = [[NSMutableData alloc] init];
-    [self triangulateManifold:_manifold trianglMeshData:&vertexData wireframeData:&wireframeData];
+    int num_rib_found = 0;
+    VertexAttributeVector<int> vs(_manifold.no_vertices(), 0);
+    vs[vID] = 1;
     
-    self.numVertices = vertexData.length / sizeof(VertexNormRGBA);
+    vector<VertexID> ribs(2*width);
     
-    self.vertexDataBuffer = [[AGLKVertexAttribArrayBuffer alloc] initWithAttribStride:sizeof(VertexNormRGBA)
-                                                                     numberOfVertices:self.numVertices
-                                                                                bytes:vertexData.bytes
-                                                                                usage:GL_DYNAMIC_DRAW];
+//    if (edgeInfo[walker.halfedge()].edge_type == RIB) {
+//        ribs[num_rib_found++] = walker.vertex();
+//        vs[walker.vertex()] = 1;
+//    }
     
-    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_POSITION]];
-    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_NORMAL]];
-    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_COLOR]];
+    while (walker.halfedge() != endHalfEdge) {
+        while (walker.vertex() != vID) {
+            walker = walker.next();
+        }
+        if (edgeInfo[walker.halfedge()].edge_type == RIB) {
+            ribs[num_rib_found++] = walker.opp().vertex();
+            vs[walker.opp().vertex()] = 1;
+        }
+        if (num_rib_found == 2*width) {
+            break;
+        }
+        walker = walker.opp();
+    }
     
-    [_wireFrame setVertexData:wireframeData vertexNum:wireframeData.length/sizeof(VertexNormRGBA)];
+    *newPoleID = polar_add_branch(_manifold, vs);
+    
+    return YES;
+    
+    
+//    Vec3d vec = _manifold.pos(vID);
+//    Vec3d r_vec = _manifold.pos(ribs[0]);
+//    Vec3d l_vec = _manifold.pos(ribs[1]);
+//    
+//    GLKVector3 vecGL = [self convertModel:GLKVector3Make(vec[0], vec[1], vec[2])];
+//    GLKVector3 r_vecGL = [self convertModel:GLKVector3Make(r_vec[0], r_vec[1], r_vec[2])];
+//    GLKVector3 l_vecGL = [self convertModel:GLKVector3Make(l_vec[0], l_vec[1], l_vec[2])];
+//    
+//    NSMutableData* data = [[NSMutableData alloc] init];
+//    [data appendBytes:&vecGL length:sizeof(GLKVector3)];
+//    [data appendBytes:&r_vecGL length:sizeof(GLKVector3)];
+//    [data appendBytes:&l_vecGL length:sizeof(GLKVector3)];
+//
+//    
+//    NSMutableData* vertexData = [[NSMutableData alloc] init];
+//    NSMutableData* wireframeData = [[NSMutableData alloc] init];
+//    [self triangulateManifold:_manifold trianglMeshData:&vertexData wireframeData:&wireframeData];
+//    
+//    self.numVertices = vertexData.length / sizeof(VertexNormRGBA);
+//    
+//    self.vertexDataBuffer = [[AGLKVertexAttribArrayBuffer alloc] initWithAttribStride:sizeof(VertexNormRGBA)
+//                                                                     numberOfVertices:self.numVertices
+//                                                                                bytes:vertexData.bytes
+//                                                                                usage:GL_DYNAMIC_DRAW];
+//    
+//    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_POSITION]];
+//    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_NORMAL]];
+//    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_COLOR]];
+//    
+//    [_wireFrame setVertexData:wireframeData vertexNum:wireframeData.length/sizeof(VertexNormRGBA)];
+    
+
+    
+//    return data;
 }
+
+//-(void)createBranchAtPoints:(NSMutableData*)pointData {
+//    GLKVector3* points = (GLKVector3*)pointData.bytes;
+//    int numOfPoints = pointData.length / sizeof(GLKVector3);
+//    
+//    int size = _manifold.no_vertices();
+//    VertexAttributeVector<int> vs(size, 0);
+//    
+//    for (int i = 0; i < numOfPoints; i++) {
+//        GLKVector3 ptn = points[i];
+//        VertexID pointID = [self closestVertexID:ptn];
+//        vs[pointID] = 1;
+//    }
+//
+//    polar_add_branch(_manifold, vs);
+//    
+//    NSMutableData* vertexData = [[NSMutableData alloc] init];
+//    NSMutableData* wireframeData = [[NSMutableData alloc] init];
+//    [self triangulateManifold:_manifold trianglMeshData:&vertexData wireframeData:&wireframeData];
+//    
+//    self.numVertices = vertexData.length / sizeof(VertexNormRGBA);
+//    
+//    self.vertexDataBuffer = [[AGLKVertexAttribArrayBuffer alloc] initWithAttribStride:sizeof(VertexNormRGBA)
+//                                                                     numberOfVertices:self.numVertices
+//                                                                                bytes:vertexData.bytes
+//                                                                                usage:GL_DYNAMIC_DRAW];
+//    
+//    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_POSITION]];
+//    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_NORMAL]];
+//    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_COLOR]];
+//    
+//    [_wireFrame setVertexData:wireframeData vertexNum:wireframeData.length/sizeof(VertexNormRGBA)];
+//}
 
 -(VertexID)closestVertexID:(GLKVector3)touchPoint {
     //iterate over every face
@@ -361,6 +411,59 @@ using namespace HMesh;
 
 -(BoundingBox)boundingBox {
     return _boundingBox;
+}
+
+-(void)gaussianStart:(GLKVector3)touchPoint {
+    touchPoint = [Utilities invertVector3:touchPoint withMatrix:self.modelMatrix];
+    Vec3d p0 = Vec3d(touchPoint.x, touchPoint.y, touchPoint.z);
+    float brush_size = 0.001;
+    mousePoint = touchPoint;
+    old_mani = _manifold;
+    Vec3d c;
+    float r;
+    bsphere(_manifold, c, r);
+    for(auto vid : _manifold.vertices())
+    {
+        double l = sqr_length(p0-_manifold.pos(vid));
+        weight_vector[vid] = exp(-l/(brush_size*r*r));
+    }
+}
+
+-(void)gaussianMove:(GLKVector3)touchPoint {
+    touchPoint = [Utilities invertVector3:touchPoint withMatrix:self.modelMatrix];
+    Vec3d displace = Vec3d(touchPoint.x - mousePoint.x, touchPoint.y - mousePoint.y, touchPoint.z - mousePoint.z);
+
+    VertexID vID = [self closestVertexID:mousePoint];
+    Vec3d norm = HMesh::normal(_manifold, vID);
+    
+    float angle = acos(dot(normalize(displace), normalize(norm)));
+    
+    if (angle < GLKMathDegreesToRadians(50)) {
+        NSLog(@"MOVED PERPENDICULAR WAS %f", GLKMathRadiansToDegrees(angle));
+        VertexID newPoleID;
+        Vec3d mouseVertex = _manifold.pos(vID);
+        
+        BOOL result = [self createBranchAtPoint:GLKVector3Make(mouseVertex[0], mouseVertex[1], mouseVertex[2]) width:1 vertexID:&newPoleID];
+        if (result) {
+            HMesh::VertexAttributeVector<int> poles(_manifold.no_vertices(), 0);
+            poles[newPoleID] = 1;
+            refine_poles(_manifold, poles);
+            
+            // Move pole
+            _manifold.pos(newPoleID) = _manifold.pos(newPoleID) + displace;
+            
+            // Move vertecies adjacent to pole
+            for (Walker walker = _manifold.walker(newPoleID); !walker.full_circle(); walker = walker.circulate_vertex_ccw()) {
+                _manifold.pos(walker.vertex()) = _manifold.pos(walker.vertex()) + displace*0.97;
+            }
+        }
+    } else {
+        NSLog(@"GAUSSIAN MOVE %f", GLKMathRadiansToDegrees(angle));
+        for(auto vid : _manifold.vertices())
+        {
+            _manifold.pos(vid) = old_mani.pos(vid) + weight_vector[vid] * displace;
+        }
+    }
 }
 
 -(void)draw {

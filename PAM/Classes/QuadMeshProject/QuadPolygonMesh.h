@@ -15,9 +15,11 @@
 -(GLKVector3)closestVertexToMeshPoint:(GLKVector3)touchPoint setAsCurrentID:(BOOL)setAsCurrentID;
 -(GLKVector3)translateCurrentSelectedVertex:(GLKVector3)newPosition;
 -(BOOL)touchedCloseToTheCurrentVertex:(GLKVector3)touchPoint;
-
-
--(NSMutableData*)createBranchAtPoint:(GLKVector3)touchPoint;
--(void)createBranchAtPoints:(NSMutableData*)pointData;
+//-(void)createBranchAtPoint:(GLKVector3)touchPoint;
+//-(void)createBranchAtPoints:(NSMutableData*)pointData;
 -(void)rebuffer;
+-(void)gaussianStart:(GLKVector3)touchPoint;
+-(void)gaussianMove:(GLKVector3)touchPoint;
+
+-(BOOL)createBranchAtPointAndRefine:(GLKVector3)touchPoint;
 @end

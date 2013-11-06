@@ -11,15 +11,18 @@
 @interface QuadPolygonMesh : PolygonMesh
 
 -(void)setMeshFromObjFile:(NSString*)objFile;
-//-(void)setVertexData:(NSMutableData*)vertexData numOfVerticies:(uint32_t)vertexNum;
+
 -(GLKVector3)closestVertexToMeshPoint:(GLKVector3)touchPoint setAsCurrentID:(BOOL)setAsCurrentID;
 -(GLKVector3)translateCurrentSelectedVertex:(GLKVector3)newPosition;
 -(BOOL)touchedCloseToTheCurrentVertex:(GLKVector3)touchPoint;
-//-(void)createBranchAtPoint:(GLKVector3)touchPoint;
-//-(void)createBranchAtPoints:(NSMutableData*)pointData;
+
 -(void)rebuffer;
 -(void)gaussianStart:(GLKVector3)touchPoint;
 -(void)gaussianMove:(GLKVector3)touchPoint;
-
 -(BOOL)createBranchAtPointAndRefine:(GLKVector3)touchPoint;
+
+-(void)showSkeleton:(BOOL)show;
+-(void)moveVertexOrthogonallyCloseTo:(GLKVector3)touchPoint;
+
+@property (nonatomic, assign) int branchWidth;
 @end

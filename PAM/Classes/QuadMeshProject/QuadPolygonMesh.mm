@@ -29,6 +29,9 @@
     HMesh::Manifold old_mani;
     GLKVector3 mousePoint;
     
+    //Skeleton
+    HMesh::Manifold skeletonMani;
+    
     HMesh::VertexAttributeVector<float> weight_vector;
 }
 
@@ -40,6 +43,8 @@
 using namespace HMesh;
 
 -(void)setMeshFromObjFile:(NSString*)objFilePath {
+    
+    _branchWidth = 1;
     //Load manifold
     _manifold = HMesh::Manifold();
     HMesh::obj_load(objFilePath.UTF8String, _manifold);
@@ -99,7 +104,7 @@ using namespace HMesh;
 //Create branch at a point near touch point.
 -(BOOL)createBranchAtPointAndRefine:(GLKVector3)touchPoint {
     VertexID newPoleID;
-    BOOL result = [self createBranchAtPoint:touchPoint width:1 vertexID:&newPoleID];
+    BOOL result = [self createBranchAtPoint:touchPoint width:self.branchWidth vertexID:&newPoleID];
     if (result) {
         HMesh::VertexAttributeVector<int> poles(_manifold.no_vertices(), 0);
         poles[newPoleID] = 1;
@@ -121,31 +126,40 @@ using namespace HMesh;
     HMesh::HalfEdgeAttributeVector<EdgeInfo> edgeInfo = trace_spine_edges(_manifold);
 
     Walker walker = _manifold.walker(vID);
-    HalfEdgeID endHalfEdge = walker.opp().halfedge();
+    HalfEdgeID endHalfEdge = walker.halfedge();
     
     int num_rib_found = 0;
     VertexAttributeVector<int> vs(_manifold.no_vertices(), 0);
     vs[vID] = 1;
     
     vector<VertexID> ribs(2*width);
-    
-//    if (edgeInfo[walker.halfedge()].edge_type == RIB) {
-//        ribs[num_rib_found++] = walker.vertex();
-//        vs[walker.vertex()] = 1;
-//    }
-    
+
+    walker = walker.next();//advance one step to pass while loop test
     while (walker.halfedge() != endHalfEdge) {
         while (walker.vertex() != vID) {
             walker = walker.next();
         }
         if (edgeInfo[walker.halfedge()].edge_type == RIB) {
             ribs[num_rib_found++] = walker.opp().vertex();
-            vs[walker.opp().vertex()] = 1;
+            int side_width = 1;
+            //Advance until we reach desireed width
+            Walker sideWalker = walker.opp();
+            while (side_width != width) {
+                sideWalker = sideWalker.next().opp().next();
+                ribs[num_rib_found++] = sideWalker.vertex();
+                side_width++;
+            }
         }
         if (num_rib_found == 2*width) {
             break;
         }
         walker = walker.opp();
+    }
+    
+    //Set all verticies to be branched out
+    for (int i = 0; i < ribs.size(); i++) {
+        VertexID cur_vID = ribs[i];
+        vs[cur_vID] = 1;
     }
     
     *newPoleID = polar_add_branch(_manifold, vs);
@@ -437,17 +451,23 @@ using namespace HMesh;
     Vec3d norm = HMesh::normal(_manifold, vID);
     
     float angle = acos(dot(normalize(displace), normalize(norm)));
+    Vec3d c;
+    float r;
+    bsphere(_manifold, c, r);
     
-    if (angle < GLKMathDegreesToRadians(50)) {
+    if (angle < GLKMathDegreesToRadians(50) && length(displace) > r*0.05) {
         NSLog(@"MOVED PERPENDICULAR WAS %f", GLKMathRadiansToDegrees(angle));
         VertexID newPoleID;
         Vec3d mouseVertex = _manifold.pos(vID);
-        
-        BOOL result = [self createBranchAtPoint:GLKVector3Make(mouseVertex[0], mouseVertex[1], mouseVertex[2]) width:1 vertexID:&newPoleID];
+
+        BOOL result = [self createBranchAtPoint:GLKVector3Make(mouseVertex[0], mouseVertex[1], mouseVertex[2]) width:self.branchWidth vertexID:&newPoleID];
         if (result) {
             HMesh::VertexAttributeVector<int> poles(_manifold.no_vertices(), 0);
             poles[newPoleID] = 1;
             refine_poles(_manifold, poles);
+            
+//            float proj = dot(norm, displace)/length(norm);
+//            displace = norm*proj;
             
             // Move pole
             _manifold.pos(newPoleID) = _manifold.pos(newPoleID) + displace;
@@ -457,6 +477,7 @@ using namespace HMesh;
                 _manifold.pos(walker.vertex()) = _manifold.pos(walker.vertex()) + displace*0.97;
             }
         }
+        
     } else {
         NSLog(@"GAUSSIAN MOVE %f", GLKMathRadiansToDegrees(angle));
         for(auto vid : _manifold.vertices())
@@ -464,6 +485,40 @@ using namespace HMesh;
             _manifold.pos(vid) = old_mani.pos(vid) + weight_vector[vid] * displace;
         }
     }
+}
+
+-(void)showSkeleton:(BOOL)show {
+    if (show) {
+        skeletonMani = _manifold;
+        skeleton_retract(_manifold, 0.9f);
+    } else {
+        _manifold = skeletonMani;
+    }
+    [self rebuffer];
+}
+
+-(void)moveVertexCloseTo:(GLKVector3)touchPoint orthogonallyBy:(float)distance {
+    touchPoint = [Utilities invertVector3:touchPoint withMatrix:self.modelMatrix];
+    VertexID vID = [self closestVertexID:touchPoint];
+    Vec3d norm = HMesh::normal(_manifold, vID);
+    
+    _manifold.pos(vID) = _manifold.pos(vID) + norm*distance;
+    
+    if (is_pole(_manifold, vID)) {
+        // Move vertecies adjacent to pole
+        for (Walker walker = _manifold.walker(vID); !walker.full_circle(); walker = walker.circulate_vertex_ccw()) {
+            _manifold.pos(walker.vertex()) = _manifold.pos(walker.vertex()) + norm*distance*0.98;
+        }
+    }
+    
+    [self rebuffer];
+}
+
+-(void)moveVertexOrthogonallyCloseTo:(GLKVector3)touchPoint {
+    Vec3d c;
+    float r;
+    bsphere(_manifold, c, r);
+    [self moveVertexCloseTo:touchPoint orthogonallyBy:r * 0.05];
 }
 
 -(void)draw {

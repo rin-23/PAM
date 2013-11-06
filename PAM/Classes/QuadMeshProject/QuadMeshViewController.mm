@@ -55,7 +55,6 @@
         _zoomManager = [[ZoomManager alloc] init];
         isMovingPoint = NO;
         _branchPoints = [[NSMutableArray alloc] init];
-        
     }
     return self;
 }
@@ -70,6 +69,13 @@
     
     [self setupGL];
     [self addGestureRecognizersToView:self.view];
+    
+    _branchWidthSlider.minimumValue = 1.0f;
+    _branchWidthSlider.maximumValue = 5.0f;
+    [_branchWidthSlider addTarget:self action:@selector(sliderChanged:) forControlEvents:UIControlEventValueChanged];
+    
+    [_skeletonSwitch addTarget:self action:@selector(skeletonSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+
 }
 
 - (void)viewDidUnload {
@@ -129,7 +135,7 @@
 -(void)addGestureRecognizersToView:(UIView*)view {
     
     //Pinch To Zoom. Scaling along X,Y,Z
-    UIPinchGestureRecognizer* pinchToZoom = [[UIPinchGestureRecognizer alloc] initWithTarget:_zoomManager action:@selector(handlePinchGesture:)];
+    UIPinchGestureRecognizer* pinchToZoom = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(handlePinchGesture:)];
     [view addGestureRecognizer:pinchToZoom];
     
     //Translation along X, Y
@@ -159,14 +165,35 @@
 //    [singleTap requireGestureRecognizerToFail:doubleTap];
 //    [view addGestureRecognizer:singleTap];
     
-//    UITapGestureRecognizer* tapWithTwoFingers = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTwoFingerTapGesture:)];
-//    tapWithTwoFingers.numberOfTapsRequired = 1;
-//    tapWithTwoFingers.numberOfTouchesRequired = 2;
-//    [view addGestureRecognizer:tapWithTwoFingers];
-    
+    UITapGestureRecognizer* tapWithTwoFingers = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTwoFingerTapGesture:)];
+    tapWithTwoFingers.numberOfTapsRequired = 1;
+    tapWithTwoFingers.numberOfTouchesRequired = 2;
+    [view addGestureRecognizer:tapWithTwoFingers];    
 }
 
 #pragma mark - Gesture recognizer selectors
+-(void)handlePinchGesture:(UIGestureRecognizer*)sender {
+    if (!_transformSwitch.isOn) {
+        [_zoomManager handlePinchGesture:sender];
+    } else {
+        if (sender.state == UIGestureRecognizerStateEnded) {
+            UIPinchGestureRecognizer* pinch = (UIPinchGestureRecognizer*) sender;
+            if (pinch.scale <= 1) {
+                CGPoint touchPoint = [self scaleTouchPoint:[sender locationInView:sender.view] inView:(GLKView*)sender.view];
+                NSMutableData* pixelData = [self renderToOffscreenDepthBuffer:@[_pMesh]];
+                
+                GLKVector3 modelCoord;
+                BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:touchPoint depthBuffer:pixelData];
+                if (!result) {
+                    NSLog(@"[WARNING] Couldn determine touch area");
+                    return;
+                }
+                [_pMesh moveVertexOrthogonallyCloseTo:modelCoord];
+            }
+            
+        }
+    }
+}
 
 -(void)handleOneFingerPanGesture:(UIGestureRecognizer*)sender {
     if (!_transformSwitch.isOn) {
@@ -255,20 +282,9 @@
 //    [_branchPoints addObject:chosenPoint];
 }
 
-//-(void)handleTwoFingerTapGesture:(UIGestureRecognizer*)sender {
-//    if (_branchPoints.count<3) {
-//        [[[UIAlertView alloc] initWithTitle:@"Warning" message:@"Need at least 3 points to branch" delegate:Nil cancelButtonTitle:@"OK" otherButtonTitles:nil] show];
-//        return;
-//    }
-//
-//    NSMutableData* data = [[NSMutableData alloc] init];
-//    for (PlateStartPoint* plate in _branchPoints) {
-//        GLKVector3 vec = plate.point;
-//        [data appendBytes:&vec length:sizeof(GLKVector3)];
-//    }
-////    [_pMesh createBranchAtPoints:data];
-//    [_branchPoints removeAllObjects];
-//}
+-(void)handleTwoFingerTapGesture:(UIGestureRecognizer*)sender {
+    [_transformSwitch setOn:!_transformSwitch.isOn];
+}
 
 #pragma mark - Helpers
 
@@ -281,8 +297,6 @@
     
     return touchPoint;
 }
-
-
 
 #pragma mark - OpenGL Drawing
 
@@ -477,8 +491,19 @@
     _zoomManager.scaleMatrix = GLKMatrix4Identity;
     [_branchPoints removeAllObjects];
 }
+-(void)sliderChanged:(id)sender{
 
+    float newStep = roundf(_branchWidthSlider.value);
+    
+    // Convert "steps" back to the context of the sliders values.
+    _branchWidthSlider.value = newStep;
+    _pMesh.branchWidth = newStep;
 
+}
+
+-(void)skeletonSwitchChanged:(id)sender {
+    [_pMesh showSkeleton:_skeletonSwitch.isOn];
+}
 
 
 @end

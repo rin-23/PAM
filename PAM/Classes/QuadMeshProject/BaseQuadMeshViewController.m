@@ -45,9 +45,15 @@
     _activity = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleGray];
     _activity.center =  CGPointMake(self.view.frame.size.width/2, self.view.frame.size.height/2);
     _activity.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin|UIViewAutoresizingFlexibleRightMargin|UIViewAutoresizingFlexibleTopMargin|UIViewAutoresizingFlexibleBottomMargin;
-    
+
     _transformSwitch = [[UISwitch alloc] initWithFrame:CGRectMake(5, 75, 30, 20)];
     [view addSubview:_transformSwitch];
+    
+    _branchWidthSlider = [[UISlider alloc] initWithFrame:CGRectMake(65, 85, 130, 10)];
+    [view addSubview:_branchWidthSlider];
+
+    _skeletonSwitch = [[UISwitch alloc] initWithFrame:CGRectMake(200, 75, 30, 20)];    
+    [view addSubview:_skeletonSwitch];
 }
 
 -(void)viewDidAppear:(BOOL)animated {

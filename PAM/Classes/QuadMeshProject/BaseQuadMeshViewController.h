@@ -13,6 +13,9 @@
     GLsizei _glWidth;
     GLsizei _glHeight;
     UISwitch* _transformSwitch;
+    UISlider* _branchWidthSlider;
+    UISwitch* _skeletonSwitch;
+
 }
 
 -(void)showLoadingIndicator;

@@ -24,5 +24,8 @@
 -(void)showSkeleton:(BOOL)show;
 -(void)moveVertexOrthogonallyCloseTo:(GLKVector3)touchPoint;
 
+-(void)createNewRibAtPoint:(GLKVector3)touchPoint;
+-(void)createNewSpineAtPoint:(GLKVector3)touchPoint;
+
 @property (nonatomic, assign) int branchWidth;
 @end

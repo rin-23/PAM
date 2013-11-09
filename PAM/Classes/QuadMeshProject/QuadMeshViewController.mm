@@ -247,8 +247,6 @@
     }
 }
 
-
-
 -(void)handleTwoFingerPanGesture:(UIGestureRecognizer*)sender {
     [_translationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity];
 }
@@ -268,8 +266,9 @@
         return;
     }
    
-    [_pMesh createBranchAtPointAndRefine:startPoint];
-
+//    [_pMesh createBranchAtPointAndRefine:startPoint];
+//    [_pMesh createNewRibAtPoint:startPoint];
+    [_pMesh createNewSpineAtPoint:startPoint];
 //    GLKVector3* dataBytes = (GLKVector3*)data.bytes;
 //    
 //    for(int i = 0; i < data.length/sizeof(GLKVector3); i++) {

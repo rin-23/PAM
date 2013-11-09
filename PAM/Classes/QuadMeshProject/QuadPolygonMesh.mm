@@ -115,6 +115,29 @@ using namespace HMesh;
     return result;
 }
 
+-(void)createNewSpineAtPoint:(GLKVector3)touchPoint {
+    VertexID vID = [self closestVertexID:touchPoint];
+    HMesh::HalfEdgeAttributeVector<EdgeInfo> edgeInfo = trace_spine_edges(_manifold);
+    Walker walker = _manifold.walker(vID);
+    if (edgeInfo[walker.halfedge()].edge_type != RIB) {
+        walker = walker.next();
+    }
+    add_spine(_manifold, walker.halfedge());
+    [self rebuffer];
+}      
+
+
+-(void)createNewRibAtPoint:(GLKVector3)touchPoint {
+    VertexID vID = [self closestVertexID:touchPoint];
+    HMesh::HalfEdgeAttributeVector<EdgeInfo> edgeInfo = trace_spine_edges(_manifold);
+    Walker walker = _manifold.walker(vID);
+    if (edgeInfo[walker.halfedge()].edge_type != SPINE) {
+        walker = walker.next();
+    }
+    add_rib(_manifold, walker.halfedge());
+    [self rebuffer];
+}
+
 //Create branch at a point near touch point. Return VertexID of newly created pole. -1 is returned if failed.
 -(BOOL)createBranchAtPoint:(GLKVector3)touchPoint width:(int)width vertexID:(VertexID*)newPoleID {
     VertexID vID = [self closestVertexID:touchPoint];

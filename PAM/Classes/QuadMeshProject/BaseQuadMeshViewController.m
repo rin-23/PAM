@@ -60,6 +60,21 @@
     [super viewDidAppear:animated];
     _glWidth = ((GLKView*)self.view).drawableWidth;
     _glHeight = ((GLKView*)self.view).drawableHeight;
+
+    // We must be the first responder to receive shake events for undo.
+	[self becomeFirstResponder];
+}
+
+-(void)viewWillDisappear:(BOOL)animated {
+    
+    // You should resign first responder status when exiting the screen.
+	[self resignFirstResponder];
+    [super viewWillDisappear:animated];
+}
+
+
+-(BOOL)canBecomeFirstResponder {
+	return YES;
 }
 
 -(void)showLoadingIndicator {

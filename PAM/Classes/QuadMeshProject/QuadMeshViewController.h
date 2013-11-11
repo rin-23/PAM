@@ -8,9 +8,10 @@
 
 #import "BaseQuadMeshViewController.h"
 
+
 @class RotationManager, ZoomManager, TranslationManager;
 
-@interface QuadMeshViewController : BaseQuadMeshViewController <UIGestureRecognizerDelegate>
+@interface QuadMeshViewController : BaseQuadMeshViewController <UIGestureRecognizerDelegate, UIAlertViewDelegate>
 
 @property (nonatomic) RotationManager* rotationManager;
 @property (nonatomic) ZoomManager* zoomManager;

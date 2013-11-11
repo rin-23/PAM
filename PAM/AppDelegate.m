@@ -13,6 +13,8 @@
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
+    
+    application.applicationSupportsShakeToEdit = YES;
     QuadMeshViewController* quadMeshViewController = [[QuadMeshViewController alloc] init];
     self.viewController = [[UINavigationController alloc] initWithRootViewController:quadMeshViewController];;
     

@@ -33,6 +33,10 @@
     HMesh::Manifold skeletonMani;
     
     HMesh::VertexAttributeVector<float> weight_vector;
+    
+    
+    //Undo
+    HMesh::Manifold undoMani;
 }
 
 @property (nonatomic) AGLKVertexAttribArrayBuffer* wireframeVertexBuffer;
@@ -47,6 +51,7 @@ using namespace HMesh;
     _branchWidth = 1;
     //Load manifold
     _manifold = HMesh::Manifold();
+    undoMani = _manifold;
     HMesh::obj_load(objFilePath.UTF8String, _manifold);
     
     //Calculate Bounding Box
@@ -111,11 +116,11 @@ using namespace HMesh;
         refine_poles(_manifold, poles);
         [self rebuffer];
     }
-    
     return result;
 }
 
 -(void)createNewSpineAtPoint:(GLKVector3)touchPoint {
+    undoMani = _manifold;
     VertexID vID = [self closestVertexID:touchPoint];
     HMesh::HalfEdgeAttributeVector<EdgeInfo> edgeInfo = trace_spine_edges(_manifold);
     Walker walker = _manifold.walker(vID);
@@ -126,20 +131,23 @@ using namespace HMesh;
     [self rebuffer];
 }      
 
-
 -(void)createNewRibAtPoint:(GLKVector3)touchPoint {
+    undoMani = _manifold;
     VertexID vID = [self closestVertexID:touchPoint];
     HMesh::HalfEdgeAttributeVector<EdgeInfo> edgeInfo = trace_spine_edges(_manifold);
     Walker walker = _manifold.walker(vID);
     if (edgeInfo[walker.halfedge()].edge_type != SPINE) {
         walker = walker.next();
     }
+    HalfEdgeID newEdge = add_rib(_manifold, walker.halfedge());
     add_rib(_manifold, walker.halfedge());
+    add_rib(_manifold, newEdge);
     [self rebuffer];
 }
 
 //Create branch at a point near touch point. Return VertexID of newly created pole. -1 is returned if failed.
 -(BOOL)createBranchAtPoint:(GLKVector3)touchPoint width:(int)width vertexID:(VertexID*)newPoleID {
+    undoMani = _manifold;
     VertexID vID = [self closestVertexID:touchPoint];
     if (is_pole(_manifold, vID)) {
         NSLog(@"Tried to create a branch at a pole");
@@ -157,7 +165,7 @@ using namespace HMesh;
     
     vector<VertexID> ribs(2*width);
 
-    walker = walker.next();//advance one step to pass while loop test
+    walker = walker.next(); //advance one step to pass while loop test
     while (walker.halfedge() != endHalfEdge) {
         while (walker.vertex() != vID) {
             walker = walker.next();
@@ -186,45 +194,11 @@ using namespace HMesh;
     }
     
     *newPoleID = polar_add_branch(_manifold, vs);
+    refine_branch(_manifold, *newPoleID);
     
     return YES;
-    
-    
-//    Vec3d vec = _manifold.pos(vID);
-//    Vec3d r_vec = _manifold.pos(ribs[0]);
-//    Vec3d l_vec = _manifold.pos(ribs[1]);
-//    
-//    GLKVector3 vecGL = [self convertModel:GLKVector3Make(vec[0], vec[1], vec[2])];
-//    GLKVector3 r_vecGL = [self convertModel:GLKVector3Make(r_vec[0], r_vec[1], r_vec[2])];
-//    GLKVector3 l_vecGL = [self convertModel:GLKVector3Make(l_vec[0], l_vec[1], l_vec[2])];
-//    
-//    NSMutableData* data = [[NSMutableData alloc] init];
-//    [data appendBytes:&vecGL length:sizeof(GLKVector3)];
-//    [data appendBytes:&r_vecGL length:sizeof(GLKVector3)];
-//    [data appendBytes:&l_vecGL length:sizeof(GLKVector3)];
-//
-//    
-//    NSMutableData* vertexData = [[NSMutableData alloc] init];
-//    NSMutableData* wireframeData = [[NSMutableData alloc] init];
-//    [self triangulateManifold:_manifold trianglMeshData:&vertexData wireframeData:&wireframeData];
-//    
-//    self.numVertices = vertexData.length / sizeof(VertexNormRGBA);
-//    
-//    self.vertexDataBuffer = [[AGLKVertexAttribArrayBuffer alloc] initWithAttribStride:sizeof(VertexNormRGBA)
-//                                                                     numberOfVertices:self.numVertices
-//                                                                                bytes:vertexData.bytes
-//                                                                                usage:GL_DYNAMIC_DRAW];
-//    
-//    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_POSITION]];
-//    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_NORMAL]];
-//    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_COLOR]];
-//    
-//    [_wireFrame setVertexData:wireframeData vertexNum:wireframeData.length/sizeof(VertexNormRGBA)];
-    
-
-    
-//    return data;
 }
+
 
 //-(void)createBranchAtPoints:(NSMutableData*)pointData {
 //    GLKVector3* points = (GLKVector3*)pointData.bytes;
@@ -461,12 +435,13 @@ using namespace HMesh;
     bsphere(_manifold, c, r);
     for(auto vid : _manifold.vertices())
     {
-        double l = sqr_length(p0-_manifold.pos(vid));
+        double l = sqr_length(p0 - _manifold.pos(vid));
         weight_vector[vid] = exp(-l/(brush_size*r*r));
     }
 }
 
 -(void)gaussianMove:(GLKVector3)touchPoint {
+    undoMani = _manifold;
     touchPoint = [Utilities invertVector3:touchPoint withMatrix:self.modelMatrix];
     Vec3d displace = Vec3d(touchPoint.x - mousePoint.x, touchPoint.y - mousePoint.y, touchPoint.z - mousePoint.z);
 
@@ -499,6 +474,13 @@ using namespace HMesh;
             for (Walker walker = _manifold.walker(newPoleID); !walker.full_circle(); walker = walker.circulate_vertex_ccw()) {
                 _manifold.pos(walker.vertex()) = _manifold.pos(walker.vertex()) + displace*0.97;
             }
+            
+            //Add ribs for the new branch
+            Walker walker = _manifold.walker(newPoleID);
+            HalfEdgeID ID_1 = walker.next().opp().next().halfedge();
+            HalfEdgeID ID_2 = add_rib(_manifold, ID_1);
+            add_rib(_manifold, ID_1);
+            add_rib(_manifold, ID_2);
         }
         
     } else {
@@ -508,6 +490,11 @@ using namespace HMesh;
             _manifold.pos(vid) = old_mani.pos(vid) + weight_vector[vid] * displace;
         }
     }
+}
+
+-(void)undo {
+    _manifold = undoMani;
+    [self rebuffer];    
 }
 
 -(void)showSkeleton:(BOOL)show {
@@ -538,6 +525,7 @@ using namespace HMesh;
 }
 
 -(void)moveVertexOrthogonallyCloseTo:(GLKVector3)touchPoint {
+    undoMani = _manifold;
     Vec3d c;
     float r;
     bsphere(_manifold, c, r);

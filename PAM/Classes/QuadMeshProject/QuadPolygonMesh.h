@@ -27,5 +27,7 @@
 -(void)createNewRibAtPoint:(GLKVector3)touchPoint;
 -(void)createNewSpineAtPoint:(GLKVector3)touchPoint;
 
+-(void)undo;
+
 @property (nonatomic, assign) int branchWidth;
 @end

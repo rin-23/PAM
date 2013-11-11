@@ -266,9 +266,9 @@
         return;
     }
    
-//    [_pMesh createBranchAtPointAndRefine:startPoint];
+    [_pMesh createBranchAtPointAndRefine:startPoint];
 //    [_pMesh createNewRibAtPoint:startPoint];
-    [_pMesh createNewSpineAtPoint:startPoint];
+//    [_pMesh createNewSpineAtPoint:startPoint];
 //    GLKVector3* dataBytes = (GLKVector3*)data.bytes;
 //    
 //    for(int i = 0; i < data.length/sizeof(GLKVector3); i++) {
@@ -285,7 +285,17 @@
     [_transformSwitch setOn:!_transformSwitch.isOn];
 }
 
+
 #pragma mark - Helpers
+
+- (void)motionEnded:(UIEventSubtype)motion withEvent:(UIEvent *)event
+{
+    if (motion == UIEventSubtypeMotionShake)
+    {
+        // your code
+        [[[UIAlertView alloc] initWithTitle:@"Undo?" message:nil delegate:self cancelButtonTitle:nil otherButtonTitles:@"Yes", @"No", nil] show];
+    }
+}
 
 -(CGPoint)scaleTouchPoint:(CGPoint)touchPoint inView:(GLKView*)view {
     CGFloat scale = view.contentScaleFactor;
@@ -504,5 +514,15 @@
     [_pMesh showSkeleton:_skeletonSwitch.isOn];
 }
 
+
+#pragma mark - UIAlertView Delegate 
+- (void)alertView:(UIAlertView *)alertView clickedButtonAtIndex:(NSInteger)buttonIndex {
+    if ([alertView.title isEqualToString:@"Undo?"]) {
+        if (buttonIndex == 0) {
+            [_pMesh undo];
+        }
+        [alertView dismissWithClickedButtonIndex:buttonIndex animated:YES];
+    }
+}
 
 @end

@@ -9,7 +9,6 @@
 #import "ZoomManager.h"
 
 @interface ZoomManager() {
-
     GLfloat _curFactor;
 }
 @end
@@ -23,8 +22,6 @@
     self = [super init];
     if (self) {
         _scaleFactor = 1.0;
-        self.doubleTapZoomLocation = GLKVector3Make(0, 0, 0);
-        self.isDoubleTapZoomed = NO;
     }
     return self;
 }
@@ -44,12 +41,11 @@
 
 - (void)setScaleFactor:(GLfloat)value{
     _scaleFactor = value;
-    
 }
 
 - (void)handlePinchGesture:(UIGestureRecognizer *)sender {
     UIPinchGestureRecognizer* pinch = (UIPinchGestureRecognizer*) sender;
-//    NSLog(@"Scale %f Velocity %f", [pinch scale], [pinch velocity]);
+    NSLog(@"Scale %f Velocity %f", [pinch scale], [pinch velocity]);
     
     if (sender.state == UIGestureRecognizerStateBegan) {
         _curFactor = _scaleFactor;
@@ -58,26 +54,5 @@
     }
 }
 
-- (void)handleDoubleTapGesture:(UIGestureRecognizer *)sender {
-    
-    if (!self.isDoubleTapZoomed) {
-        
-        UITapGestureRecognizer* tap = (UITapGestureRecognizer*)sender;
-        float aspectRatio=tap.view.frame.size.height/tap.view.frame.size.width;
-        
-        CGPoint touchLocation = [tap locationInView:tap.view];
-        CGPoint center = tap.view.center;
-        
-        self.isDoubleTapZoomed = YES;
-        self.doubleTapZoomLocation = GLKVector3Make(2*(touchLocation.x - center.x)/tap.view.frame.size.width,
-                                                    -2*(touchLocation.y - center.y)*aspectRatio/tap.view.frame.size.height,
-                                                    0);
-    }
-    
-}
-
-- (void)handleTwoFingerTapGesture:(UIGestureRecognizer *)sender {
-    self.isDoubleTapZoomed = NO;
-}
 
 @end

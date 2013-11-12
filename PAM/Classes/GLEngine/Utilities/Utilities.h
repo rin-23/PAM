@@ -50,4 +50,5 @@ double triangleAngleWithSides(double a, double b, double c);
                   rayDirection:(GLKVector3)ray;
 
 +(GLKVector3)invertVector3:(GLKVector3)vector3 withMatrix:(GLKMatrix4)matrix4;
++(GLKVector3)invertVector4:(GLKVector4)vector4 withMatrix:(GLKMatrix4)matrix4;
 @end

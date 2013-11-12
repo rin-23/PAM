@@ -29,5 +29,10 @@
 
 -(void)undo;
 
+-(void)branchCreateMovementStart:(GLKVector3)touchPoint;
+-(void)branchCreateMovementEnd:(GLKVector3)touchPoint;
+
+-(void)scaleRib:(GLKVector3)touchPoint byFactor:(float)scale;
+
 @property (nonatomic, assign) int branchWidth;
 @end

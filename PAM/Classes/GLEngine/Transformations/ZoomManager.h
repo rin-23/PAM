@@ -15,11 +15,7 @@
 
 @property (nonatomic, assign) GLfloat scaleFactor;
 @property (nonatomic, assign) GLKMatrix4 scaleMatrix;
-@property (nonatomic, assign) GLKVector3 doubleTapZoomLocation;
-@property (nonatomic, assign) BOOL isDoubleTapZoomed;
 
 - (void)handlePinchGesture:(UIGestureRecognizer *)sender;
-- (void)handleDoubleTapGesture:(UIGestureRecognizer *)sender;
-- (void)handleTwoFingerTapGesture:(UIGestureRecognizer *)sender;
 - (void)setScaleFactor:(GLfloat)value;
 @end

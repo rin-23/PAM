@@ -295,12 +295,16 @@ double triangleAngleWithSides(double a, double b, double c) {
     return normCross;
 }
 
-+(GLKVector3)invertVector3:(GLKVector3)vector3 withMatrix:(GLKMatrix4)matrix4 {
-    GLKVector4 vector4 = GLKVector4MakeWithVector3(vector3, 1.0);
++(GLKVector3)invertVector4:(GLKVector4)vector4 withMatrix:(GLKMatrix4)matrix4 {
     bool isInvertable;
     vector4 = GLKMatrix4MultiplyVector4(GLKMatrix4Invert(matrix4, &isInvertable), vector4);
-    vector3 = GLKVector3Make(vector4.x, vector4.y, vector4.z);
+    GLKVector3 vector3 = GLKVector3Make(vector4.x, vector4.y, vector4.z);
     return vector3;
+}
+
++(GLKVector3)invertVector3:(GLKVector3)vector3 withMatrix:(GLKMatrix4)matrix4 {
+    GLKVector4 vector4 = GLKVector4MakeWithVector3(vector3, 1.0);
+    return [self invertVector4:vector4 withMatrix:matrix4];
 }
 
 @end

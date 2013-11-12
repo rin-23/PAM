@@ -16,6 +16,12 @@
 #import "MeshLoader.h"
 #import "PlateStartPoint.h"
 
+typedef enum {
+    TOUCHED_NONE,
+    TOUCHED_MODEL,
+    TOUCHED_BACKGROUND
+} DrawingState;
+
 @interface QuadMeshViewController () {
     //GL
     GLKMatrix4 viewMatrix;
@@ -37,11 +43,10 @@
     
     //Gaussian transformations
     float _gaussianDepth;
-    BOOL _gaussianDraging;
+    
+    DrawingState _state;
 }
 @end
-
-
 
 @implementation QuadMeshViewController
 
@@ -165,10 +170,14 @@
 //    [singleTap requireGestureRecognizerToFail:doubleTap];
 //    [view addGestureRecognizer:singleTap];
     
-    UITapGestureRecognizer* tapWithTwoFingers = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTwoFingerTapGesture:)];
-    tapWithTwoFingers.numberOfTapsRequired = 1;
+    UILongPressGestureRecognizer* tapWithTwoFingers = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleTwoFingerTapGesture:)];
     tapWithTwoFingers.numberOfTouchesRequired = 2;
-    [view addGestureRecognizer:tapWithTwoFingers];    
+    tapWithTwoFingers.minimumPressDuration = 0.01;
+    [view addGestureRecognizer:tapWithTwoFingers];
+    
+    UITapGestureRecognizer* tapWithFourFingers = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleFourFingerTapGesture:)];
+    tapWithTwoFingers.numberOfTouchesRequired = 4;
+    [view addGestureRecognizer:tapWithFourFingers];
 }
 
 #pragma mark - Gesture recognizer selectors
@@ -178,8 +187,8 @@
     } else {
         if (sender.state == UIGestureRecognizerStateEnded) {
             UIPinchGestureRecognizer* pinch = (UIPinchGestureRecognizer*) sender;
-            if (pinch.scale <= 1) {
-                CGPoint touchPoint = [self scaleTouchPoint:[sender locationInView:sender.view] inView:(GLKView*)sender.view];
+//            if (pinch.scale <= 1) {
+                CGPoint touchPoint = [self touchPointFromGesture:pinch];
                 NSMutableData* pixelData = [self renderToOffscreenDepthBuffer:@[_pMesh]];
                 
                 GLKVector3 modelCoord;
@@ -188,9 +197,10 @@
                     NSLog(@"[WARNING] Couldn determine touch area");
                     return;
                 }
-                [_pMesh moveVertexOrthogonallyCloseTo:modelCoord];
-            }
+//                [_pMesh moveVertexOrthogonallyCloseTo:modelCoord];
+//            }
             
+            [_pMesh scaleRib:modelCoord byFactor:pinch.scale];
         }
     }
 }
@@ -199,50 +209,62 @@
     if (!_transformSwitch.isOn) {
         [_rotationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity isOrthogonal:NO];
     } else {
-        if (sender.state == UIGestureRecognizerStateBegan) {
-            CGPoint touchPoint = [self scaleTouchPoint:[sender locationInView:sender.view] inView:(GLKView*)sender.view];
+        if (sender.state == UIGestureRecognizerStateBegan)
+        {
+            _state = TOUCHED_NONE;
+            
+            CGPoint touchPoint = [self touchPointFromGesture:sender];
             NSMutableData* pixelData = [self renderToOffscreenDepthBuffer:@[_pMesh]];
-            _gaussianDepth = [self depthForPoint:touchPoint depthBuffer:pixelData];
-            
-            GLKVector3 modelCoord;
-            BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:touchPoint depthBuffer:pixelData];
-            
-            if (!result) {
-                NSLog(@"[WARNING] Couldn determine touch area");
-                return;
-            }
-            
-            [_pMesh gaussianStart:modelCoord];
-            _gaussianDraging = YES;
+            float depth = [self depthForPoint:touchPoint depthBuffer:pixelData];
 
-//            GLKVector3 selectedVertex = [_pMesh closestVertexToMeshPoint:startPoint setAsCurrentID:YES];
-//            _meshTouchPoint = [[PlateStartPoint alloc] initWithPoint:selectedVertex color:GLKVector3Make(0, 255, 0)];
-            
-        } else if (sender.state == UIGestureRecognizerStateChanged) {
-            
-//                GLKVector3 rayOrigin, rayDir;
-//                BOOL result = [self rayOrigin:&rayOrigin rayDirection:&rayDir forGesture:sender];
-//                GLKVector3 newPosition = [_pMesh translateCurrentSelectedVertex:rayOrigin];
-//                _meshTouchPoint = [[PlateStartPoint alloc] initWithPoint:newPosition color:GLKVector3Make(0, 255, 0)];
-            
-        } else if (sender.state == UIGestureRecognizerStateEnded) {
-            if (_gaussianDraging) {
-                CGPoint screenCoord = [self scaleTouchPoint:[sender locationInView:sender.view] inView:(GLKView*)sender.view];
-                GLKVector3 screenCoord3D = GLKVector3Make(screenCoord.x, screenCoord.y, _gaussianDepth);
+            if (depth < 0) { //clicked on background
                 GLKVector3 modelCoord;
-                BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:screenCoord3D];
+                BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, 0)];
+                if (!result) {
+                    NSLog(@"[WARNING] Couldn't determine touch area");
+                    return;
+                }
+                [_pMesh branchCreateMovementStart:modelCoord];
+
+                _state = TOUCHED_BACKGROUND;
+            } else { //clicked on a model
+                _gaussianDepth = depth;
+                GLKVector3 modelCoord;
+                BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, _gaussianDepth)];
+                if (!result) {
+                    NSLog(@"[WARNING] Couldn't determine touch area");
+                    return;
+                }
+                [_pMesh gaussianStart:modelCoord];
+                
+                _state = TOUCHED_MODEL;
+            }
+        }
+        else if (sender.state == UIGestureRecognizerStateChanged)
+        {
+
+        }
+        else if (sender.state == UIGestureRecognizerStateEnded)
+        {
+            CGPoint touchPoint = [self touchPointFromGesture:sender];
+            if (_state == TOUCHED_MODEL) {
+                GLKVector3 modelCoord;
+                BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, _gaussianDepth)];
                 if (!result) {
                     NSLog(@"[WARNING] Couldn determine touch area");
                     return;
                 }
                 [_pMesh gaussianMove:modelCoord];
-                [_pMesh rebuffer];
+            } else if (_state == TOUCHED_BACKGROUND){
+                GLKVector3 modelCoord;
+                BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, 0)];
+                if (!result) {
+                    NSLog(@"[WARNING] Couldn't determine touch area");
+                    return;
+                }
+                [_pMesh branchCreateMovementEnd:modelCoord];
             }
-            _gaussianDraging = NO;
-//            if (_meshTouchPoint) {
-//                [_pMesh rebuffer];
-//                _meshTouchPoint = nil;
-//            }
+            _state = TOUCHED_NONE;
         }
     }
 }
@@ -282,12 +304,23 @@
 }
 
 -(void)handleTwoFingerTapGesture:(UIGestureRecognizer*)sender {
-    [_transformSwitch setOn:!_transformSwitch.isOn];
+    if(sender.state == UIGestureRecognizerStateBegan) {
+        NSLog(@"Started tap");
+    } else if (sender.state == UIGestureRecognizerStateEnded) {
+        NSLog(@"Ended tap");
+    }
 }
 
+-(void)handleFourFingerTapGesture:(UIGestureRecognizer*)sender {
+    if (sender.state == UIGestureRecognizerStateEnded) {
+        NSLog(@"Ended tap");
+        [_transformSwitch setOn:!_transformSwitch.isOn];
+    }
+}
 
 #pragma mark - Helpers
 
+//Respong to shake events in order to promit undo dialog
 - (void)motionEnded:(UIEventSubtype)motion withEvent:(UIEvent *)event
 {
     if (motion == UIEventSubtypeMotionShake)
@@ -297,6 +330,12 @@
     }
 }
 
+//Get scaled and flipped touch coordinates from touch gesture
+-(CGPoint)touchPointFromGesture:(UIGestureRecognizer*)sender {
+    return [self scaleTouchPoint:[sender locationInView:sender.view] inView:(GLKView*)sender.view];
+}
+
+//Get scaled and flipped touch coordinates from touch point coordinates in a view
 -(CGPoint)scaleTouchPoint:(CGPoint)touchPoint inView:(GLKView*)view {
     CGFloat scale = view.contentScaleFactor;
     
@@ -309,6 +348,7 @@
 
 #pragma mark - OpenGL Drawing
 
+//Update camera matrix transformations
 - (void)update {
     //Projection
     const GLfloat aspectRatio = (GLfloat)_glHeight / (GLfloat)_glWidth;
@@ -332,6 +372,7 @@
     modelViewProjectionMatrix = GLKMatrix4Multiply(projectionMatrix, viewMatrix);
 }
 
+//Draw callback
 - (void)glkView:(GLKView *)view drawInRect:(CGRect)rect {
     [(AGLKContext *)view.context clear:GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT];
     
@@ -350,6 +391,7 @@
     }
 }
 
+//Load initial mesh from OBJ file
 -(void)loadMeshData {
     [self setPaused:YES]; //pause rendering
     
@@ -449,6 +491,8 @@
     return -1;
 }
 
+//Convert window coordinates into world coordinates.
+//Touchpoint is in the form of (touchx, touchy, depth)
 -(BOOL)modelCoordinates:(GLKVector3*)objectCoord3 forTouchPoint:(GLKVector3)touchPoint {
     GLKVector4 viewport = GLKVector4Make(0, 0, _glWidth, _glHeight);
     int result = [Utilities gluUnProjectf:touchPoint :modelViewProjectionMatrix :viewport :objectCoord3];
@@ -458,6 +502,8 @@
     return NO;
 }
 
+//Convert window coordinates into world coordinates.
+//Touchpoint is in the form of (touchx, touchy). Depth is extracted from given depth buffer information
 -(BOOL)modelCoordinates:(GLKVector3*)objectCoord3 forTouchPoint:(CGPoint)touchPoint depthBuffer:(NSData*)pixelData {
     float depth = [self depthForPoint:touchPoint depthBuffer:pixelData];
     
@@ -472,6 +518,7 @@
     return NO;
 }
 
+//Create a ray from a given touch point in a direction orthogonal to the surface of the screen
 -(BOOL)rayOrigin:(GLKVector3*)rayOrigin rayDirection:(GLKVector3*)rayDirection forTouchPoint:(CGPoint)touchPoint {
     GLKVector3 rayStartWindow = GLKVector3Make(touchPoint.x, touchPoint.y, 0);
     GLKVector4 viewport = GLKVector4Make(0, 0, _glWidth, _glHeight);
@@ -486,8 +533,9 @@
     return NO;
 }
 
+//Create a ray from a given touch gesture in a direction orthogonal to the surface of the screen
 -(BOOL)rayOrigin:(GLKVector3*)rayOrigin rayDirection:(GLKVector3*)rayDirection forGesture:(UIGestureRecognizer*)gesture {
-    CGPoint touchPoint = [self scaleTouchPoint:[gesture locationInView:gesture.view] inView:(GLKView*)gesture.view];
+    CGPoint touchPoint = [self touchPointFromGesture:gesture];
     return [self rayOrigin:rayOrigin rayDirection:rayDirection forTouchPoint:touchPoint];
 }
 

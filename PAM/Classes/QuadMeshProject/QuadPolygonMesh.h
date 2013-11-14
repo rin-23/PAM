@@ -12,11 +12,12 @@
 
 -(void)setMeshFromObjFile:(NSString*)objFile;
 
--(GLKVector3)closestVertexToMeshPoint:(GLKVector3)touchPoint setAsCurrentID:(BOOL)setAsCurrentID;
--(GLKVector3)translateCurrentSelectedVertex:(GLKVector3)newPosition;
--(BOOL)touchedCloseToTheCurrentVertex:(GLKVector3)touchPoint;
+//-(GLKVector3)closestVertexToMeshPoint:(GLKVector3)touchPoint setAsCurrentID:(BOOL)setAsCurrentID;
+//-(GLKVector3)translateCurrentSelectedVertex:(GLKVector3)newPosition;
+//-(BOOL)touchedCloseToTheCurrentVertex:(GLKVector3)touchPoint;
 
 -(void)rebuffer;
+
 -(void)gaussianStart:(GLKVector3)touchPoint;
 -(void)gaussianMove:(GLKVector3)touchPoint;
 -(BOOL)createBranchAtPointAndRefine:(GLKVector3)touchPoint;
@@ -32,7 +33,11 @@
 -(void)branchCreateMovementStart:(GLKVector3)touchPoint;
 -(void)branchCreateMovementEnd:(GLKVector3)touchPoint;
 
+-(void)bendBranchBeginWithBendingPivot:(GLKVector3)bendingPivot touchPoint:(GLKVector3)touchPoint;
+-(void)bendBranchEnd:(GLKVector3)touchPoint;
+
 -(void)scaleRib:(GLKVector3)touchPoint byFactor:(float)scale;
 
 @property (nonatomic, assign) int branchWidth;
+
 @end

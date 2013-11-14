@@ -260,6 +260,7 @@ double triangleAngleWithSides(double a, double b, double c) {
     }
 }
 
+
 +(BOOL)hitTestCircleWithRadius:(double)radius
                         center:(GLKVector3)center
              inscribedTriangle:(GLKVector3*)triangle
@@ -306,5 +307,6 @@ double triangleAngleWithSides(double a, double b, double c) {
     GLKVector4 vector4 = GLKVector4MakeWithVector3(vector3, 1.0);
     return [self invertVector4:vector4 withMatrix:matrix4];
 }
+
 
 @end

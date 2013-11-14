@@ -18,6 +18,7 @@
 #import "Utilities.h"
 #import "Walker.h"
 #include "polarize.h"
+#include "Mat4x4d.h"
 
 @interface QuadPolygonMesh() {
     HMesh::Manifold _manifold;
@@ -30,6 +31,10 @@
     GLKVector3 mousePoint;
     HMesh::VertexAttributeVector<float> weight_vector;
     
+    //Branch bending
+    HMesh::FaceID _branchBendFaceID;
+    GLKVector3 _branchBendingInitialPoint;
+    
     //Skeleton
     HMesh::Manifold skeletonMani;
     
@@ -41,6 +46,20 @@
 @end
 
 @implementation QuadPolygonMesh
+
+GLKVector3 GLKMatrix4MultiplyVector3Custom(GLKMatrix4 matrix, GLKVector3 vector3) {
+    GLKVector4 vector4 = GLKVector4MakeWithVector3(vector3, 1.0f);
+    vector4 = GLKMatrix4MultiplyVector4(matrix, vector4);
+    return GLKVector3Make(vector4.x, vector4.y, vector4.z);
+}
+
+GLKVector2 GLKVector2MakeWithVector3(GLKVector3 vector3) {
+    return GLKVector2Make(vector3.x, vector3.y);
+}
+
+GLKVector3 GLKVector3MakeWithVec3d(Vec3d v) {
+    return GLKVector3Make(v[0], v[1], v[2]);
+}
 
 using namespace HMesh;
 
@@ -232,7 +251,7 @@ using namespace HMesh;
 //}
 
 
-//touchPoint is in view coordinates. need to convert manifold coordinates in to view coordinates
+//touchPoint is in WORLD coordinates. need to convert manifold coordinates into view coordinates
 -(VertexID)closestVertexID_2DProjection:(GLKVector2)touchPoint {
     float distance = FLT_MAX;
     HMesh::VertexID closestVertex;
@@ -253,6 +272,7 @@ using namespace HMesh;
     return closestVertex;
 }
 
+//touchPoint is in VIEW coordinates.
 -(VertexID)closestVertexID:(GLKVector3)touchPoint {
     //iterate over every face
     float distance = FLT_MAX;
@@ -260,79 +280,88 @@ using namespace HMesh;
     
     touchPoint = [Utilities invertVector3:touchPoint withMatrix:self.modelMatrix];
     
-    for(FaceIDIterator fid = _manifold.faces_begin(); fid != _manifold.faces_end(); ++fid) {
-        //iterate over every vertex of the face
-        for (Walker w = _manifold.walker(*fid); !w.full_circle(); w = w.circulate_face_ccw()) {
-            CGLA::Vec3d vertexPos = _manifold.pos(w.vertex());
+    //TODO refactor
+    for (VertexIDIterator vID = _manifold.vertices_begin(); vID != _manifold.vertices_end(); vID++) {
+            CGLA::Vec3d vertexPos = _manifold.pos(*vID);
             GLKVector3 glkVertextPos = GLKVector3Make(vertexPos[0], vertexPos[1], vertexPos[2]);
             float cur_distance = GLKVector3Distance(touchPoint, glkVertextPos);
             if (cur_distance < distance) {
                 distance = cur_distance;
-                closestVertex = w.vertex();
+                closestVertex = *vID;
             }
-        }
     }
     return closestVertex;
 }
 
--(GLKVector3)closestVertexToMeshPoint:(GLKVector3)touchPoint setAsCurrentID:(BOOL)setAsCurrentID {
-    
-    VertexID vID = [self closestVertexID:touchPoint];
-    if (setAsCurrentID) {
-        _curSelectedVertexID = vID;
-    }
-    CGLA::Vec3d vertexPos = _manifold.pos(vID);
-    GLKVector4 glkVertextPos = GLKVector4Make(vertexPos[0], vertexPos[1], vertexPos[2], 1.0);
-    glkVertextPos = GLKMatrix4MultiplyVector4(self.modelMatrix, glkVertextPos);
-    return  GLKVector3Make(glkVertextPos.x, glkVertextPos.y, glkVertextPos.z);
+//touchPoint is in VIEW coordinates. Need to convert manifold coordinates into view coordinates
+//TODO make it better by figuring out the FaceID that contain touchPoint within
+-(FaceID)closestFaceID_2DProjection:(GLKVector3)touchPoint {
+    touchPoint = GLKMatrix4MultiplyVector3Custom(self.viewMatrix, touchPoint);
+    VertexID vID = [self closestVertexID_2DProjection:GLKVector2Make(touchPoint.x, touchPoint.y)];
+    Walker w = _manifold.walker(vID);
+    return w.face();
 }
 
--(GLKVector3)convertModel:(GLKVector3)vertexPos {
-    GLKVector4 glkVertextPos = GLKVector4MakeWithVector3(vertexPos, 1.0f);
-    glkVertextPos = GLKMatrix4MultiplyVector4(self.modelMatrix, glkVertextPos);
-    return  GLKVector3Make(glkVertextPos.x, glkVertextPos.y, glkVertextPos.z);
-}
 
--(BOOL)touchedCloseToTheCurrentVertex:(GLKVector3)touchPoint {
-    touchPoint = [Utilities invertVector3:touchPoint withMatrix:self.modelMatrix];
-    float threshold = _boundingBox.radius * 0.1;
-    
-    CGLA::Vec3d vertexPos = _manifold.pos(_curSelectedVertexID);
-    GLKVector3 glkPos = GLKVector3Make(vertexPos[0], vertexPos[1], vertexPos[2]);
-    
-    GLKVector4 currentPosition4 = GLKMatrix4MultiplyVector4(self.modelViewMatrix, GLKVector4MakeWithVector3(glkPos, 1.0));
-    GLKVector4 newPosition4 = GLKMatrix4MultiplyVector4(self.modelViewMatrix, GLKVector4MakeWithVector3(touchPoint, 1.0));
-    
-    float d = GLKVector2Distance(GLKVector2Make(currentPosition4.x, currentPosition4.y), GLKVector2Make(newPosition4.x, newPosition4.y));
-    if (d <= threshold) {
-        return YES;
-    }
-    return NO;
-}
 
--(GLKVector3)translateCurrentSelectedVertex:(GLKVector3)newPosition  {
-    
-    newPosition = [Utilities invertVector3:newPosition withMatrix:self.modelMatrix];
-    
-    CGLA::Vec3d vertexPos = _manifold.pos(_curSelectedVertexID);
-    GLKVector3 currePosition = GLKVector3Make(vertexPos[0], vertexPos[1], vertexPos[2]);
-    
-    GLKVector4 currentPosition4 = GLKMatrix4MultiplyVector4(self.modelViewMatrix, GLKVector4MakeWithVector3(currePosition, 1.0));
-    GLKVector4 newPosition4 = GLKMatrix4MultiplyVector4(self.modelViewMatrix, GLKVector4MakeWithVector3(newPosition, 1.0));
-    GLKVector3 point3 = GLKVector3Make(newPosition4.x, newPosition4.y, currentPosition4.z);
-    
-    bool isInvertible;
-    GLKVector4 axis = GLKMatrix4MultiplyVector4(GLKMatrix4Invert(self.modelViewMatrix, &isInvertible), GLKVector4MakeWithVector3(point3, 1.0));
-        
-    GLKVector3 vk = GLKVector3Make(axis.x, axis.y, axis.z);
+//-(GLKVector3)closestVertexToMeshPoint:(GLKVector3)touchPoint setAsCurrentID:(BOOL)setAsCurrentID {
+//    
+//    VertexID vID = [self closestVertexID:touchPoint];
+//    if (setAsCurrentID) {
+//        _curSelectedVertexID = vID;
+//    }
+//    CGLA::Vec3d vertexPos = _manifold.pos(vID);
+//    GLKVector4 glkVertextPos = GLKVector4Make(vertexPos[0], vertexPos[1], vertexPos[2], 1.0);
+//    glkVertextPos = GLKMatrix4MultiplyVector4(self.modelMatrix, glkVertextPos);
+//    return  GLKVector3Make(glkVertextPos.x, glkVertextPos.y, glkVertextPos.z);
+//}
 
-    CGLA::Vec3d newPos = CGLA::Vec3d(vk.x, vk.y, vk.z);
-    _manifold.pos(_curSelectedVertexID) = newPos;
-    
-    GLKVector4 glkVertextPos = GLKVector4MakeWithVector3(vk, 1.0f);
-    glkVertextPos = GLKMatrix4MultiplyVector4(self.modelMatrix, glkVertextPos);
-    return  GLKVector3Make(glkVertextPos.x, glkVertextPos.y, glkVertextPos.z);
-}
+//-(GLKVector3)convertModel:(GLKVector3)vertexPos {
+//    GLKVector4 glkVertextPos = GLKVector4MakeWithVector3(vertexPos, 1.0f);
+//    glkVertextPos = GLKMatrix4MultiplyVector4(self.modelMatrix, glkVertextPos);
+//    return  GLKVector3Make(glkVertextPos.x, glkVertextPos.y, glkVertextPos.z);
+//}
+
+//-(BOOL)touchedCloseToTheCurrentVertex:(GLKVector3)touchPoint {
+//    touchPoint = [Utilities invertVector3:touchPoint withMatrix:self.modelMatrix];
+//    float threshold = _boundingBox.radius * 0.1;
+//    
+//    CGLA::Vec3d vertexPos = _manifold.pos(_curSelectedVertexID);
+//    GLKVector3 glkPos = GLKVector3Make(vertexPos[0], vertexPos[1], vertexPos[2]);
+//    
+//    GLKVector4 currentPosition4 = GLKMatrix4MultiplyVector4(self.modelViewMatrix, GLKVector4MakeWithVector3(glkPos, 1.0));
+//    GLKVector4 newPosition4 = GLKMatrix4MultiplyVector4(self.modelViewMatrix, GLKVector4MakeWithVector3(touchPoint, 1.0));
+//    
+//    float d = GLKVector2Distance(GLKVector2Make(currentPosition4.x, currentPosition4.y), GLKVector2Make(newPosition4.x, newPosition4.y));
+//    if (d <= threshold) {
+//        return YES;
+//    }
+//    return NO;
+//}
+//
+//-(GLKVector3)translateCurrentSelectedVertex:(GLKVector3)newPosition  {
+//    
+//    newPosition = [Utilities invertVector3:newPosition withMatrix:self.modelMatrix];
+//    
+//    CGLA::Vec3d vertexPos = _manifold.pos(_curSelectedVertexID);
+//    GLKVector3 currePosition = GLKVector3Make(vertexPos[0], vertexPos[1], vertexPos[2]);
+//    
+//    GLKVector4 currentPosition4 = GLKMatrix4MultiplyVector4(self.modelViewMatrix, GLKVector4MakeWithVector3(currePosition, 1.0));
+//    GLKVector4 newPosition4 = GLKMatrix4MultiplyVector4(self.modelViewMatrix, GLKVector4MakeWithVector3(newPosition, 1.0));
+//    GLKVector3 point3 = GLKVector3Make(newPosition4.x, newPosition4.y, currentPosition4.z);
+//    
+//    bool isInvertible;
+//    GLKVector4 axis = GLKMatrix4MultiplyVector4(GLKMatrix4Invert(self.modelViewMatrix, &isInvertible), GLKVector4MakeWithVector3(point3, 1.0));
+//        
+//    GLKVector3 vk = GLKVector3Make(axis.x, axis.y, axis.z);
+//
+//    CGLA::Vec3d newPos = CGLA::Vec3d(vk.x, vk.y, vk.z);
+//    _manifold.pos(_curSelectedVertexID) = newPos;
+//    
+//    GLKVector4 glkVertextPos = GLKVector4MakeWithVector3(vk, 1.0f);
+//    glkVertextPos = GLKMatrix4MultiplyVector4(self.modelMatrix, glkVertextPos);
+//    return  GLKVector3Make(glkVertextPos.x, glkVertextPos.y, glkVertextPos.z);
+//}
 
 -(void)rebuffer {
     NSMutableData* vertexData = [[NSMutableData alloc] init];
@@ -462,20 +491,23 @@ using namespace HMesh;
 }
 
 -(void)branchCreateMovementStart:(GLKVector3)touchPoint {
-    mousePoint = touchPoint;
+    
+    mousePoint = [Utilities invertVector3:touchPoint withMatrix:self.modelMatrix];;
 }
 
 -(void)branchCreateMovementEnd:(GLKVector3)touchPoint {
     [self saveState];
-    GLKVector4 mousePoint_inView_4 = GLKMatrix4MultiplyVector4(self.viewMatrix, GLKVector4MakeWithVector3(mousePoint, 1.0f));
-    GLKVector2 mousePoint_inView_2 = GLKVector2Make(mousePoint_inView_4.x, mousePoint_inView_4.y);
-    VertexID vID = [self closestVertexID_2DProjection:mousePoint_inView_2];
-    Vec3d norm = HMesh::normal(_manifold, vID);
+    touchPoint = [Utilities invertVector3:touchPoint withMatrix:self.modelMatrix];
     
-    GLKVector4 touchPoint_inView_4 = GLKMatrix4MultiplyVector4(self.viewMatrix, GLKVector4MakeWithVector3(touchPoint, 1.0f));
-    GLKVector2 touchPoint_inView_2 = GLKVector2Make(touchPoint_inView_4.x, touchPoint_inView_4.y);
-    Vec2d displace2d = Vec2d(touchPoint_inView_2.x - mousePoint_inView_2.x, touchPoint_inView_2.y - mousePoint_inView_2.y);
+    GLKVector3 mousePoint_inView_3 = GLKMatrix4MultiplyVector3Custom(self.modelViewMatrix, mousePoint);
+    VertexID vID = [self closestVertexID_2DProjection:GLKVector2Make(mousePoint_inView_3.x, mousePoint_inView_3.y)];
+    Vec3d norm = normalize(HMesh::normal(_manifold, vID));
     
+//    GLKVector3 touchPoint_inView_3 = touchPoint;//GLKMatrix4MultiplyVector3Custom(self.viewMatrix, touchPoint);
+//    GLKVector2 touchPoint_inView_2 = GLKVector2Make(touchPoint_inView_3.x, touchPoint_inView_3.y);
+//    Vec2d displace2d = Vec2d(touchPoint_inView_2.x - mousePoint_inView_2.x, touchPoint_inView_2.y - mousePoint_inView_2.y);
+    Vec3d displace = Vec3d(touchPoint.x - mousePoint.x, touchPoint.y - mousePoint.y, touchPoint.z - mousePoint.z);
+
     VertexID newPoleID;
     Vec3d mouseVertex = _manifold.pos(vID);
     BOOL result = [self createBranchAtPoint:GLKVector3Make(mouseVertex[0], mouseVertex[1], mouseVertex[2])
@@ -486,7 +518,7 @@ using namespace HMesh;
         poles[newPoleID] = 1;
         refine_poles(_manifold, poles);
 
-        Vec3d displace3d = norm * displace2d.length();
+        Vec3d displace3d =  norm * displace.length();
         
         // Move pole
         _manifold.pos(newPoleID) = _manifold.pos(newPoleID) + displace3d;
@@ -569,9 +601,117 @@ using namespace HMesh;
         
     } else {
 //        NSLog(@"GAUSSIAN MOVE %f", GLKMathRadiansToDegrees(angle));
-        for(auto vid : _manifold.vertices())
+//        for(auto vid : _manifold.vertices())
+//        {
+//            _manifold.pos(vid) = old_mani.pos(vid) + weight_vector[vid] * displace;
+//        }
+    }
+    [self rebuffer];
+}
+
+
+//Touch point in VIEW coordinates
+-(void)bendBranchBeginWithBendingPivot:(GLKVector3)bendingPivot touchPoint:(GLKVector3)touchPoint {
+    _branchBendingInitialPoint = touchPoint;
+    _branchBendFaceID = [self closestFaceID_2DProjection:bendingPivot];
+}
+
+//Touch point in VIEW coordinates
+-(void)bendBranchEnd:(GLKVector3)touchPoint {
+    [self saveState];
+    HMesh::HalfEdgeAttributeVector<EdgeInfo> edgeInfo = trace_spine_edges(_manifold);
+    Walker w = _manifold.walker(_branchBendFaceID);
+    
+    if (edgeInfo[w.halfedge()].edge_type == RIB) {
+        w = w.next();
+    }
+    
+    assert(edgeInfo[w.halfedge()].edge_type == SPINE);
+    
+    //FIND POLE
+    //Walk one direction
+    HalfEdgeID poleDirectionHalfEdge;
+    Walker w1 = w;
+    
+    while (!is_pole(_manifold, w1.vertex()) && !is_connecting_ring(_manifold, w1.next().halfedge())) {
+        w1 = w1.next().opp().next();
+    }
+    if (is_pole(_manifold, w1.vertex())) {
+        poleDirectionHalfEdge = w.halfedge();
+    } else if (is_connecting_ring(_manifold, w1.next().halfedge())) {
+        //walk opposite direction
+        Walker w1 = w.opp();
+        while (!is_pole(_manifold, w1.vertex()) && !is_connecting_ring(_manifold, w1.next().halfedge())) {
+            w1 = w1.next().opp().next();
+        }
+        if (is_pole(_manifold, w1.vertex())) {
+            poleDirectionHalfEdge = w.opp().halfedge();
+        } else if (is_connecting_ring(_manifold, w1.next().halfedge())) {
+            NSLog(@"Erroe bending the branch. Couldnt find the pole");
+            return;
+        }
+    }
+    
+    //Walk towards pole and collect vertex ids for every ring
+    vector<vector<VertexID>> rings;
+    vector<Vec3d> centroids;
+    Walker spineWalker = _manifold.walker(poleDirectionHalfEdge);
+    for (; !is_pole(_manifold, spineWalker.vertex()); spineWalker = spineWalker.next().opp().next())
+    {
+        assert(edgeInfo[spineWalker.next().halfedge()].edge_type == RIB);
+        
+        vector<VertexID> vIDs;
+        Vec3d centroid = Vec3d(0,0,0);
+        Walker ribWalker = _manifold.walker(spineWalker.next().halfedge());
+        
+        for (;!ribWalker.full_circle(); ribWalker = ribWalker.next().opp().next())
         {
-            _manifold.pos(vid) = old_mani.pos(vid) + weight_vector[vid] * displace;
+            vIDs.push_back(ribWalker.vertex());
+            centroid += _manifold.pos(ribWalker.vertex());
+        }
+        centroids.push_back(centroid/(float)vIDs.size());
+        rings.push_back(vIDs);
+    }
+    //Add the pole
+    centroids.push_back(_manifold.pos(spineWalker.vertex()));
+    vector<VertexID> vIDs;
+    vIDs.push_back(spineWalker.vertex());
+    rings.push_back(vIDs);
+    
+    assert(centroids.size() == rings.size());
+    
+    //Get the length of the branch
+    float branch_length = 0;
+    for (int i = centroids.size() - 1; i > 0; i--) {
+        branch_length += (centroids[i] - centroids[i-1]).length();
+    }
+    
+    //Calculate gaussian weights
+    vector<float> gaussian_weights(centroids.size());
+    for (int i = 0; i < centroids.size(); i++) {
+        double l = sqr_length(centroids[i] - centroids[centroids.size() - 1]);
+        gaussian_weights[i] = exp(-l/(branch_length*branch_length));
+    }
+    
+    //TODO apply translation and apply gaussian weights
+    GLKVector3 startBendingWorld = GLKMatrix4MultiplyVector3Custom(self.viewMatrix, _branchBendingInitialPoint);
+    GLKVector3 endBendingWorld = GLKMatrix4MultiplyVector3Custom(self.viewMatrix, touchPoint);
+    GLKVector2 displacement = GLKVector2Subtract(GLKVector2MakeWithVector3(endBendingWorld),
+                                                 GLKVector2MakeWithVector3(startBendingWorld));
+    
+    for (int i = 0; i < rings.size(); i++) {
+        vector<VertexID> vIDs = rings[i];
+        float weight = gaussian_weights[i];
+        for (int j = 0; j < vIDs.size(); j++) {
+            VertexID vID = vIDs[j];
+            Vec3d v_pos = _manifold.pos(vID);
+            GLKVector3 v_pos_glk_model = GLKVector3MakeWithVec3d(v_pos);
+            GLKVector3 v_pos_glk_world = GLKMatrix4MultiplyVector3Custom(self.modelViewMatrix, v_pos_glk_model);
+            v_pos_glk_world.x += weight * displacement.x;
+            v_pos_glk_world.y += weight * displacement.y;
+            v_pos_glk_model = [Utilities invertVector3:v_pos_glk_world withMatrix:self.modelViewMatrix];
+            v_pos = Vec3d(v_pos_glk_model.x, v_pos_glk_model.y, v_pos_glk_model.z);
+            _manifold.pos(vID) = v_pos;
         }
     }
     [self rebuffer];
@@ -616,6 +756,8 @@ using namespace HMesh;
     bsphere(_manifold, c, r);
     [self moveVertexCloseTo:touchPoint orthogonallyBy:r * 0.05];
 }
+
+
 
 -(void)draw {
     glUseProgram(self.drawShaderProgram.program);

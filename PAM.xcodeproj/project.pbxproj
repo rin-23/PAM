@@ -52,6 +52,7 @@
 		15646615182033920000B985 /* QuadMeshViewController.mm in Sources */ = {isa = PBXBuildFile; fileRef = 15646609182033920000B985 /* QuadMeshViewController.mm */; };
 		15646616182033920000B985 /* QuadPolygonMesh.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1564660B182033920000B985 /* QuadPolygonMesh.mm */; };
 		15646617182033920000B985 /* WireFrame.m in Sources */ = {isa = PBXBuildFile; fileRef = 1564660D182033920000B985 /* WireFrame.m */; };
+		1A9438AD1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m in Sources */ = {isa = PBXBuildFile; fileRef = 1A9438AC1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -167,6 +168,8 @@
 		1564660B182033920000B985 /* QuadPolygonMesh.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = QuadPolygonMesh.mm; sourceTree = "<group>"; };
 		1564660C182033920000B985 /* WireFrame.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WireFrame.h; sourceTree = "<group>"; };
 		1564660D182033920000B985 /* WireFrame.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WireFrame.m; sourceTree = "<group>"; };
+		1A9438AB1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = UITwoFingerHoldGestureRecognizer.h; path = Classes/QuadMeshProject/UITwoFingerHoldGestureRecognizer.h; sourceTree = "<group>"; };
+		1A9438AC1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = UITwoFingerHoldGestureRecognizer.m; path = Classes/QuadMeshProject/UITwoFingerHoldGestureRecognizer.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -321,6 +324,8 @@
 		156463F01820266E0000B985 /* PAM */ = {
 			isa = PBXGroup;
 			children = (
+				1A9438AA1832F39F0081F188 /* Helpers */,
+				15646602182033920000B985 /* ObjFiles */,
 				153B4E0818206CC100962DB2 /* 3DModels */,
 				153B4E0B18206CC100962DB2 /* GLEngine */,
 				153B4E2918206CC100962DB2 /* Shaders */,
@@ -380,7 +385,6 @@
 				156465FF182033920000B985 /* BaseQuadMeshViewController.m */,
 				15646600182033920000B985 /* MeshLoader.h */,
 				15646601182033920000B985 /* MeshLoader.mm */,
-				15646602182033920000B985 /* ObjFiles */,
 				15646608182033920000B985 /* QuadMeshViewController.h */,
 				15646609182033920000B985 /* QuadMeshViewController.mm */,
 				1564660A182033920000B985 /* QuadPolygonMesh.h */,
@@ -401,7 +405,17 @@
 				15646606182033920000B985 /* newTEST.obj */,
 				15646607182033920000B985 /* teapot.obj */,
 			);
-			path = ObjFiles;
+			name = ObjFiles;
+			path = Classes/QuadMeshProject/ObjFiles;
+			sourceTree = "<group>";
+		};
+		1A9438AA1832F39F0081F188 /* Helpers */ = {
+			isa = PBXGroup;
+			children = (
+				1A9438AB1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.h */,
+				1A9438AC1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m */,
+			);
+			name = Helpers;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -556,6 +570,7 @@
 				153B4E3D18206CC200962DB2 /* GyroRotationManager.m in Sources */,
 				153B4E3918206CC200962DB2 /* Mesh.m in Sources */,
 				153B4E3C18206CC200962DB2 /* ShaderProgram.m in Sources */,
+				1A9438AD1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m in Sources */,
 				153B4E3818206CC200962DB2 /* AGLKVertexAttribArrayBuffer.m in Sources */,
 				153B4E4018206CC200962DB2 /* ZoomManager.m in Sources */,
 				153B4E3B18206CC200962DB2 /* PolygonMesh.m in Sources */,

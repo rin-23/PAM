@@ -15,6 +15,8 @@
 #import "Utilities.h"
 #import "MeshLoader.h"
 #import "PlateStartPoint.h"
+#import "UITwoFingerHoldGestureRecognizer.h"
+
 
 typedef enum {
     TOUCHED_NONE,
@@ -45,6 +47,11 @@ typedef enum {
     float _gaussianDepth;
     
     DrawingState _state;
+    
+    //Gestures
+//    UILongPressGestureRecognizer* _twoFingerBending;
+    UITwoFingerHoldGestureRecognizer* _twoFingerBending;
+    UIPanGestureRecognizer* _oneFingerPanning;
 }
 @end
 
@@ -79,6 +86,7 @@ typedef enum {
     _branchWidthSlider.maximumValue = 5.0f;
     [_branchWidthSlider addTarget:self action:@selector(sliderChanged:) forControlEvents:UIControlEventValueChanged];
     
+    [_transformSwitch addTarget:self action:@selector(transformSwitchChanged:) forControlEvents:UIControlEventValueChanged];
     [_skeletonSwitch addTarget:self action:@selector(skeletonSwitchChanged:) forControlEvents:UIControlEventValueChanged];
 
 }
@@ -154,10 +162,10 @@ typedef enum {
     [view addGestureRecognizer:rotationInPlaneOfScreen];
     
     //ArcBall Rotation
-    UIPanGestureRecognizer* onFingerRotation = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleOneFingerPanGesture:)];
-    onFingerRotation.minimumNumberOfTouches = 1;
-    onFingerRotation.maximumNumberOfTouches = 1;
-    [view addGestureRecognizer:onFingerRotation];
+    _oneFingerPanning = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleOneFingerPanGesture:)];
+    _oneFingerPanning.delegate = self;
+    _oneFingerPanning.maximumNumberOfTouches = 1;
+    [view addGestureRecognizer:_oneFingerPanning];
     
     UITapGestureRecognizer* doubleTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleDoubleTapGesture:)];
     doubleTap.numberOfTouchesRequired = 1;
@@ -170,15 +178,40 @@ typedef enum {
 //    [singleTap requireGestureRecognizerToFail:doubleTap];
 //    [view addGestureRecognizer:singleTap];
     
-    UILongPressGestureRecognizer* tapWithTwoFingers = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleTwoFingerTapGesture:)];
-    tapWithTwoFingers.numberOfTouchesRequired = 2;
-    tapWithTwoFingers.minimumPressDuration = 0.01;
-    [view addGestureRecognizer:tapWithTwoFingers];
-    
-    UITapGestureRecognizer* tapWithFourFingers = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleFourFingerTapGesture:)];
-    tapWithTwoFingers.numberOfTouchesRequired = 4;
-    [view addGestureRecognizer:tapWithFourFingers];
+    _twoFingerBending = [[UITwoFingerHoldGestureRecognizer alloc] initWithTarget:self action:@selector(handleTwoFingerTapGesture:)];
+    _twoFingerBending.delegate = self;
+//    _twoFingerBending.numberOfTouchesRequired = 2;
+//    _twoFingerBending.minimumPressDuration = 0.01;
+    _twoFingerBending.enabled = NO;
+    [view addGestureRecognizer:_twoFingerBending];
+
+//    UITapGestureRecognizer* tapWithFourFingers = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleFourFingerTapGesture:)];
+//    tapWithTwoFingers.numberOfTouchesRequired = 4;
+//    [view addGestureRecognizer:tapWithFourFingers];
 }
+
+#pragma mark - UIGestureRecognizerDelegate
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
+{
+//    if (gestureRecognizer == _twoFingerBending && otherGestureRecognizer == _oneFingerPanning) {
+//        return YES;
+//    }
+//    if (gestureRecognizer == _oneFingerPanning && otherGestureRecognizer == _twoFingerBending) {
+//        return YES;
+//    }
+    return NO;
+}
+
+// called before touchesBegan:withEvent: is called on the gesture recognizer for a new touch. return NO to prevent the gesture recognizer from seeing this touch
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch {
+    if (gestureRecognizer == _twoFingerBending) {
+        BOOL flag = [_twoFingerBending needsMoreTouch];
+        return flag;
+    }
+    
+    return YES;
+}
+
 
 #pragma mark - Gesture recognizer selectors
 -(void)handlePinchGesture:(UIGestureRecognizer*)sender {
@@ -209,6 +242,48 @@ typedef enum {
     if (!_transformSwitch.isOn) {
         [_rotationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity isOrthogonal:NO];
     } else {
+//        //Handle branch bending
+//        NSLog(@"One finger panning");
+//        if (_twoFingerBending.state == UIGestureRecognizerStateBegan ||
+//            _twoFingerBending.state == UIGestureRecognizerStateChanged)
+//            
+//        {
+//
+//            CGPoint touchPoint = [self touchPointFromGesture:sender];
+//            if (sender.state == UIGestureRecognizerStateBegan)
+//            {
+//                CGPoint branchPivot = [self touchPointFromGesture:_twoFingerBending];
+//                GLKVector3 branchPivotViewCoord, touchPointViewCoord;
+//                
+//                BOOL result1 = [self modelCoordinates:&branchPivotViewCoord forTouchPoint:GLKVector3Make(branchPivot.x, branchPivot.y, 0)];
+//                BOOL result2 = [self modelCoordinates:&touchPointViewCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, 0)];
+//                if (!result1 || !result2) {
+//                    NSLog(@"[WARNING] Couldn't determine touch area");
+//                    return;
+//                }
+//
+//                [_pMesh bendBranchBeginWithBendingPivot:branchPivotViewCoord touchPoint:touchPointViewCoord];
+//            }
+//            else if (sender.state == UIGestureRecognizerStateChanged)
+//            {
+//                
+//            }
+//            else if (sender.state == UIGestureRecognizerStateEnded)
+//            {
+//                GLKVector3 touchPointViewCoord;
+//                BOOL result2 = [self modelCoordinates:&touchPointViewCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, 0)];
+//                if (!result2) {
+//                    NSLog(@"[WARNING] Couldn't determine touch area");
+//                    return;
+//                }
+//                [_pMesh bendBranchEnd:touchPointViewCoord];
+//            }
+//            
+//            return;
+//        }
+        
+        
+        //Handle branch creation
         if (sender.state == UIGestureRecognizerStateBegan)
         {
             _state = TOUCHED_NONE;
@@ -270,6 +345,9 @@ typedef enum {
 }
 
 -(void)handleTwoFingerPanGesture:(UIGestureRecognizer*)sender {
+    if(sender.state == UIGestureRecognizerStateBegan) {
+        NSLog(@"Started");
+    }
     [_translationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity];
 }
 
@@ -278,6 +356,9 @@ typedef enum {
 }
 
 -(void)handleDoubleTapGesture:(UIGestureRecognizer*)sender {
+    
+    return;
+    
     NSMutableData* pixelData = [self renderToOffscreenDepthBuffer:@[_pMesh]];
     CGPoint touchPoint = [self scaleTouchPoint:[sender locationInView:sender.view] inView:(GLKView*)sender.view];
     GLKVector3 startPoint;
@@ -289,6 +370,8 @@ typedef enum {
     }
    
     [_pMesh createBranchAtPointAndRefine:startPoint];
+
+    
 //    [_pMesh createNewRibAtPoint:startPoint];
 //    [_pMesh createNewSpineAtPoint:startPoint];
 //    GLKVector3* dataBytes = (GLKVector3*)data.bytes;
@@ -305,9 +388,38 @@ typedef enum {
 
 -(void)handleTwoFingerTapGesture:(UIGestureRecognizer*)sender {
     if(sender.state == UIGestureRecognizerStateBegan) {
-        NSLog(@"Started tap");
+        NSLog(@"Two finger bending Started");
+        CGPoint touchPoint1 = [self scaleTouchPoint:[sender locationOfTouch:0 inView:(GLKView*)sender.view]
+                                             inView:(GLKView*)sender.view];
+        CGPoint touchPoint2 = [self scaleTouchPoint:[sender locationOfTouch:1 inView:(GLKView*)sender.view]
+                                             inView:(GLKView*)sender.view];
+
+        GLKVector3 branchPivotViewCoord, touchPointViewCoord;
+        BOOL result1 = [self modelCoordinates:&branchPivotViewCoord forTouchPoint:GLKVector3Make(touchPoint1.x, touchPoint1.y, 0)];
+        BOOL result2 = [self modelCoordinates:&touchPointViewCoord forTouchPoint:GLKVector3Make(touchPoint2.x, touchPoint2.y, 0)];
+        if (!result1 || !result2) {
+            NSLog(@"[WARNING] Couldn't determine touch area");
+            return;
+        }
+        [_pMesh bendBranchBeginWithBendingPivot:branchPivotViewCoord touchPoint:touchPointViewCoord];
+        
+    } else if (sender.state == UIGestureRecognizerStateChanged) {
+        NSLog(@"Two finger bending Changed");
     } else if (sender.state == UIGestureRecognizerStateEnded) {
-        NSLog(@"Ended tap");
+        NSLog(@"Two finger bending Ended ");
+        CGPoint touchPoint2 = [self scaleTouchPoint:[sender locationOfTouch:1 inView:(GLKView*)sender.view]
+                                             inView:(GLKView*)sender.view];
+        GLKVector3 touchPointViewCoord;
+        BOOL result = [self modelCoordinates:&touchPointViewCoord forTouchPoint:GLKVector3Make(touchPoint2.x, touchPoint2.y, 0)];
+        if (!result) {
+            NSLog(@"[WARNING] Couldn't determine touch area");
+            return;
+        }
+        [_pMesh bendBranchEnd:touchPointViewCoord];
+    } else if (sender.state == UIGestureRecognizerStateFailed) {
+        NSLog(@"Two finger bending Failed ");
+    } else {
+        NSLog(@"Two finger bending Uknown State ");
     }
 }
 
@@ -548,6 +660,7 @@ typedef enum {
     _zoomManager.scaleMatrix = GLKMatrix4Identity;
     [_branchPoints removeAllObjects];
 }
+
 -(void)sliderChanged:(id)sender{
 
     float newStep = roundf(_branchWidthSlider.value);
@@ -556,6 +669,11 @@ typedef enum {
     _branchWidthSlider.value = newStep;
     _pMesh.branchWidth = newStep;
 
+}
+
+-(void)transformSwitchChanged:(id)sender {
+    UISwitch* s = (UISwitch*)sender;
+    _twoFingerBending.enabled = s.isOn;
 }
 
 -(void)skeletonSwitchChanged:(id)sender {

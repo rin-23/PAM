@@ -531,12 +531,10 @@ using namespace HMesh;
         //Add ribs for the new branch
         Walker walker = _manifold.walker(newPoleID);
         HalfEdgeID ID_1 = walker.next().opp().next().halfedge();
-        HalfEdgeID ID_2 = add_rib(_manifold, ID_1);
-        add_rib(_manifold, ID_1);
-        add_rib(_manifold, ID_2);
+        recursively_add_rib(_manifold, ID_1, 4);
+
         [self rebuffer];
     }
-
 }
 
 -(void)gaussianStart:(GLKVector3)touchPoint {
@@ -690,7 +688,7 @@ using namespace HMesh;
     vector<float> gaussian_weights(centroids.size());
     for (int i = 0; i < centroids.size(); i++) {
         double l = sqr_length(centroids[i] - centroids[centroids.size() - 1]);
-        gaussian_weights[i] = exp(-l/(branch_length*branch_length));
+        gaussian_weights[i] = exp(-l/(0.3*branch_length*branch_length));
     }
     
     //TODO apply translation and apply gaussian weights

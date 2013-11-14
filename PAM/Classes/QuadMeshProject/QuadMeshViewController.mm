@@ -48,6 +48,9 @@ typedef enum {
     UIPanGestureRecognizer* _oneFingerPanning;
     
     Line* _selectionLine;
+    
+    DrawingState _state;
+    float _gaussianDepth;
 }
 @end
 
@@ -236,46 +239,87 @@ typedef enum {
     if (!_transformSwitch.isOn) {
         [_rotationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity isOrthogonal:NO];
     } else {
-        //Handle branch creation
-        if (sender.state == UIGestureRecognizerStateBegan)  {
+        if (sender.state == UIGestureRecognizerStateBegan)
+        {
+            _state = TOUCHED_NONE;
+            
             CGPoint touchPoint = [self touchPointFromGesture:sender];
-            GLKVector3 rayOrigin, rayDir;
-            BOOL result =[self rayOrigin:&rayOrigin rayDirection:&rayDir forTouchPoint:touchPoint];
-//            BOOL result = [self modelCoordinates:&rayOrigin forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, 0)];
+            
+            //Add touch point to a line
+            GLKVector3 rayOrigin, rayDirection;
+            BOOL result = [self rayOrigin:&rayOrigin rayDirection:&rayDirection forTouchPoint:touchPoint];
             if (!result) {
                 NSLog(@"[WARNING] Couldn't determine touch area");
                 return;
             }
-            [_pMesh branchCreateMovementStart:rayOrigin];
-            
-            rayOrigin = GLKVector3Add(rayOrigin, GLKVector3MultiplyScalar(rayDir, 5));
+            rayOrigin = GLKVector3Add(rayOrigin, rayDirection);
             VertexRGBA vertex = {{rayOrigin.x, rayOrigin.y, rayOrigin.z}, {255,0,0,255}};
             NSMutableData* lineData = [[NSMutableData alloc] initWithBytes:&vertex length:sizeof(VertexRGBA)];
             _selectionLine = [[Line alloc] initWithVertexData:lineData];
+            
+            //Start branch creation
+            NSMutableData* pixelData = [self renderToOffscreenDepthBuffer:@[_pMesh]];
+            float depth = [self depthForPoint:touchPoint depthBuffer:pixelData];
+            
+            if (depth < 0) { //clicked on background
+                GLKVector3 modelCoord;
+                BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, 0)];
+                if (!result) {
+                    NSLog(@"[WARNING] Couldn't determine touch area");
+                    return;
+                }
+                [_pMesh branchCreateMovementStart:modelCoord];
+                
+                _state = TOUCHED_BACKGROUND;
+            } else { //clicked on a model
+                _gaussianDepth = depth;
+                GLKVector3 modelCoord;
+                BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, _gaussianDepth)];
+                if (!result) {
+                    NSLog(@"[WARNING] Couldn't determine touch area");
+                    return;
+                }
+                [_pMesh gaussianStart:modelCoord];
+                
+                _state = TOUCHED_MODEL;
+            }
+            
         }
         else if (sender.state == UIGestureRecognizerStateChanged)
         {
+            //Add touch point to a line
             CGPoint touchPoint = [self touchPointFromGesture:sender];
-            GLKVector3 rayOrigin, rayDir;
-            BOOL result =[self rayOrigin:&rayOrigin rayDirection:&rayDir forTouchPoint:touchPoint];
+            GLKVector3 rayOrigin, rayDirection;
+            BOOL result = [self rayOrigin:&rayOrigin rayDirection:&rayDirection forTouchPoint:touchPoint];
             if (!result) {
                 NSLog(@"[WARNING] Couldn't determine touch area");
                 return;
             }
+            rayOrigin = GLKVector3Add(rayOrigin, rayDirection);
+
             [_selectionLine addVertex:rayOrigin];
         }
         else if (sender.state == UIGestureRecognizerStateEnded)
         {
             CGPoint touchPoint = [self touchPointFromGesture:sender];
-//            GLKVector3 modelCoord;
-//            BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, 0)];
-            GLKVector3 rayOrigin, rayDir;
-            BOOL result =[self rayOrigin:&rayOrigin rayDirection:&rayDir forTouchPoint:touchPoint];
-            if (!result) {
-                NSLog(@"[WARNING] Couldn't determine touch area");
-                return;
+            if (_state == TOUCHED_MODEL) {
+                GLKVector3 modelCoord;
+                BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, _gaussianDepth)];
+                if (!result) {
+                    NSLog(@"[WARNING] Couldn determine touch area");
+                    return;
+                }
+                [_pMesh gaussianMove:modelCoord];
+            } else if (_state == TOUCHED_BACKGROUND){
+                GLKVector3 modelCoord;
+                BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, 0)];
+                if (!result) {
+                    NSLog(@"[WARNING] Couldn't determine touch area");
+                    return;
+                }
+                [_pMesh branchCreateMovementEnd:modelCoord];
             }
-            [_pMesh branchCreateMovementEnd:rayOrigin];
+            _state = TOUCHED_NONE;
             _selectionLine = nil;
         }
     }
@@ -425,12 +469,13 @@ typedef enum {
 //Draw callback
 - (void)glkView:(GLKView *)view drawInRect:(CGRect)rect {
     [(AGLKContext *)view.context clear:GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT];
+
     glLineWidth(1.0f);
     _pMesh.viewMatrix = viewMatrix;
     _pMesh.projectionMatrix = projectionMatrix;
     [_pMesh draw];
     
-    glLineWidth(2.0f);
+    glLineWidth(3.0f);
     _selectionLine.viewMatrix = viewMatrix;
     _selectionLine.projectionMatrix = projectionMatrix;
     [_selectionLine draw];

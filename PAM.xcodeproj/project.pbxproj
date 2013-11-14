@@ -27,6 +27,7 @@
 		153B4E5818206CF400962DB2 /* PointCloudRGBAShader.vsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E3318206CC200962DB2 /* PointCloudRGBAShader.vsh */; };
 		153B4E5918206CF400962DB2 /* TextureShader.fsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E3418206CC200962DB2 /* TextureShader.fsh */; };
 		153B4E5A18206CF400962DB2 /* TextureShader.vsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E3518206CC200962DB2 /* TextureShader.vsh */; };
+		1551ED6E18348F7F00855993 /* Line.m in Sources */ = {isa = PBXBuildFile; fileRef = 1551ED6D18348F7F00855993 /* Line.m */; };
 		156463EB1820266E0000B985 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 156463EA1820266E0000B985 /* Foundation.framework */; };
 		156463ED1820266E0000B985 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 156463EC1820266E0000B985 /* CoreGraphics.framework */; };
 		156463EF1820266E0000B985 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 156463EE1820266E0000B985 /* UIKit.framework */; };
@@ -134,6 +135,8 @@
 		153B4E3318206CC200962DB2 /* PointCloudRGBAShader.vsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = PointCloudRGBAShader.vsh; sourceTree = "<group>"; };
 		153B4E3418206CC200962DB2 /* TextureShader.fsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = TextureShader.fsh; sourceTree = "<group>"; };
 		153B4E3518206CC200962DB2 /* TextureShader.vsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = TextureShader.vsh; sourceTree = "<group>"; };
+		1551ED6C18348F7F00855993 /* Line.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Line.h; sourceTree = "<group>"; };
+		1551ED6D18348F7F00855993 /* Line.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = Line.m; sourceTree = "<group>"; };
 		156463E71820266E0000B985 /* PAM.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PAM.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		156463EA1820266E0000B985 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		156463EC1820266E0000B985 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
@@ -202,6 +205,8 @@
 		153B4E0818206CC100962DB2 /* 3DModels */ = {
 			isa = PBXGroup;
 			children = (
+				1551ED6C18348F7F00855993 /* Line.h */,
+				1551ED6D18348F7F00855993 /* Line.m */,
 				153B4E0918206CC100962DB2 /* PlateStartPoint.h */,
 				153B4E0A18206CC100962DB2 /* PlateStartPoint.m */,
 			);
@@ -580,6 +585,7 @@
 				156463FB1820266E0000B985 /* AppDelegate.m in Sources */,
 				153B4E3718206CC200962DB2 /* AGLKContext.m in Sources */,
 				153B4E4218206CC200962DB2 /* Utilities.m in Sources */,
+				1551ED6E18348F7F00855993 /* Line.m in Sources */,
 				1564660F182033920000B985 /* MeshLoader.mm in Sources */,
 				156463F71820266E0000B985 /* main.m in Sources */,
 				15646615182033920000B985 /* QuadMeshViewController.mm in Sources */,

@@ -43,13 +43,7 @@ typedef enum {
     
     NSMutableArray* _branchPoints;
     
-    //Gaussian transformations
-    float _gaussianDepth;
-    
-    DrawingState _state;
-    
     //Gestures
-//    UILongPressGestureRecognizer* _twoFingerBending;
     UITwoFingerHoldGestureRecognizer* _twoFingerBending;
     UIPanGestureRecognizer* _oneFingerPanning;
 }
@@ -88,7 +82,6 @@ typedef enum {
     
     [_transformSwitch addTarget:self action:@selector(transformSwitchChanged:) forControlEvents:UIControlEventValueChanged];
     [_skeletonSwitch addTarget:self action:@selector(skeletonSwitchChanged:) forControlEvents:UIControlEventValueChanged];
-
 }
 
 - (void)viewDidUnload {
@@ -146,7 +139,7 @@ typedef enum {
 }
 
 -(void)addGestureRecognizersToView:(UIView*)view {
-    
+
     //Pinch To Zoom. Scaling along X,Y,Z
     UIPinchGestureRecognizer* pinchToZoom = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(handlePinchGesture:)];
     [view addGestureRecognizer:pinchToZoom];
@@ -212,7 +205,6 @@ typedef enum {
     return YES;
 }
 
-
 #pragma mark - Gesture recognizer selectors
 -(void)handlePinchGesture:(UIGestureRecognizer*)sender {
     if (!_transformSwitch.isOn) {
@@ -242,104 +234,28 @@ typedef enum {
     if (!_transformSwitch.isOn) {
         [_rotationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity isOrthogonal:NO];
     } else {
-//        //Handle branch bending
-//        NSLog(@"One finger panning");
-//        if (_twoFingerBending.state == UIGestureRecognizerStateBegan ||
-//            _twoFingerBending.state == UIGestureRecognizerStateChanged)
-//            
-//        {
-//
-//            CGPoint touchPoint = [self touchPointFromGesture:sender];
-//            if (sender.state == UIGestureRecognizerStateBegan)
-//            {
-//                CGPoint branchPivot = [self touchPointFromGesture:_twoFingerBending];
-//                GLKVector3 branchPivotViewCoord, touchPointViewCoord;
-//                
-//                BOOL result1 = [self modelCoordinates:&branchPivotViewCoord forTouchPoint:GLKVector3Make(branchPivot.x, branchPivot.y, 0)];
-//                BOOL result2 = [self modelCoordinates:&touchPointViewCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, 0)];
-//                if (!result1 || !result2) {
-//                    NSLog(@"[WARNING] Couldn't determine touch area");
-//                    return;
-//                }
-//
-//                [_pMesh bendBranchBeginWithBendingPivot:branchPivotViewCoord touchPoint:touchPointViewCoord];
-//            }
-//            else if (sender.state == UIGestureRecognizerStateChanged)
-//            {
-//                
-//            }
-//            else if (sender.state == UIGestureRecognizerStateEnded)
-//            {
-//                GLKVector3 touchPointViewCoord;
-//                BOOL result2 = [self modelCoordinates:&touchPointViewCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, 0)];
-//                if (!result2) {
-//                    NSLog(@"[WARNING] Couldn't determine touch area");
-//                    return;
-//                }
-//                [_pMesh bendBranchEnd:touchPointViewCoord];
-//            }
-//            
-//            return;
-//        }
-        
-        
         //Handle branch creation
-        if (sender.state == UIGestureRecognizerStateBegan)
-        {
-            _state = TOUCHED_NONE;
-            
+        if (sender.state == UIGestureRecognizerStateBegan)  {
             CGPoint touchPoint = [self touchPointFromGesture:sender];
-            NSMutableData* pixelData = [self renderToOffscreenDepthBuffer:@[_pMesh]];
-            float depth = [self depthForPoint:touchPoint depthBuffer:pixelData];
-
-            if (depth < 0) { //clicked on background
-                GLKVector3 modelCoord;
-                BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, 0)];
-                if (!result) {
-                    NSLog(@"[WARNING] Couldn't determine touch area");
-                    return;
-                }
-                [_pMesh branchCreateMovementStart:modelCoord];
-
-                _state = TOUCHED_BACKGROUND;
-            } else { //clicked on a model
-                _gaussianDepth = depth;
-                GLKVector3 modelCoord;
-                BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, _gaussianDepth)];
-                if (!result) {
-                    NSLog(@"[WARNING] Couldn't determine touch area");
-                    return;
-                }
-                [_pMesh gaussianStart:modelCoord];
-                
-                _state = TOUCHED_MODEL;
+            GLKVector3 modelCoord;
+            BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, 0)];
+            if (!result) {
+                NSLog(@"[WARNING] Couldn't determine touch area");
+                return;
             }
+            [_pMesh branchCreateMovementStart:modelCoord];
         }
-        else if (sender.state == UIGestureRecognizerStateChanged)
-        {
-
-        }
+        else if (sender.state == UIGestureRecognizerStateChanged) {}
         else if (sender.state == UIGestureRecognizerStateEnded)
         {
             CGPoint touchPoint = [self touchPointFromGesture:sender];
-            if (_state == TOUCHED_MODEL) {
-                GLKVector3 modelCoord;
-                BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, _gaussianDepth)];
-                if (!result) {
-                    NSLog(@"[WARNING] Couldn determine touch area");
-                    return;
-                }
-                [_pMesh gaussianMove:modelCoord];
-            } else if (_state == TOUCHED_BACKGROUND){
-                GLKVector3 modelCoord;
-                BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, 0)];
-                if (!result) {
-                    NSLog(@"[WARNING] Couldn't determine touch area");
-                    return;
-                }
-                [_pMesh branchCreateMovementEnd:modelCoord];
+            GLKVector3 modelCoord;
+            BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, 0)];
+            if (!result) {
+                NSLog(@"[WARNING] Couldn't determine touch area");
+                return;
             }
-            _state = TOUCHED_NONE;
+            [_pMesh branchCreateMovementEnd:modelCoord];
         }
     }
 }

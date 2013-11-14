@@ -16,7 +16,7 @@
 #import "MeshLoader.h"
 #import "PlateStartPoint.h"
 #import "UITwoFingerHoldGestureRecognizer.h"
-
+#import "Line.h"
 
 typedef enum {
     TOUCHED_NONE,
@@ -37,15 +37,17 @@ typedef enum {
     GLuint _offScreenColorBuffer;
     GLuint _offScreenDepthBuffer;
     
-    PlateStartPoint* _meshTouchPoint;
-    
-    BOOL isMovingPoint;
-    
-    NSMutableArray* _branchPoints;
+//    PlateStartPoint* _meshTouchPoint;
+//    
+//    BOOL isMovingPoint;
+//    
+//    NSMutableArray* _branchPoints;
     
     //Gestures
     UITwoFingerHoldGestureRecognizer* _twoFingerBending;
     UIPanGestureRecognizer* _oneFingerPanning;
+    
+    Line* _selectionLine;
 }
 @end
 
@@ -59,8 +61,8 @@ typedef enum {
         _translationManager = [[TranslationManager alloc] init];
         _rotationManager = [[RotationManager alloc] init];
         _zoomManager = [[ZoomManager alloc] init];
-        isMovingPoint = NO;
-        _branchPoints = [[NSMutableArray alloc] init];
+//        isMovingPoint = NO;
+//        _branchPoints = [[NSMutableArray alloc] init];
     }
     return self;
 }
@@ -135,7 +137,7 @@ typedef enum {
 -(void)setupGL {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
-    glLineWidth(1.0f);
+
 }
 
 -(void)addGestureRecognizersToView:(UIView*)view {
@@ -237,25 +239,44 @@ typedef enum {
         //Handle branch creation
         if (sender.state == UIGestureRecognizerStateBegan)  {
             CGPoint touchPoint = [self touchPointFromGesture:sender];
-            GLKVector3 modelCoord;
-            BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, 0)];
+            GLKVector3 rayOrigin, rayDir;
+            BOOL result =[self rayOrigin:&rayOrigin rayDirection:&rayDir forTouchPoint:touchPoint];
+//            BOOL result = [self modelCoordinates:&rayOrigin forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, 0)];
             if (!result) {
                 NSLog(@"[WARNING] Couldn't determine touch area");
                 return;
             }
-            [_pMesh branchCreateMovementStart:modelCoord];
+            [_pMesh branchCreateMovementStart:rayOrigin];
+            
+            rayOrigin = GLKVector3Add(rayOrigin, GLKVector3MultiplyScalar(rayDir, 5));
+            VertexRGBA vertex = {{rayOrigin.x, rayOrigin.y, rayOrigin.z}, {255,0,0,255}};
+            NSMutableData* lineData = [[NSMutableData alloc] initWithBytes:&vertex length:sizeof(VertexRGBA)];
+            _selectionLine = [[Line alloc] initWithVertexData:lineData];
         }
-        else if (sender.state == UIGestureRecognizerStateChanged) {}
+        else if (sender.state == UIGestureRecognizerStateChanged)
+        {
+            CGPoint touchPoint = [self touchPointFromGesture:sender];
+            GLKVector3 rayOrigin, rayDir;
+            BOOL result =[self rayOrigin:&rayOrigin rayDirection:&rayDir forTouchPoint:touchPoint];
+            if (!result) {
+                NSLog(@"[WARNING] Couldn't determine touch area");
+                return;
+            }
+            [_selectionLine addVertex:rayOrigin];
+        }
         else if (sender.state == UIGestureRecognizerStateEnded)
         {
             CGPoint touchPoint = [self touchPointFromGesture:sender];
-            GLKVector3 modelCoord;
-            BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, 0)];
+//            GLKVector3 modelCoord;
+//            BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, 0)];
+            GLKVector3 rayOrigin, rayDir;
+            BOOL result =[self rayOrigin:&rayOrigin rayDirection:&rayDir forTouchPoint:touchPoint];
             if (!result) {
                 NSLog(@"[WARNING] Couldn't determine touch area");
                 return;
             }
-            [_pMesh branchCreateMovementEnd:modelCoord];
+            [_pMesh branchCreateMovementEnd:rayOrigin];
+            _selectionLine = nil;
         }
     }
 }
@@ -382,9 +403,10 @@ typedef enum {
     const GLfloat aspectRatio = (GLfloat)_glHeight / (GLfloat)_glWidth;
     
     BoundingBox bbox = _pMesh.boundingBox;
+    
     projectionMatrix = GLKMatrix4MakeOrtho(-bbox.width/2, bbox.width/2,
                                            -(bbox.height/2)*aspectRatio, (bbox.height/2)*aspectRatio,
-                                           -bbox.depth*4, bbox.depth);
+                                           -bbox.depth, bbox.depth);
     
     viewMatrix = GLKMatrix4Identity;
     
@@ -403,20 +425,25 @@ typedef enum {
 //Draw callback
 - (void)glkView:(GLKView *)view drawInRect:(CGRect)rect {
     [(AGLKContext *)view.context clear:GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT];
-    
+    glLineWidth(1.0f);
     _pMesh.viewMatrix = viewMatrix;
     _pMesh.projectionMatrix = projectionMatrix;
     [_pMesh draw];
     
-    _meshTouchPoint.viewMatrix = viewMatrix;
-    _meshTouchPoint.projectionMatrix = projectionMatrix;
-    [_meshTouchPoint draw];
+    glLineWidth(2.0f);
+    _selectionLine.viewMatrix = viewMatrix;
+    _selectionLine.projectionMatrix = projectionMatrix;
+    [_selectionLine draw];
     
-    for (Mesh* bPoint in _branchPoints) {
-        bPoint.viewMatrix = viewMatrix;
-        bPoint.projectionMatrix = projectionMatrix;
-        [bPoint draw];
-    }
+//    _meshTouchPoint.viewMatrix = viewMatrix;
+//    _meshTouchPoint.projectionMatrix = projectionMatrix;
+//    [_meshTouchPoint draw];
+//    
+//    for (Mesh* bPoint in _branchPoints) {
+//        bPoint.viewMatrix = viewMatrix;
+//        bPoint.projectionMatrix = projectionMatrix;
+//        [bPoint draw];
+//    }
 }
 
 //Load initial mesh from OBJ file
@@ -574,7 +601,7 @@ typedef enum {
     viewMatrix = GLKMatrix4Identity;
     _translationManager.translationMatrix = GLKMatrix4Identity;
     _zoomManager.scaleMatrix = GLKMatrix4Identity;
-    [_branchPoints removeAllObjects];
+//    [_branchPoints removeAllObjects];
 }
 
 -(void)sliderChanged:(id)sender{

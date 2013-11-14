@@ -11,9 +11,7 @@
 @interface Line : Mesh
 
 -(id)initWithVertexData:(NSMutableData*)vertexData;
--(void)addVertex:(GLKVector3)vertex;
+-(void)addVertex:(GLKVector3)vector3;
 -(void)reBuffer:(NSMutableData*)vertexData;
-
-@property (nonatomic, assign) GLenum lineDrawingMode;
 
 @end

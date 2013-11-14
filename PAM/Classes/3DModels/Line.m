@@ -13,9 +13,7 @@
 -(id)initWithVertexData:(NSMutableData*)vertexData {
     self = [super init];
     if (self) {
-        
-        self.lineDrawingMode = GL_LINE_STRIP;
-        
+       
         NSString* vShaderPath = [[NSBundle mainBundle] pathForResource:@"PointCloudRGBAShader" ofType:@"vsh"];
         NSString* fShaderPath = [[NSBundle mainBundle] pathForResource:@"PointCloudRGBAShader" ofType:@"fsh"];
         self.drawShaderProgram = [[ShaderProgram alloc] initWithVertexShader:vShaderPath fragmentShader:fShaderPath];
@@ -52,8 +50,21 @@
     [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_POSITION]];
 }
 
--(void)addVertex:(GLKVector3)vertex {
-    
+-(void)addVertex:(GLKVector3)vector3 {
+    VertexRGBA vertex = {{vector3.x, vector3.y,vector3.z}, {255,0,0,255}};
+    [self.meshData appendBytes:&vertex length:sizeof(VertexRGBA)];
+    [self rebuffer];
+}
+
+//meshData was changed, so need to rebuffer
+-(void)rebuffer {
+    self.numVertices = self.meshData.length / sizeof(VertexRGBA);
+    self.vertexDataBuffer = [[AGLKVertexAttribArrayBuffer alloc] initWithAttribStride:sizeof(VertexRGBA)
+                                                                     numberOfVertices:self.numVertices
+                                                                                bytes:self.meshData.bytes
+                                                                                usage:GL_DYNAMIC_DRAW];
+    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_COLOR]];
+    [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_POSITION]];
 }
 
 -(void)draw {
@@ -75,7 +86,7 @@
                                               dataType:GL_UNSIGNED_BYTE
                                              normalize:GL_TRUE];
         
-        [AGLKVertexAttribArrayBuffer drawPreparedArraysWithMode:self.lineDrawingMode
+        [AGLKVertexAttribArrayBuffer drawPreparedArraysWithMode:GL_LINE_STRIP
                                                startVertexIndex:0
                                                numberOfVertices:self.numVertices];
 

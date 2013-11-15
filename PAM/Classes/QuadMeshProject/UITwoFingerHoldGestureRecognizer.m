@@ -20,11 +20,12 @@
     [super touchesBegan:touches withEvent:event];
     if (self.state == UIGestureRecognizerStatePossible) { //ignore all other touches after gesture recognized
         NSArray* touchesArray = [touches allObjects];
-        if ([touches count] == 2) {
-            t1 = touchesArray[0];
-            t2 = touchesArray[1];
-            [self setState:UIGestureRecognizerStateBegan];
-        } else if ([touches count] == 1) {
+//        if ([touches count] == 2) {
+////            t1 = touchesArray[0];
+////            t2 = touchesArray[1];
+//            [self setState:UIGestureRecognizerStateBegan];
+//        } else
+        if ([touches count] == 1) {
             if (t1 == nil && t2 == nil) {
                 t1 = touchesArray[0];
                 [self setState:UIGestureRecognizerStatePossible];

@@ -215,8 +215,11 @@ typedef enum {
     if (!_transformSwitch.isOn) {
         [_zoomManager handlePinchGesture:sender];
     } else {
-        if (sender.state == UIGestureRecognizerStateEnded) {
-            UIPinchGestureRecognizer* pinch = (UIPinchGestureRecognizer*) sender;
+        UIPinchGestureRecognizer* pinch = (UIPinchGestureRecognizer*) sender;
+        if (sender.state == UIGestureRecognizerStateBegan) {
+            
+        } else if (sender.state == UIGestureRecognizerStateEnded) {
+
 //            if (pinch.scale <= 1) {
                 CGPoint touchPoint = [self touchPointFromGesture:pinch];
                 NSMutableData* pixelData = [self renderToOffscreenDepthBuffer:@[_pMesh]];
@@ -375,15 +378,15 @@ typedef enum {
         CGPoint touchPoint2 = [self scaleTouchPoint:[sender locationOfTouch:1 inView:(GLKView*)sender.view]
                                              inView:(GLKView*)sender.view];
 
-        GLKVector3 branchPivotViewCoord, touchPointViewCoord;
-        BOOL result1 = [self modelCoordinates:&branchPivotViewCoord forTouchPoint:GLKVector3Make(touchPoint1.x, touchPoint1.y, 0)];
+        GLKVector3 rayOrgin, rayDir, touchPointViewCoord;
+        BOOL result1 = [self rayOrigin:&rayOrgin rayDirection:&rayDir forTouchPoint:touchPoint1];
         BOOL result2 = [self modelCoordinates:&touchPointViewCoord forTouchPoint:GLKVector3Make(touchPoint2.x, touchPoint2.y, 0)];
         if (!result1 || !result2) {
             NSLog(@"[WARNING] Couldn't determine touch area");
             return;
         }
-        [_pMesh bendBranchBeginWithBendingPivot:branchPivotViewCoord touchPoint:touchPointViewCoord];
-        
+//        [_pMesh bendBranchBeginWithBendingPivot:branchPivotViewCoord touchPoint:touchPointViewCoord];
+        [_pMesh bendBranchBeginWithFirstTouchRayOrigin:rayOrgin rayDirection:rayDir secondTouchPoint:touchPointViewCoord];        
     } else if (sender.state == UIGestureRecognizerStateChanged) {
         NSLog(@"Two finger bending Changed");
     } else if (sender.state == UIGestureRecognizerStateEnded) {
@@ -504,7 +507,7 @@ typedef enum {
     }
 
     //Load obj file
-    NSString* objPath = [[NSBundle mainBundle] pathForResource:@"newPolars" ofType:@"obj"];
+    NSString* objPath = [[NSBundle mainBundle] pathForResource:@"quad_sphere_high_res" ofType:@"obj"];
     [_pMesh setMeshFromObjFile:objPath];
     _translationManager.scaleFactor = _pMesh.boundingBox.radius;
     

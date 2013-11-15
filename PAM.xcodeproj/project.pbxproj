@@ -53,6 +53,9 @@
 		15646615182033920000B985 /* QuadMeshViewController.mm in Sources */ = {isa = PBXBuildFile; fileRef = 15646609182033920000B985 /* QuadMeshViewController.mm */; };
 		15646616182033920000B985 /* QuadPolygonMesh.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1564660B182033920000B985 /* QuadPolygonMesh.mm */; };
 		15646617182033920000B985 /* WireFrame.m in Sources */ = {isa = PBXBuildFile; fileRef = 1564660D182033920000B985 /* WireFrame.m */; };
+		1A408F3918357A8D0044E48E /* sphere.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1A408F3818357A8D0044E48E /* sphere.obj */; };
+		1A408F3E18357BAB0044E48E /* quad_sphere.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1A408F3D18357BAB0044E48E /* quad_sphere.obj */; };
+		1A408F4018357CAA0044E48E /* quad_sphere_high_res.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1A408F3F18357CAA0044E48E /* quad_sphere_high_res.obj */; };
 		1A9438AD1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m in Sources */ = {isa = PBXBuildFile; fileRef = 1A9438AC1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m */; };
 /* End PBXBuildFile section */
 
@@ -171,6 +174,9 @@
 		1564660B182033920000B985 /* QuadPolygonMesh.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = QuadPolygonMesh.mm; sourceTree = "<group>"; };
 		1564660C182033920000B985 /* WireFrame.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WireFrame.h; sourceTree = "<group>"; };
 		1564660D182033920000B985 /* WireFrame.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WireFrame.m; sourceTree = "<group>"; };
+		1A408F3818357A8D0044E48E /* sphere.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = sphere.obj; sourceTree = "<group>"; };
+		1A408F3D18357BAB0044E48E /* quad_sphere.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = quad_sphere.obj; sourceTree = "<group>"; };
+		1A408F3F18357CAA0044E48E /* quad_sphere_high_res.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = quad_sphere_high_res.obj; sourceTree = "<group>"; };
 		1A9438AB1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = UITwoFingerHoldGestureRecognizer.h; path = Classes/QuadMeshProject/UITwoFingerHoldGestureRecognizer.h; sourceTree = "<group>"; };
 		1A9438AC1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = UITwoFingerHoldGestureRecognizer.m; path = Classes/QuadMeshProject/UITwoFingerHoldGestureRecognizer.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -404,6 +410,9 @@
 		15646602182033920000B985 /* ObjFiles */ = {
 			isa = PBXGroup;
 			children = (
+				1A408F3F18357CAA0044E48E /* quad_sphere_high_res.obj */,
+				1A408F3D18357BAB0044E48E /* quad_sphere.obj */,
+				1A408F3818357A8D0044E48E /* sphere.obj */,
 				15646603182033920000B985 /* 3DFile.obj */,
 				15646604182033920000B985 /* mesh.obj */,
 				15646605182033920000B985 /* newPolars.obj */,
@@ -543,9 +552,12 @@
 				153B4E5718206CF400962DB2 /* PointCloudRGBAShader.fsh in Resources */,
 				153B4E5818206CF400962DB2 /* PointCloudRGBAShader.vsh in Resources */,
 				153B4E5918206CF400962DB2 /* TextureShader.fsh in Resources */,
+				1A408F3E18357BAB0044E48E /* quad_sphere.obj in Resources */,
 				153B4E5A18206CF400962DB2 /* TextureShader.vsh in Resources */,
 				15646613182033920000B985 /* newTEST.obj in Resources */,
 				156463F51820266E0000B985 /* InfoPlist.strings in Resources */,
+				1A408F3918357A8D0044E48E /* sphere.obj in Resources */,
+				1A408F4018357CAA0044E48E /* quad_sphere_high_res.obj in Resources */,
 				15646610182033920000B985 /* 3DFile.obj in Resources */,
 				15646611182033920000B985 /* mesh.obj in Resources */,
 				15646614182033920000B985 /* teapot.obj in Resources */,

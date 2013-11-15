@@ -260,6 +260,32 @@ double triangleAngleWithSides(double a, double b, double c) {
     }
 }
 
++(BOOL)hitTestQuad:(GLKVector3*)quad withRayStart:(GLKVector3)rayStartPoint rayDirection:(GLKVector3)ray  {
+    
+    GLKVector3 triangle1[3];
+    triangle1[0] = quad[0];
+    triangle1[1] = quad[2];
+    triangle1[2] = quad[1];
+    
+    GLKVector3 triangle2[3];
+    triangle2[0] = quad[0];
+    triangle2[1] = quad[3];
+    triangle2[2] = quad[2];
+    
+    BOOL hit1 = [self hitTestTriangle:triangle1 withRayStart:rayStartPoint rayDirection:ray];
+    if (hit1) {
+        return YES;
+    }
+    
+    BOOL hit2 = [self hitTestTriangle:triangle2 withRayStart:rayStartPoint rayDirection:ray];
+    
+    if (hit2) {
+        return YES;
+    }
+    
+    return NO;
+}
+
 
 +(BOOL)hitTestCircleWithRadius:(double)radius
                         center:(GLKVector3)center

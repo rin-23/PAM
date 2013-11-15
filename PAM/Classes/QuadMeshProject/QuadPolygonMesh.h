@@ -33,7 +33,9 @@
 -(void)branchCreateMovementStart:(GLKVector3)touchPoint;
 -(void)branchCreateMovementEnd:(GLKVector3)touchPoint;
 
--(void)bendBranchBeginWithBendingPivot:(GLKVector3)bendingPivot touchPoint:(GLKVector3)touchPoint;
+-(BOOL)bendBranchBeginWithFirstTouchRayOrigin:(GLKVector3)rayOrigin
+                                 rayDirection:(GLKVector3)rayDirection
+                             secondTouchPoint:(GLKVector3)touchPoint;
 -(void)bendBranchEnd:(GLKVector3)touchPoint;
 
 -(void)scaleRib:(GLKVector3)touchPoint byFactor:(float)scale;

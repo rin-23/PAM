@@ -34,6 +34,7 @@
     //Branch bending
     HMesh::FaceID _branchBendFaceID;
     GLKVector3 _branchBendingInitialPoint;
+    BOOL _firstTouchedFace;
     
     //Skeleton
     HMesh::Manifold skeletonMani;
@@ -302,7 +303,37 @@ using namespace HMesh;
     return w.face();
 }
 
+-(BOOL)pickFace:(FaceID*)faceID rayOrigin:(GLKVector3)rayOrigin rayDirection:(GLKVector3)rayDirection
 
+{
+    for(FaceIDIterator fid = _manifold.faces_begin(); fid != _manifold.faces_end(); ++fid) {
+        
+        GLKVector3 faceVerticies[4];
+        int num_edges = 0;
+        for(Walker w = _manifold.walker(*fid); !w.full_circle(); w = w.circulate_face_cw()) {
+            Vec3d v = _manifold.pos(w.vertex());
+            faceVerticies[num_edges] = GLKVector3Make(v[0], v[1], v[2]);
+            num_edges++;
+            if (num_edges > 4) { //either quad or triangle
+                NSLog(@"[ERROR][QuadPolygonMesh][pickFacetRayOrigin:rayDirection:] Wrong number of edges");
+                return NO;
+            }
+        }
+
+        BOOL hit = NO;
+        if (num_edges == 3) {
+            hit = [Utilities hitTestTriangle:faceVerticies withRayStart:rayOrigin rayDirection:rayDirection];
+        } else { //quad
+            hit = [Utilities hitTestQuad:faceVerticies withRayStart:rayOrigin rayDirection:rayDirection];
+        }
+        
+        if (hit) {
+            *faceID = *fid;
+            return YES;
+        }
+    }
+    return NO;
+}
 
 //-(GLKVector3)closestVertexToMeshPoint:(GLKVector3)touchPoint setAsCurrentID:(BOOL)setAsCurrentID {
 //    
@@ -592,11 +623,11 @@ using namespace HMesh;
             //Add ribs for the new branch
             Walker walker = _manifold.walker(newPoleID);
             HalfEdgeID ID_1 = walker.next().opp().next().halfedge();
-            HalfEdgeID ID_2 = add_rib(_manifold, ID_1);
-            add_rib(_manifold, ID_1);
-            add_rib(_manifold, ID_2);
+            recursively_add_rib(_manifold, ID_1, 4);
+//            HalfEdgeID ID_2 = add_rib(_manifold, ID_1);
+//            add_rib(_manifold, ID_1);
+//            add_rib(_manifold, ID_2);
         }
-        
     } else {
 //        NSLog(@"GAUSSIAN MOVE %f", GLKMathRadiansToDegrees(angle));
 //        for(auto vid : _manifold.vertices())
@@ -608,20 +639,29 @@ using namespace HMesh;
 }
 
 
-//Touch point in VIEW coordinates
--(void)bendBranchBeginWithBendingPivot:(GLKVector3)bendingPivot touchPoint:(GLKVector3)touchPoint {
+//Touch point in VIEW coordinates. Return true if you can begin bending
+-(BOOL)bendBranchBeginWithFirstTouchRayOrigin:(GLKVector3)rayOrigin
+                                 rayDirection:(GLKVector3)rayDirection
+                             secondTouchPoint:(GLKVector3)touchPoint
+{
+//    _branchBendFaceID = [self closestFaceID_2DProjection:bendingPivot];
+    _firstTouchedFace = [self pickFace:&_branchBendFaceID
+                            rayOrigin:rayOrigin
+                         rayDirection:rayDirection];
     _branchBendingInitialPoint = touchPoint;
-    _branchBendFaceID = [self closestFaceID_2DProjection:bendingPivot];
+    
+    return _firstTouchedFace;
 }
 
 //Touch point in VIEW coordinates
 -(void)bendBranchEnd:(GLKVector3)touchPoint {
+    if (!_firstTouchedFace) return;
     [self saveState];
     HMesh::HalfEdgeAttributeVector<EdgeInfo> edgeInfo = trace_spine_edges(_manifold);
     Walker w = _manifold.walker(_branchBendFaceID);
     
     if (edgeInfo[w.halfedge()].edge_type == RIB) {
-        w = w.next();
+        w = w.next(); //spine
     }
     
     assert(edgeInfo[w.halfedge()].edge_type == SPINE);
@@ -654,6 +694,7 @@ using namespace HMesh;
     vector<vector<VertexID>> rings;
     vector<Vec3d> centroids;
     Walker spineWalker = _manifold.walker(poleDirectionHalfEdge);
+    spineWalker = spineWalker.next().opp().next(); //advance to the next spine
     for (; !is_pole(_manifold, spineWalker.vertex()); spineWalker = spineWalker.next().opp().next())
     {
         assert(edgeInfo[spineWalker.next().halfedge()].edge_type == RIB);

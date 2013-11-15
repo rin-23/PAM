@@ -43,6 +43,10 @@ double triangleAngleWithSides(double a, double b, double c);
           withRayStart:(GLKVector3)rayStartPoint
           rayDirection:(GLKVector3)ray;
 
++(BOOL)hitTestQuad:(GLKVector3*)quad
+      withRayStart:(GLKVector3)rayStartPoint
+      rayDirection:(GLKVector3)ray;
+
 +(BOOL)hitTestCircleWithRadius:(double)radius
                         center:(GLKVector3)center
              inscribedTriangle:(GLKVector3*)triangle

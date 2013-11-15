@@ -36,8 +36,14 @@
     GLKVector3 _branchBendingInitialPoint;
     BOOL _firstTouchedFace;
     
+    //Scaling of Rings
+    HMesh::FaceID _scaleRibFace1;
+    HMesh::FaceID _scaleRibFace2;
+    BOOL _shouldBeginRibScaling;
+    
     //Skeleton
     HMesh::Manifold skeletonMani;
+
     
     //Undo
     HMesh::Manifold undoMani;
@@ -414,19 +420,7 @@ using namespace HMesh;
     [_wireFrame setVertexData:wireframeData vertexNum:wireframeData.length/sizeof(VertexNormRGBA)];
 }
 
--(void)scaleRib:(GLKVector3)touchPoint byFactor:(float)scale {
-    touchPoint = [Utilities invertVector3:touchPoint withMatrix:self.modelMatrix];
-    VertexID vID = [self closestVertexID:touchPoint];
-    Walker w = _manifold.walker(vID);
-    HMesh::HalfEdgeAttributeVector<EdgeInfo> edgeInfo = trace_spine_edges(_manifold);
-    if (edgeInfo[w.halfedge()].edge_type != RIB) {
-        w = w.prev();
-    }
-    assert(edgeInfo[w.halfedge()].edge_type == RIB);
-    
-    change_rib_radius(_manifold, w.halfedge(), scale);
-    [self rebuffer];
-}
+
 
 //Triangulate manifold for display in case it has quads. GLES doesnt handle quads.
 -(void)triangulateManifold:(HMesh::Manifold&)mani
@@ -753,6 +747,86 @@ using namespace HMesh;
             _manifold.pos(vID) = v_pos;
         }
     }
+    [self rebuffer];
+}
+
+
+-(void)beginScalingRibsWithRayOrigin1:(GLKVector3)rayOrigin1
+                           rayOrigin2:(GLKVector3)rayOrigin2
+                        rayDirection1:(GLKVector3)rayDir1
+                        rayDirection2:(GLKVector3)rayDir2
+{
+    
+    BOOL hit1 = [self pickFace:&_scaleRibFace1 rayOrigin:rayOrigin1 rayDirection:rayDir1];
+    BOOL hit2 = [self pickFace:&_scaleRibFace2 rayOrigin:rayOrigin2 rayDirection:rayDir2];
+    
+    _shouldBeginRibScaling = NO;
+    if (hit1 && hit2) {
+        if (_scaleRibFace1 != _scaleRibFace2) { //dont scale same faces
+            _shouldBeginRibScaling = YES;
+        }
+    }
+    
+//    touchPoint = [Utilities invertVector3:touchPoint withMatrix:self.modelMatrix];
+//    VertexID vID = [self closestVertexID:touchPoint];
+//    Walker w = _manifold.walker(vID);
+//    HMesh::HalfEdgeAttributeVector<EdgeInfo> edgeInfo = trace_spine_edges(_manifold);
+//    if (edgeInfo[w.halfedge()].edge_type != RIB) {
+//        w = w.prev();
+//    }
+//    assert(edgeInfo[w.halfedge()].edge_type == RIB);
+//    
+//    change_rib_radius(_manifold, w.halfedge(), scale);
+//    [self rebuffer];
+}
+
+-(void)endScalingRibsWithScaleFactor:(float)scale {
+    if (!_shouldBeginRibScaling) {
+        return;
+    }
+    
+    Walker w1 = _manifold.walker(_scaleRibFace1);
+    Walker w2 = _manifold.walker(_scaleRibFace2);
+    HMesh::HalfEdgeAttributeVector<EdgeInfo> edgeInfo = trace_spine_edges(_manifold);
+    
+    //TODO handle triangles
+
+    if (edgeInfo[w1.halfedge()].edge_type != SPINE) {
+        w1 = w1.next();
+    }
+    assert(edgeInfo[w1.halfedge()].edge_type == SPINE);
+
+    if (edgeInfo[w2.halfedge()].edge_type != SPINE) {
+        w2 = w2.next();
+    }
+    assert(edgeInfo[w2.halfedge()].edge_type == SPINE);
+    
+    //test which direction to go from face1 to  reach face2
+    //i.e. find out rib edges in between fingers
+    Vec3d w1pos1 = _manifold.pos(w1.vertex());
+    Vec3d w1pos2 = _manifold.pos(w1.opp().vertex());
+    Vec3d w2pos1 = _manifold.pos(w2.vertex());
+    Vec3d w2pos2 = _manifold.pos(w2.opp().vertex());
+    
+    if ((w1pos2 - w2pos1).length() < (w1pos1 - w2pos1).length()) {
+        //w1.opp is closer
+        w1 = w1.opp();
+    }
+
+    if ((w2pos2 - w1pos1).length() < (w2pos1 - w1pos1).length()) {
+        //w2.opp is closer
+        w2 = w2.opp();
+    }
+    
+    HalfEdgeID finalRib = w2.next().halfedge();
+    
+    
+    while (!lie_on_same_rib(_manifold, w1.next().halfedge(), finalRib)) {
+        change_rib_radius(_manifold, w1.next().halfedge(), scale);
+        w1 =  w1.next().opp().next();
+    }
+    change_rib_radius(_manifold, w1.next().halfedge(), scale); //last one
+    
     [self rebuffer];
 }
 

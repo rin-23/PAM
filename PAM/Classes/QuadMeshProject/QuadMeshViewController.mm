@@ -51,6 +51,8 @@ typedef enum {
     
     DrawingState _state;
     float _gaussianDepth;
+    
+    NSArray* _ingnoredViews;
 }
 @end
 
@@ -87,6 +89,8 @@ typedef enum {
     
     [_transformSwitch addTarget:self action:@selector(transformSwitchChanged:) forControlEvents:UIControlEventValueChanged];
     [_skeletonSwitch addTarget:self action:@selector(skeletonSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+    
+    _ingnoredViews = @[_transformSwitch, _branchWidthSlider, _skeletonSwitch];
 }
 
 - (void)viewDidUnload {
@@ -181,7 +185,7 @@ typedef enum {
 //    _twoFingerBending.numberOfTouchesRequired = 2;
 //    _twoFingerBending.minimumPressDuration = 0.01;
     _twoFingerBending.enabled = NO;
-    [view addGestureRecognizer:_twoFingerBending];
+//    [view addGestureRecognizer:_twoFingerBending];
 
 //    UITapGestureRecognizer* tapWithFourFingers = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleFourFingerTapGesture:)];
 //    tapWithTwoFingers.numberOfTouchesRequired = 4;
@@ -202,6 +206,15 @@ typedef enum {
 
 // called before touchesBegan:withEvent: is called on the gesture recognizer for a new touch. return NO to prevent the gesture recognizer from seeing this touch
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch {
+    CGPoint p = [touch locationInView:self.view];
+
+    for(UIView* view in _ingnoredViews) {
+        if (CGRectContainsPoint(view.frame, p)) {
+            return NO;
+        }
+    }
+    
+
     if (gestureRecognizer == _twoFingerBending) {
         BOOL flag = [_twoFingerBending needsMoreTouch];
         return flag;
@@ -217,23 +230,40 @@ typedef enum {
     } else {
         UIPinchGestureRecognizer* pinch = (UIPinchGestureRecognizer*) sender;
         if (sender.state == UIGestureRecognizerStateBegan) {
+            CGPoint touchPoint1 = [self scaleTouchPoint:[sender locationOfTouch:0 inView:(GLKView*)sender.view]
+                                                 inView:(GLKView*)sender.view];
+            CGPoint touchPoint2 = [self scaleTouchPoint:[sender locationOfTouch:1 inView:(GLKView*)sender.view]
+                                                 inView:(GLKView*)sender.view];
+            
+            GLKVector3 rayOrigin1, rayDir1, rayOrigin2, rayDir2;
+            BOOL result1 = [self rayOrigin:&rayOrigin1 rayDirection:&rayDir1 forTouchPoint:touchPoint1];
+            BOOL result2 = [self rayOrigin:&rayOrigin2 rayDirection:&rayDir2 forTouchPoint:touchPoint2];
+            if (!result1 || !result2) {
+                NSLog(@"[WARNING] Couldn't determine touch area");
+                return;
+            }
+            [_pMesh beginScalingRibsWithRayOrigin1:rayOrigin1 
+                                        rayOrigin2:rayOrigin2
+                                     rayDirection1:rayDir1 
+                                     rayDirection2:rayDir2];
             
         } else if (sender.state == UIGestureRecognizerStateEnded) {
+            [_pMesh endScalingRibsWithScaleFactor:pinch.scale*0.7];
 
 //            if (pinch.scale <= 1) {
-                CGPoint touchPoint = [self touchPointFromGesture:pinch];
-                NSMutableData* pixelData = [self renderToOffscreenDepthBuffer:@[_pMesh]];
-                
-                GLKVector3 modelCoord;
-                BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:touchPoint depthBuffer:pixelData];
-                if (!result) {
-                    NSLog(@"[WARNING] Couldn determine touch area");
-                    return;
-                }
+
+//                NSMutableData* pixelData = [self renderToOffscreenDepthBuffer:@[_pMesh]];
+            
+//                GLKVector3 modelCoord;
+//                BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:touchPoint depthBuffer:pixelData];
+//                if (!result) {
+//                    NSLog(@"[WARNING] Couldn determine touch area");
+//                    return;
+//                }
 //                [_pMesh moveVertexOrthogonallyCloseTo:modelCoord];
 //            }
             
-            [_pMesh scaleRib:modelCoord byFactor:pinch.scale];
+//            [_pMesh scaleRib:modelCoord byFactor:pinch.scale];
         }
     }
 }
@@ -385,7 +415,6 @@ typedef enum {
             NSLog(@"[WARNING] Couldn't determine touch area");
             return;
         }
-//        [_pMesh bendBranchBeginWithBendingPivot:branchPivotViewCoord touchPoint:touchPointViewCoord];
         [_pMesh bendBranchBeginWithFirstTouchRayOrigin:rayOrgin rayDirection:rayDir secondTouchPoint:touchPointViewCoord];        
     } else if (sender.state == UIGestureRecognizerStateChanged) {
         NSLog(@"Two finger bending Changed");

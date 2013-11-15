@@ -38,7 +38,12 @@
                              secondTouchPoint:(GLKVector3)touchPoint;
 -(void)bendBranchEnd:(GLKVector3)touchPoint;
 
--(void)scaleRib:(GLKVector3)touchPoint byFactor:(float)scale;
+-(void)beginScalingRibsWithRayOrigin1:(GLKVector3)rayOrigin1
+                           rayOrigin2:(GLKVector3)rayOrigin2
+                        rayDirection1:(GLKVector3)rayDir1
+                        rayDirection2:(GLKVector3)rayDir2;
+-(void)endScalingRibsWithScaleFactor:(float)scale;
+
 
 @property (nonatomic, assign) int branchWidth;
 

@@ -19,9 +19,13 @@
 #import "Walker.h"
 #include "polarize.h"
 #include "Mat4x4d.h"
+#include <map>
+#include <set>
 
 @interface QuadPolygonMesh() {
     HMesh::Manifold _manifold;
+    HMesh::HalfEdgeAttributeVector<EdgeInfo> _edgeInfo;
+
     WireFrame* _wireFrame;
     HMesh::VertexID _curSelectedVertexID;
     BoundingBox _boundingBox;
@@ -35,18 +39,24 @@
     HMesh::FaceID _branchBendFaceID;
     GLKVector3 _branchBendingInitialPoint;
     BOOL _firstTouchedFace;
+    float _accumScale;
     
     //Scaling of Rings
     HMesh::FaceID _scaleRibFace1;
     HMesh::FaceID _scaleRibFace2;
     BOOL _shouldBeginRibScaling;
+    vector<HMesh::HalfEdgeID> _edges_to_scale;
+//    HMesh::Manifold _scaleSaveMani;
     
     //Skeleton
     HMesh::Manifold skeletonMani;
-
     
     //Undo
     HMesh::Manifold undoMani;
+ 
+    map<HMesh::VertexID, vector<HMesh::FaceID>> dic_vertex_to_face; //store information about regions need to be updated
+    map<HMesh::FaceID, int> dic_face_to_buffer; //store information about regions need to be updated
+    map<HMesh::VertexID, vector<int>> dic_wireframe_vertex_to_buffer; //store information about regions need to be updated
 }
 
 @property (nonatomic) AGLKVertexAttribArrayBuffer* wireframeVertexBuffer;
@@ -113,6 +123,7 @@ using namespace HMesh;
     [self triangulateManifold:_manifold trianglMeshData:&vertexData wireframeData:&wireframeData];
 
     self.numVertices = vertexData.length / sizeof(VertexNormRGBA);
+    self.meshData = vertexData;
     
     self.vertexDataBuffer = [[AGLKVertexAttribArrayBuffer alloc] initWithAttribStride:sizeof(VertexNormRGBA)
                                                                      numberOfVertices:self.numVertices
@@ -146,9 +157,8 @@ using namespace HMesh;
 -(void)createNewSpineAtPoint:(GLKVector3)touchPoint {
     undoMani = _manifold;
     VertexID vID = [self closestVertexID:touchPoint];
-    HMesh::HalfEdgeAttributeVector<EdgeInfo> edgeInfo = trace_spine_edges(_manifold);
     Walker walker = _manifold.walker(vID);
-    if (edgeInfo[walker.halfedge()].edge_type != RIB) {
+    if (_edgeInfo[walker.halfedge()].edge_type != RIB) {
         walker = walker.next();
     }
     add_spine(_manifold, walker.halfedge());
@@ -158,9 +168,8 @@ using namespace HMesh;
 -(void)createNewRibAtPoint:(GLKVector3)touchPoint {
     undoMani = _manifold;
     VertexID vID = [self closestVertexID:touchPoint];
-    HMesh::HalfEdgeAttributeVector<EdgeInfo> edgeInfo = trace_spine_edges(_manifold);
     Walker walker = _manifold.walker(vID);
-    if (edgeInfo[walker.halfedge()].edge_type != SPINE) {
+    if (_edgeInfo[walker.halfedge()].edge_type != SPINE) {
         walker = walker.next();
     }
     HalfEdgeID newEdge = add_rib(_manifold, walker.halfedge());
@@ -178,8 +187,6 @@ using namespace HMesh;
         return NO;
     }
 
-    HMesh::HalfEdgeAttributeVector<EdgeInfo> edgeInfo = trace_spine_edges(_manifold);
-
     Walker walker = _manifold.walker(vID);
     HalfEdgeID endHalfEdge = walker.halfedge();
     
@@ -194,7 +201,7 @@ using namespace HMesh;
         while (walker.vertex() != vID) {
             walker = walker.next();
         }
-        if (edgeInfo[walker.halfedge()].edge_type == RIB) {
+        if (_edgeInfo[walker.halfedge()].edge_type == RIB) {
             ribs[num_rib_found++] = walker.opp().vertex();
             int side_width = 1;
             //Advance until we reach desireed width
@@ -406,26 +413,25 @@ using namespace HMesh;
     [self triangulateManifold:_manifold trianglMeshData:&vertexData wireframeData:&wireframeData];
     
     self.numVertices = vertexData.length / sizeof(VertexNormRGBA);
+    self.meshData = vertexData;
     
     self.vertexDataBuffer = [[AGLKVertexAttribArrayBuffer alloc] initWithAttribStride:sizeof(VertexNormRGBA)
                                                                      numberOfVertices:self.numVertices
-                                                                                bytes:vertexData.bytes
-                                                                                            usage:GL_DYNAMIC_DRAW];
+                                                                                bytes:self.meshData.bytes
+                                                                                usage:GL_DYNAMIC_DRAW];
     
     glEnableVertexAttribArray(attrib[ATTRIB_POSITION]);
     glEnableVertexAttribArray(attrib[ATTRIB_NORMAL]);
     glEnableVertexAttribArray(attrib[ATTRIB_COLOR]);
     
-    
     [_wireFrame setVertexData:wireframeData vertexNum:wireframeData.length/sizeof(VertexNormRGBA)];
+    
 }
-
-
 
 //Triangulate manifold for display in case it has quads. GLES doesnt handle quads.
 -(void)triangulateManifold:(HMesh::Manifold&)mani
-           trianglMeshData:(NSMutableData**)verticies
-             wireframeData:(NSMutableData**)wireframe
+       trianglMeshData:(NSMutableData**)verticies
+         wireframeData:(NSMutableData**)wireframe
 {
     if (*verticies == nil) {
         *verticies = [[NSMutableData alloc] init];
@@ -434,76 +440,142 @@ using namespace HMesh;
     if (*wireframe == nil) {
         *wireframe = [[NSMutableData alloc] init];
     }
+
+    //clear dictionaries
+    dic_vertex_to_face.clear();
+    dic_face_to_buffer.clear();
+    dic_wireframe_vertex_to_buffer.clear();
     
     //iterate over every face
     for(FaceIDIterator fid = mani.faces_begin(); fid != mani.faces_end(); ++fid) {
         int vertexNum = 0;
-        VertexNormRGBA firstVertex;
-        VertexNormRGBA secondVertex;
-        VertexNormRGBA thirdVertex;
-        VertexNormRGBA fourthVertex;
+        VertexNormRGBA facet[4];
 
         CGLA::Vec3d norm = HMesh::normal(mani, *fid);
         PositionXYZ normGL = {(GLfloat)norm[0], (GLfloat)norm[1], (GLfloat)norm[2]};
         
         ColorRGBA vertexColor = {200,200,200,255};
         
+        //Populate face to buffer offset dictionary
+        dic_face_to_buffer[*fid] = (*verticies).length;
+        
         //iterate over every vertex of the face
         for(Walker w = mani.walker(*fid); !w.full_circle(); w = w.circulate_face_ccw()) {
+
+//            CGLA::Vec3d norm = HMesh::normal(mani, w.vertex());
+//            PositionXYZ normGL = {(GLfloat)norm[0], (GLfloat)norm[1], (GLfloat)norm[2]};
             
             //add vertex to the data array
-            CGLA::Vec3d c = mani.pos(w.vertex());
+            VertexID vID = w.vertex();
+            CGLA::Vec3d c = mani.pos(vID);
             PositionXYZ positionDCM = {(GLfloat)c[0], (GLfloat)c[1], (GLfloat)c[2]};
             VertexNormRGBA vertexMono = {positionDCM, normGL, vertexColor};
 
+            facet[vertexNum] = vertexMono;
             vertexNum++;
-            
-            //Create a second triangle
-            switch (vertexNum) {
-                case 1:
-                    firstVertex = vertexMono;
-                    break;
-                case 2:
-                    secondVertex = vertexMono;
-                    break;
-                case 3:
-                    thirdVertex = vertexMono;
-                    break;
-                case 4:
-                    //Create a second triangle from quad
-                    [*verticies appendBytes:&firstVertex length:sizeof(VertexNormRGBA)];
-                    [*verticies appendBytes:&thirdVertex length:sizeof(VertexNormRGBA)];
-                    fourthVertex = vertexMono;
-                    break;
-                default:
-                    break;
+        
+            if (vertexNum == 4) {
+                //Create a second triangle
+                [*verticies appendBytes:&facet[0] length:sizeof(VertexNormRGBA)];
+                [*verticies appendBytes:&facet[2] length:sizeof(VertexNormRGBA)];
             }
             
             [*verticies appendBytes:&vertexMono length:sizeof(VertexNormRGBA)];
+            
+            //Populate vertex to face dictionary
+            if (dic_vertex_to_face.count(vID) == 0) {
+                vector<HMesh::FaceID> faces;
+                faces.push_back(*fid);
+                dic_vertex_to_face.insert(pair<VertexID, vector<FaceID>>(vID, faces));
+            } else {
+                vector<HMesh::FaceID> faces = dic_vertex_to_face[vID];
+                faces.push_back(*fid);
+                dic_vertex_to_face[vID] = faces;
+            }
+            
         }
         
         //add wireframe data
         ColorRGBA wireframeColor = {0,0,0,255};
         if (vertexNum == 3 || vertexNum == 4) {
-            firstVertex.color = wireframeColor;
-            secondVertex.color = wireframeColor;
-            thirdVertex.color = wireframeColor;
+            facet[0].color = wireframeColor;
+            facet[1].color = wireframeColor;
+            facet[2].color = wireframeColor;
             
-            [*wireframe appendBytes:&firstVertex length:sizeof(VertexNormRGBA)];
-            [*wireframe appendBytes:&secondVertex length:sizeof(VertexNormRGBA)];
-            [*wireframe appendBytes:&secondVertex length:sizeof(VertexNormRGBA)];
-            [*wireframe appendBytes:&thirdVertex length:sizeof(VertexNormRGBA)];
+            [*wireframe appendBytes:&facet[0] length:sizeof(VertexNormRGBA)];
+            [*wireframe appendBytes:&facet[1] length:sizeof(VertexNormRGBA)];
+            [*wireframe appendBytes:&facet[1] length:sizeof(VertexNormRGBA)];
+            [*wireframe appendBytes:&facet[2] length:sizeof(VertexNormRGBA)];
             if (vertexNum == 3) {
-                [*wireframe appendBytes:&thirdVertex length:sizeof(VertexNormRGBA)];
-                [*wireframe appendBytes:&firstVertex length:sizeof(VertexNormRGBA)];
+                [*wireframe appendBytes:&facet[2] length:sizeof(VertexNormRGBA)];
+                [*wireframe appendBytes:&facet[0] length:sizeof(VertexNormRGBA)];
             } else if (vertexNum == 4) {
-                fourthVertex.color = wireframeColor;
-                [*wireframe appendBytes:&thirdVertex length:sizeof(VertexNormRGBA)];
-                [*wireframe appendBytes:&fourthVertex length:sizeof(VertexNormRGBA)];
-                [*wireframe appendBytes:&fourthVertex length:sizeof(VertexNormRGBA)];
-                [*wireframe appendBytes:&firstVertex length:sizeof(VertexNormRGBA)];
+                facet[3].color = wireframeColor;
+                [*wireframe appendBytes:&facet[2] length:sizeof(VertexNormRGBA)];
+                [*wireframe appendBytes:&facet[3] length:sizeof(VertexNormRGBA)];
+                [*wireframe appendBytes:&facet[3] length:sizeof(VertexNormRGBA)];
+                [*wireframe appendBytes:&facet[0] length:sizeof(VertexNormRGBA)];
             }
         }
+    }
+    
+    _edgeInfo = trace_spine_edges(_manifold);
+}
+
+-(void)subBufferForVertexIDs:(vector<HMesh::VertexID>)vector_of_vid mani:(HMesh::Manifold) mani{
+    set<FaceID> set_of_faces;
+    
+    //Add all faces that are affected by the verticies
+    for (VertexID vid: vector_of_vid) {
+        if (dic_vertex_to_face.count(vid) >0 ) {
+            vector<FaceID>vector_of_faces = dic_vertex_to_face[vid];
+            for (FaceID fid: vector_of_faces) {
+                set_of_faces.insert(fid);
+            }
+        } else {
+            NSLog(@"[ERROR][QuadPolygonMesh][subBufferForVertexID:] unkown vertex id");
+        }
+    }
+    
+    //Update the mesh
+    for (FaceID fid: set_of_faces) {
+        NSMutableData* verticies = [[NSMutableData alloc] init];
+        int vertexNum = 0;
+        VertexNormRGBA facet[4];
+        
+//        CGLA::Vec3d norm = HMesh::normal(mani, fid);
+        CGLA::Vec3d norm = Vec3d(0,0,0);
+        PositionXYZ normGL = {(GLfloat)norm[0], (GLfloat)norm[1], (GLfloat)norm[2]};
+        
+        ColorRGBA vertexColor = {200,200,200,255};
+        
+        //iterate over every vertex of the face
+        for(Walker w = mani.walker(fid); !w.full_circle(); w = w.circulate_face_ccw()) {
+            
+            //            CGLA::Vec3d norm = HMesh::normal(mani, w.vertex());
+            //            PositionXYZ normGL = {(GLfloat)norm[0], (GLfloat)norm[1], (GLfloat)norm[2]};
+            
+            //add vertex to the data array
+            VertexID vID = w.vertex();
+            CGLA::Vec3d c = mani.pos(vID);
+            PositionXYZ positionDCM = {(GLfloat)c[0], (GLfloat)c[1], (GLfloat)c[2]};
+            VertexNormRGBA vertexMono = {positionDCM, normGL, vertexColor};
+            
+            facet[vertexNum] = vertexMono;
+            vertexNum++;
+            
+            if (vertexNum == 4) {
+                //Create a second triangle
+                [verticies appendBytes:&facet[0] length:sizeof(VertexNormRGBA)];
+                [verticies appendBytes:&facet[2] length:sizeof(VertexNormRGBA)];
+            }
+            [verticies appendBytes:&vertexMono length:sizeof(VertexNormRGBA)];
+        }
+        
+        NSUInteger offset = dic_face_to_buffer[fid];
+        NSRange range = {offset, verticies.length};
+        [self.meshData replaceBytesInRange:range withBytes:verticies.bytes];
+//        [self.vertexDataBuffer bufferSubDataWithOffset:offset size:verticies.length data:verticies.bytes];
     }
 }
 
@@ -514,6 +586,8 @@ using namespace HMesh;
 -(void)saveState {
     undoMani = _manifold;
 }
+
+#pragma mark - CREATING A BRANCH WHEN TOUCHED OUTSIDE OF MODEL
 
 -(void)branchCreateMovementStart:(GLKVector3)touchPoint {
     
@@ -550,17 +624,19 @@ using namespace HMesh;
         
         // Move vertecies adjacent to pole
         for (Walker walker = _manifold.walker(newPoleID); !walker.full_circle(); walker = walker.circulate_vertex_ccw()) {
-            _manifold.pos(walker.vertex()) = _manifold.pos(walker.vertex()) + displace3d*0.8f;
+            _manifold.pos(walker.vertex()) = _manifold.pos(walker.vertex()) + displace3d*0.95f;
         }
         
         //Add ribs for the new branch
         Walker walker = _manifold.walker(newPoleID);
         HalfEdgeID ID_1 = walker.next().opp().next().halfedge();
-        recursively_add_rib(_manifold, ID_1, 4);
+        recursively_add_rib(_manifold, ID_1, 5);
 
         [self rebuffer];
     }
 }
+
+#pragma mark - CREATING A BRANCH WHEN TOUCHED INSIDE OF MODEL
 
 -(void)gaussianStart:(GLKVector3)touchPoint {
     touchPoint = [Utilities invertVector3:touchPoint withMatrix:self.modelMatrix];
@@ -611,13 +687,13 @@ using namespace HMesh;
             
             // Move vertecies adjacent to pole
             for (Walker walker = _manifold.walker(newPoleID); !walker.full_circle(); walker = walker.circulate_vertex_ccw()) {
-                _manifold.pos(walker.vertex()) = _manifold.pos(walker.vertex()) + displace*0.8f;
+                _manifold.pos(walker.vertex()) = _manifold.pos(walker.vertex()) + displace*0.95f;
             }
             
             //Add ribs for the new branch
             Walker walker = _manifold.walker(newPoleID);
             HalfEdgeID ID_1 = walker.next().opp().next().halfedge();
-            recursively_add_rib(_manifold, ID_1, 4);
+            recursively_add_rib(_manifold, ID_1, 5);
 //            HalfEdgeID ID_2 = add_rib(_manifold, ID_1);
 //            add_rib(_manifold, ID_1);
 //            add_rib(_manifold, ID_2);
@@ -632,6 +708,7 @@ using namespace HMesh;
     [self rebuffer];
 }
 
+#pragma mark - BENDING
 
 //Touch point in VIEW coordinates. Return true if you can begin bending
 -(BOOL)bendBranchBeginWithFirstTouchRayOrigin:(GLKVector3)rayOrigin
@@ -651,14 +728,13 @@ using namespace HMesh;
 -(void)bendBranchEnd:(GLKVector3)touchPoint {
     if (!_firstTouchedFace) return;
     [self saveState];
-    HMesh::HalfEdgeAttributeVector<EdgeInfo> edgeInfo = trace_spine_edges(_manifold);
     Walker w = _manifold.walker(_branchBendFaceID);
     
-    if (edgeInfo[w.halfedge()].edge_type == RIB) {
+    if (_edgeInfo[w.halfedge()].edge_type == RIB) {
         w = w.next(); //spine
     }
     
-    assert(edgeInfo[w.halfedge()].edge_type == SPINE);
+    assert(_edgeInfo[w.halfedge()].edge_type == SPINE);
     
     //FIND POLE
     //Walk one direction
@@ -691,7 +767,7 @@ using namespace HMesh;
     spineWalker = spineWalker.next().opp().next(); //advance to the next spine
     for (; !is_pole(_manifold, spineWalker.vertex()); spineWalker = spineWalker.next().opp().next())
     {
-        assert(edgeInfo[spineWalker.next().halfedge()].edge_type == RIB);
+        assert(_edgeInfo[spineWalker.next().halfedge()].edge_type == RIB);
         
         vector<VertexID> vIDs;
         Vec3d centroid = Vec3d(0,0,0);
@@ -750,13 +826,13 @@ using namespace HMesh;
     [self rebuffer];
 }
 
+#pragma mark - SCALING
 
 -(void)beginScalingRibsWithRayOrigin1:(GLKVector3)rayOrigin1
                            rayOrigin2:(GLKVector3)rayOrigin2
                         rayDirection1:(GLKVector3)rayDir1
                         rayDirection2:(GLKVector3)rayDir2
 {
-    
     BOOL hit1 = [self pickFace:&_scaleRibFace1 rayOrigin:rayOrigin1 rayDirection:rayDir1];
     BOOL hit2 = [self pickFace:&_scaleRibFace2 rayOrigin:rayOrigin2 rayDirection:rayDir2];
     
@@ -767,39 +843,21 @@ using namespace HMesh;
         }
     }
     
-//    touchPoint = [Utilities invertVector3:touchPoint withMatrix:self.modelMatrix];
-//    VertexID vID = [self closestVertexID:touchPoint];
-//    Walker w = _manifold.walker(vID);
-//    HMesh::HalfEdgeAttributeVector<EdgeInfo> edgeInfo = trace_spine_edges(_manifold);
-//    if (edgeInfo[w.halfedge()].edge_type != RIB) {
-//        w = w.prev();
-//    }
-//    assert(edgeInfo[w.halfedge()].edge_type == RIB);
-//    
-//    change_rib_radius(_manifold, w.halfedge(), scale);
-//    [self rebuffer];
-}
-
--(void)endScalingRibsWithScaleFactor:(float)scale {
-    if (!_shouldBeginRibScaling) {
-        return;
-    }
     
     Walker w1 = _manifold.walker(_scaleRibFace1);
     Walker w2 = _manifold.walker(_scaleRibFace2);
-    HMesh::HalfEdgeAttributeVector<EdgeInfo> edgeInfo = trace_spine_edges(_manifold);
     
     //TODO handle triangles
-
-    if (edgeInfo[w1.halfedge()].edge_type != SPINE) {
+    
+    if (_edgeInfo[w1.halfedge()].edge_type != SPINE) {
         w1 = w1.next();
     }
-    assert(edgeInfo[w1.halfedge()].edge_type == SPINE);
-
-    if (edgeInfo[w2.halfedge()].edge_type != SPINE) {
+    assert(_edgeInfo[w1.halfedge()].edge_type == SPINE);
+    
+    if (_edgeInfo[w2.halfedge()].edge_type != SPINE) {
         w2 = w2.next();
     }
-    assert(edgeInfo[w2.halfedge()].edge_type == SPINE);
+    assert(_edgeInfo[w2.halfedge()].edge_type == SPINE);
     
     //test which direction to go from face1 to  reach face2
     //i.e. find out rib edges in between fingers
@@ -812,7 +870,7 @@ using namespace HMesh;
         //w1.opp is closer
         w1 = w1.opp();
     }
-
+    
     if ((w2pos2 - w1pos1).length() < (w2pos1 - w1pos1).length()) {
         //w2.opp is closer
         w2 = w2.opp();
@@ -820,13 +878,121 @@ using namespace HMesh;
     
     HalfEdgeID finalRib = w2.next().halfedge();
     
-    
-    while (!lie_on_same_rib(_manifold, w1.next().halfedge(), finalRib)) {
-        change_rib_radius(_manifold, w1.next().halfedge(), scale);
+//    Manifold temp_mani = _manifold;
+    _edges_to_scale.clear();
+    vector<VertexID> all_vector_vid;
+    while (!lie_on_same_rib(_manifold, w1.next().halfedge(), finalRib, _edgeInfo)) {
+        _edges_to_scale.push_back(w1.next().halfedge());
+        vector<VertexID> vector_vid = change_rib_radius(_manifold, w1.next().halfedge(), 1.0);
+        all_vector_vid.insert(all_vector_vid.end(), vector_vid.begin(), vector_vid.end());
         w1 =  w1.next().opp().next();
     }
-    change_rib_radius(_manifold, w1.next().halfedge(), scale); //last one
+    _edges_to_scale.push_back(w1.next().halfedge());
+    vector<VertexID> vector_vid =change_rib_radius(_manifold, w1.next().halfedge(), 1.0); //last one
+    all_vector_vid.insert(all_vector_vid.end(), vector_vid.begin(), vector_vid.end());
     
+    //    [self rebuffer];
+    [self subBufferForVertexIDs:all_vector_vid mani:_manifold];
+    
+    _accumScale = 1.0;
+    
+//    touchPoint = [Utilities invertVector3:touchPoint withMatrix:self.modelMatrix];
+//    VertexID vID = [self closestVertexID:touchPoint];
+//    Walker w = _manifold.walker(vID);
+//    if (_edgeInfo[w.halfedge()].edge_type != RIB) {
+//        w = w.prev();
+//    }
+//    assert(_edgeInfo[w.halfedge()].edge_type == RIB);
+//    
+//    change_rib_radius(_manifold, w.halfedge(), scale);
+//    [self rebuffer];
+}
+
+-(void)changeScalingRibsWithScaleFactor:(float)scale {
+//    NSLog(@"Pumpmpm");
+    
+   
+    if (!_shouldBeginRibScaling) {
+        return;
+    }
+//    dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0ul);
+//    dispatch_async(queue, ^{
+        float k;
+        if (scale < 1)
+            k = 0.9;
+        else
+            k = 1.1;
+        vector<VertexID> all_vector_vid;
+        for (HalfEdgeID hID: _edges_to_scale) {
+       
+            vector<VertexID> vector_vid = change_rib_radius(_manifold, hID, k);
+            all_vector_vid.insert(all_vector_vid.end(), vector_vid.begin(), vector_vid.end());
+        }
+    //    [self rebuffer];
+        [self subBufferForVertexIDs:all_vector_vid mani:_manifold];
+//    });
+    
+//
+//        Walker w1 = _manifold.walker(_scaleRibFace1);
+//        Walker w2 = _manifold.walker(_scaleRibFace2);
+//        
+//        //TODO handle triangles
+//        
+//        if (_edgeInfo[w1.halfedge()].edge_type != SPINE) {
+//            w1 = w1.next();
+//        }
+//        assert(_edgeInfo[w1.halfedge()].edge_type == SPINE);
+//        
+//        if (_edgeInfo[w2.halfedge()].edge_type != SPINE) {
+//            w2 = w2.next();
+//        }
+//        assert(_edgeInfo[w2.halfedge()].edge_type == SPINE);
+//        
+//        //test which direction to go from face1 to  reach face2
+//        //i.e. find out rib edges in between fingers
+//        Vec3d w1pos1 = _manifold.pos(w1.vertex());
+//        Vec3d w1pos2 = _manifold.pos(w1.opp().vertex());
+//        Vec3d w2pos1 = _manifold.pos(w2.vertex());
+//        Vec3d w2pos2 = _manifold.pos(w2.opp().vertex());
+//        
+//        if ((w1pos2 - w2pos1).length() < (w1pos1 - w2pos1).length()) {
+//            //w1.opp is closer
+//            w1 = w1.opp();
+//        }
+//        
+//        if ((w2pos2 - w1pos1).length() < (w2pos1 - w1pos1).length()) {
+//            //w2.opp is closer
+//            w2 = w2.opp();
+//        }
+//        
+//        HalfEdgeID finalRib = w2.next().halfedge();
+//        
+//        Manifold temp_mani = _manifold;
+//        
+//        vector<VertexID> all_vector_vid;
+//        while (!lie_on_same_rib(temp_mani, w1.next().halfedge(), finalRib, _edgeInfo)) {
+//            vector<VertexID> vector_vid = change_rib_radius(temp_mani, w1.next().halfedge(), scale);
+//            all_vector_vid.insert(all_vector_vid.end(), vector_vid.begin(), vector_vid.end());
+//            w1 =  w1.next().opp().next();
+//        }
+//        vector<VertexID> vector_vid =change_rib_radius(temp_mani, w1.next().halfedge(), scale); //last one
+//        all_vector_vid.insert(all_vector_vid.end(), vector_vid.begin(), vector_vid.end());
+//        
+//        //    [self rebuffer];
+//        [self subBufferForVertexIDs:all_vector_vid mani:temp_mani];
+
+    
+}
+
+-(void)endScalingRibsWithScaleFactor:(float)scale {
+    if (!_shouldBeginRibScaling) {
+        return;
+    }
+    
+    for (HalfEdgeID hID: _edges_to_scale) {
+        change_rib_radius(_manifold, hID, scale);
+    }
+
     [self rebuffer];
 }
 
@@ -870,9 +1036,10 @@ using namespace HMesh;
     [self moveVertexCloseTo:touchPoint orthogonallyBy:r * 0.05];
 }
 
-
+#pragma mark - DRAWING
 
 -(void)draw {
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
     glUseProgram(self.drawShaderProgram.program);
     
     glUniformMatrix4fv(uniforms[UNIFORM_MODELVIEWPROJECTION_MATRIX], 1, 0, self.modelViewProjectionMatrix.m);

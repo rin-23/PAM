@@ -45,7 +45,7 @@
 
 - (void)handlePinchGesture:(UIGestureRecognizer *)sender {
     UIPinchGestureRecognizer* pinch = (UIPinchGestureRecognizer*) sender;
-    NSLog(@"Scale %f Velocity %f", [pinch scale], [pinch velocity]);
+//    NSLog(@"Scale %f Velocity %f", [pinch scale], [pinch velocity]);
     
     if (sender.state == UIGestureRecognizerStateBegan) {
         _curFactor = _scaleFactor;

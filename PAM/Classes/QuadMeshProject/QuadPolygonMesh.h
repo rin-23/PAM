@@ -20,6 +20,7 @@
 
 -(void)gaussianStart:(GLKVector3)touchPoint;
 -(void)gaussianMove:(GLKVector3)touchPoint;
+
 -(BOOL)createBranchAtPointAndRefine:(GLKVector3)touchPoint;
 
 -(void)showSkeleton:(BOOL)show;
@@ -43,7 +44,7 @@
                         rayDirection1:(GLKVector3)rayDir1
                         rayDirection2:(GLKVector3)rayDir2;
 -(void)endScalingRibsWithScaleFactor:(float)scale;
-
+-(void)changeScalingRibsWithScaleFactor:(float)scale;
 
 @property (nonatomic, assign) int branchWidth;
 

@@ -185,7 +185,7 @@ typedef enum {
 //    _twoFingerBending.numberOfTouchesRequired = 2;
 //    _twoFingerBending.minimumPressDuration = 0.01;
     _twoFingerBending.enabled = NO;
-//    [view addGestureRecognizer:_twoFingerBending];
+    [view addGestureRecognizer:_twoFingerBending];
 
 //    UITapGestureRecognizer* tapWithFourFingers = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleFourFingerTapGesture:)];
 //    tapWithTwoFingers.numberOfTouchesRequired = 4;
@@ -248,7 +248,7 @@ typedef enum {
                                      rayDirection2:rayDir2];
             
         } else if (sender.state == UIGestureRecognizerStateEnded) {
-            [_pMesh endScalingRibsWithScaleFactor:pinch.scale*0.7];
+            [_pMesh endScalingRibsWithScaleFactor:pinch.scale*0.9];
 
 //            if (pinch.scale <= 1) {
 

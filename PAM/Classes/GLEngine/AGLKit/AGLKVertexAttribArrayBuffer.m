@@ -4,6 +4,8 @@
 //
 
 #import "AGLKVertexAttribArrayBuffer.h"
+#import <OpenGLES/ES2/gl.h>
+#import <OpenGLES/ES2/glext.h>
 
 @interface AGLKVertexAttribArrayBuffer ()
 
@@ -71,6 +73,10 @@
     glEnableVertexAttribArray(index);
 }
 
+
+-(void)bind {
+       glBindBuffer(GL_ARRAY_BUFFER,self.name);
+}
 /////////////////////////////////////////////////////////////////
 // A vertex attribute array buffer must be prepared when your 
 // application wants to use the buffer to render any geometry. 
@@ -86,7 +92,7 @@
    NSParameterAssert(offset < self.stride);
    NSAssert(0 != name, @"Invalid name");
 
-   glBindBuffer(GL_ARRAY_BUFFER,self.name);
+
 
 //    glVertexAttribPointer (GLuint indx, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const GLvoid* ptr)
     

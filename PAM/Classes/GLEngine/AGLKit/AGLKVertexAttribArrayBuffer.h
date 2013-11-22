@@ -57,6 +57,7 @@ typedef enum {
 
 -(void)enableAttribute:(GLuint)index;
 
+-(void)bind;
 
 
 @end

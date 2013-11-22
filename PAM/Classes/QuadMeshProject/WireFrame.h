@@ -10,6 +10,6 @@
 
 @interface WireFrame : PolygonMesh
 
--(void)setVertexData:(NSMutableData*)vertexData vertexNum:(uint32_t)vertexNum;
+-(void)setVertexData:(NSMutableData*)vertexData vertexNum:(int)vertexNum;
 
 @end

@@ -22,7 +22,10 @@
 #include <map>
 #include <set>
 
+typedef CGLA::Vec3d Vec; 
+typedef CGLA::Vec3f Vecf;
 @interface QuadPolygonMesh() {
+    int current_buffer;
     HMesh::Manifold _manifold;
     HMesh::HalfEdgeAttributeVector<EdgeInfo> _edgeInfo;
 
@@ -46,6 +49,8 @@
     HMesh::FaceID _scaleRibFace2;
     BOOL _shouldBeginRibScaling;
     vector<HMesh::HalfEdgeID> _edges_to_scale;
+    vector<HMesh::VertexID> _all_vector_vid;
+    HMesh::VertexAttributeVector<Vec> _current_scale_position;
 //    HMesh::Manifold _scaleSaveMani;
     
     //Skeleton
@@ -55,7 +60,8 @@
     HMesh::Manifold undoMani;
  
     map<HMesh::VertexID, vector<HMesh::FaceID>> dic_vertex_to_face; //store information about regions need to be updated
-    map<HMesh::FaceID, int> dic_face_to_buffer; //store information about regions need to be updated
+    map<HMesh::FaceID, unsigned long> dic_face_to_buffer; //store information about regions need to be updated
+    
     map<HMesh::VertexID, vector<int>> dic_wireframe_vertex_to_buffer; //store information about regions need to be updated
 }
 
@@ -74,7 +80,7 @@ GLKVector2 GLKVector2MakeWithVector3(GLKVector3 vector3) {
     return GLKVector2Make(vector3.x, vector3.y);
 }
 
-GLKVector3 GLKVector3MakeWithVec3d(Vec3d v) {
+GLKVector3 GLKVector3MakeWithVec(Vec v) {
     return GLKVector3Make(v[0], v[1], v[2]);
 }
 
@@ -83,6 +89,7 @@ using namespace HMesh;
 -(void)setMeshFromObjFile:(NSString*)objFilePath {
     
     _branchWidth = 1;
+    current_buffer = 0;
     //Load manifold
     _manifold = HMesh::Manifold();
     undoMani = _manifold;
@@ -132,7 +139,15 @@ using namespace HMesh;
     [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_POSITION]];
     [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_NORMAL]];
     [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_COLOR]];
-    
+
+    self.doubleVertexBuffer = [[AGLKVertexAttribArrayBuffer alloc] initWithAttribStride:sizeof(VertexNormRGBA)
+                                                                     numberOfVertices:self.numVertices
+                                                                                bytes:vertexData.bytes
+                                                                                usage:GL_DYNAMIC_DRAW];
+    [self.doubleVertexBuffer enableAttribute:attrib[ATTRIB_POSITION]];
+    [self.doubleVertexBuffer enableAttribute:attrib[ATTRIB_NORMAL]];
+    [self.doubleVertexBuffer enableAttribute:attrib[ATTRIB_COLOR]];
+
     
     //Create Wireframe Object
     _wireFrame = [[WireFrame alloc]  init];
@@ -271,7 +286,7 @@ using namespace HMesh;
     HMesh::VertexID closestVertex;
     
     for (VertexIDIterator vID = _manifold.vertices_begin(); vID != _manifold.vertices_end(); vID++) {
-        CGLA::Vec3d vertexPos = _manifold.pos(*vID);
+        Vec vertexPos = _manifold.pos(*vID);
         
         GLKVector4 glkVertextPos = GLKVector4Make(vertexPos[0], vertexPos[1], vertexPos[2], 1.0f);
         GLKVector4 glkVertextPosModelView = GLKMatrix4MultiplyVector4(self.modelViewMatrix, glkVertextPos);
@@ -296,7 +311,7 @@ using namespace HMesh;
     
     //TODO refactor
     for (VertexIDIterator vID = _manifold.vertices_begin(); vID != _manifold.vertices_end(); vID++) {
-            CGLA::Vec3d vertexPos = _manifold.pos(*vID);
+            Vec vertexPos = _manifold.pos(*vID);
             GLKVector3 glkVertextPos = GLKVector3Make(vertexPos[0], vertexPos[1], vertexPos[2]);
             float cur_distance = GLKVector3Distance(touchPoint, glkVertextPos);
             if (cur_distance < distance) {
@@ -324,7 +339,7 @@ using namespace HMesh;
         GLKVector3 faceVerticies[4];
         int num_edges = 0;
         for(Walker w = _manifold.walker(*fid); !w.full_circle(); w = w.circulate_face_cw()) {
-            Vec3d v = _manifold.pos(w.vertex());
+            Vec v = _manifold.pos(w.vertex());
             faceVerticies[num_edges] = GLKVector3Make(v[0], v[1], v[2]);
             num_edges++;
             if (num_edges > 4) { //either quad or triangle
@@ -354,7 +369,7 @@ using namespace HMesh;
 //    if (setAsCurrentID) {
 //        _curSelectedVertexID = vID;
 //    }
-//    CGLA::Vec3d vertexPos = _manifold.pos(vID);
+//    Vec vertexPos = _manifold.pos(vID);
 //    GLKVector4 glkVertextPos = GLKVector4Make(vertexPos[0], vertexPos[1], vertexPos[2], 1.0);
 //    glkVertextPos = GLKMatrix4MultiplyVector4(self.modelMatrix, glkVertextPos);
 //    return  GLKVector3Make(glkVertextPos.x, glkVertextPos.y, glkVertextPos.z);
@@ -370,7 +385,7 @@ using namespace HMesh;
 //    touchPoint = [Utilities invertVector3:touchPoint withMatrix:self.modelMatrix];
 //    float threshold = _boundingBox.radius * 0.1;
 //    
-//    CGLA::Vec3d vertexPos = _manifold.pos(_curSelectedVertexID);
+//    Vec vertexPos = _manifold.pos(_curSelectedVertexID);
 //    GLKVector3 glkPos = GLKVector3Make(vertexPos[0], vertexPos[1], vertexPos[2]);
 //    
 //    GLKVector4 currentPosition4 = GLKMatrix4MultiplyVector4(self.modelViewMatrix, GLKVector4MakeWithVector3(glkPos, 1.0));
@@ -387,7 +402,7 @@ using namespace HMesh;
 //    
 //    newPosition = [Utilities invertVector3:newPosition withMatrix:self.modelMatrix];
 //    
-//    CGLA::Vec3d vertexPos = _manifold.pos(_curSelectedVertexID);
+//    Vec vertexPos = _manifold.pos(_curSelectedVertexID);
 //    GLKVector3 currePosition = GLKVector3Make(vertexPos[0], vertexPos[1], vertexPos[2]);
 //    
 //    GLKVector4 currentPosition4 = GLKMatrix4MultiplyVector4(self.modelViewMatrix, GLKVector4MakeWithVector3(currePosition, 1.0));
@@ -399,7 +414,7 @@ using namespace HMesh;
 //        
 //    GLKVector3 vk = GLKVector3Make(axis.x, axis.y, axis.z);
 //
-//    CGLA::Vec3d newPos = CGLA::Vec3d(vk.x, vk.y, vk.z);
+//    Vec newPos = Vec(vk.x, vk.y, vk.z);
 //    _manifold.pos(_curSelectedVertexID) = newPos;
 //    
 //    GLKVector4 glkVertextPos = GLKVector4MakeWithVector3(vk, 1.0f);
@@ -416,6 +431,15 @@ using namespace HMesh;
     self.meshData = vertexData;
     
     self.vertexDataBuffer = [[AGLKVertexAttribArrayBuffer alloc] initWithAttribStride:sizeof(VertexNormRGBA)
+                                                                     numberOfVertices:self.numVertices
+                                                                                bytes:self.meshData.bytes
+                                                                                usage:GL_DYNAMIC_DRAW];
+    
+    glEnableVertexAttribArray(attrib[ATTRIB_POSITION]);
+    glEnableVertexAttribArray(attrib[ATTRIB_NORMAL]);
+    glEnableVertexAttribArray(attrib[ATTRIB_COLOR]);
+    
+    self.doubleVertexBuffer = [[AGLKVertexAttribArrayBuffer alloc] initWithAttribStride:sizeof(VertexNormRGBA)
                                                                      numberOfVertices:self.numVertices
                                                                                 bytes:self.meshData.bytes
                                                                                 usage:GL_DYNAMIC_DRAW];
@@ -450,8 +474,9 @@ using namespace HMesh;
     for(FaceIDIterator fid = mani.faces_begin(); fid != mani.faces_end(); ++fid) {
         int vertexNum = 0;
         VertexNormRGBA facet[4];
-
-        CGLA::Vec3d norm = HMesh::normal(mani, *fid);
+        
+        Vec norm = HMesh::normal(mani, *fid);
+        
         PositionXYZ normGL = {(GLfloat)norm[0], (GLfloat)norm[1], (GLfloat)norm[2]};
         
         ColorRGBA vertexColor = {200,200,200,255};
@@ -462,12 +487,13 @@ using namespace HMesh;
         //iterate over every vertex of the face
         for(Walker w = mani.walker(*fid); !w.full_circle(); w = w.circulate_face_ccw()) {
 
-//            CGLA::Vec3d norm = HMesh::normal(mani, w.vertex());
+//            Vec norm = HMesh::normal(mani, w.vertex());
 //            PositionXYZ normGL = {(GLfloat)norm[0], (GLfloat)norm[1], (GLfloat)norm[2]};
             
             //add vertex to the data array
             VertexID vID = w.vertex();
-            CGLA::Vec3d c = mani.pos(vID);
+            Vec c = mani.pos(vID);
+
             PositionXYZ positionDCM = {(GLfloat)c[0], (GLfloat)c[1], (GLfloat)c[2]};
             VertexNormRGBA vertexMono = {positionDCM, normGL, vertexColor};
 
@@ -476,6 +502,7 @@ using namespace HMesh;
         
             if (vertexNum == 4) {
                 //Create a second triangle
+
                 [*verticies appendBytes:&facet[0] length:sizeof(VertexNormRGBA)];
                 [*verticies appendBytes:&facet[2] length:sizeof(VertexNormRGBA)];
             }
@@ -522,7 +549,14 @@ using namespace HMesh;
     _edgeInfo = trace_spine_edges(_manifold);
 }
 
--(void)subBufferForVertexIDs:(vector<HMesh::VertexID>)vector_of_vid mani:(HMesh::Manifold) mani{
+-(void)subBufferForVertexIDs:(vector<HMesh::VertexID>)vector_of_vid mani:(HMesh::Manifold) mani mappedData:(GLvoid*)ptr {
+    
+    for (HalfEdgeID hID: _edges_to_scale) {
+        scaled_pos_for_rib(_manifold, hID, _edgeInfo, _accumScale, _current_scale_position);
+        //            vector<VertexID> vector_vid = change_rib_radius(_manifold, hID, k);
+        //            _all_vector_vid.insert(_all_vector_vid.end(), vector_vid.begin(), vector_vid.end());
+    }
+    
     set<FaceID> set_of_faces;
     
     //Add all faces that are affected by the verticies
@@ -543,8 +577,8 @@ using namespace HMesh;
         int vertexNum = 0;
         VertexNormRGBA facet[4];
         
-//        CGLA::Vec3d norm = HMesh::normal(mani, fid);
-        CGLA::Vec3d norm = Vec3d(0,0,0);
+//        Vec norm = HMesh::normal(mani, fid);
+        Vec norm = Vec(0,0,0);
         PositionXYZ normGL = {(GLfloat)norm[0], (GLfloat)norm[1], (GLfloat)norm[2]};
         
         ColorRGBA vertexColor = {200,200,200,255};
@@ -552,12 +586,20 @@ using namespace HMesh;
         //iterate over every vertex of the face
         for(Walker w = mani.walker(fid); !w.full_circle(); w = w.circulate_face_ccw()) {
             
-            //            CGLA::Vec3d norm = HMesh::normal(mani, w.vertex());
+            //            Vec norm = HMesh::normal(mani, w.vertex());
             //            PositionXYZ normGL = {(GLfloat)norm[0], (GLfloat)norm[1], (GLfloat)norm[2]};
             
             //add vertex to the data array
             VertexID vID = w.vertex();
-            CGLA::Vec3d c = mani.pos(vID);
+            Vec c = mani.pos(vID);
+            for (VertexID v: vector_of_vid) {
+                if (v == vID) {
+                    c = _current_scale_position[vID];
+                    break;
+                }
+            }
+            
+//            Vec c = _current_scale_position[vID];
             PositionXYZ positionDCM = {(GLfloat)c[0], (GLfloat)c[1], (GLfloat)c[2]};
             VertexNormRGBA vertexMono = {positionDCM, normGL, vertexColor};
             
@@ -572,9 +614,10 @@ using namespace HMesh;
             [verticies appendBytes:&vertexMono length:sizeof(VertexNormRGBA)];
         }
         
-        NSUInteger offset = dic_face_to_buffer[fid];
-        NSRange range = {offset, verticies.length};
-        [self.meshData replaceBytesInRange:range withBytes:verticies.bytes];
+        unsigned long offset = dic_face_to_buffer[fid];
+//        NSRange range = {offset, verticies.length};
+        memcpy(((char*)ptr) + offset, verticies.bytes, verticies.length);
+//        [self.meshData replaceBytesInRange:range withBytes:verticies.bytes];
 //        [self.vertexDataBuffer bufferSubDataWithOffset:offset size:verticies.length data:verticies.bytes];
     }
 }
@@ -600,15 +643,15 @@ using namespace HMesh;
     
     GLKVector3 mousePoint_inView_3 = GLKMatrix4MultiplyVector3Custom(self.modelViewMatrix, mousePoint);
     VertexID vID = [self closestVertexID_2DProjection:GLKVector2Make(mousePoint_inView_3.x, mousePoint_inView_3.y)];
-    Vec3d norm = normalize(HMesh::normal(_manifold, vID));
+    Vec norm = normalize(HMesh::normal(_manifold, vID));
     
 //    GLKVector3 touchPoint_inView_3 = touchPoint;//GLKMatrix4MultiplyVector3Custom(self.viewMatrix, touchPoint);
 //    GLKVector2 touchPoint_inView_2 = GLKVector2Make(touchPoint_inView_3.x, touchPoint_inView_3.y);
 //    Vec2d displace2d = Vec2d(touchPoint_inView_2.x - mousePoint_inView_2.x, touchPoint_inView_2.y - mousePoint_inView_2.y);
-    Vec3d displace = Vec3d(touchPoint.x - mousePoint.x, touchPoint.y - mousePoint.y, touchPoint.z - mousePoint.z);
+    Vec displace = Vec(touchPoint.x - mousePoint.x, touchPoint.y - mousePoint.y, touchPoint.z - mousePoint.z);
 
     VertexID newPoleID;
-    Vec3d mouseVertex = _manifold.pos(vID);
+    Vec mouseVertex = _manifold.pos(vID);
     BOOL result = [self createBranchAtPoint:GLKVector3Make(mouseVertex[0], mouseVertex[1], mouseVertex[2])
                                       width:self.branchWidth
                                    vertexID:&newPoleID];
@@ -617,7 +660,7 @@ using namespace HMesh;
         poles[newPoleID] = 1;
         refine_poles(_manifold, poles);
 
-        Vec3d displace3d =  norm * displace.length();
+        Vec displace3d =  norm * displace.length();
         
         // Move pole
         _manifold.pos(newPoleID) = _manifold.pos(newPoleID) + displace3d;
@@ -640,11 +683,11 @@ using namespace HMesh;
 
 -(void)gaussianStart:(GLKVector3)touchPoint {
     touchPoint = [Utilities invertVector3:touchPoint withMatrix:self.modelMatrix];
-    Vec3d p0 = Vec3d(touchPoint.x, touchPoint.y, touchPoint.z);
+    Vec p0 = Vec(touchPoint.x, touchPoint.y, touchPoint.z);
     float brush_size = 0.001;
     mousePoint = touchPoint;
     old_mani = _manifold;
-    Vec3d c;
+    Vec c;
     float r;
     bsphere(_manifold, c, r);
     for(auto vid : _manifold.vertices())
@@ -658,20 +701,20 @@ using namespace HMesh;
     [self saveState];
     
     touchPoint = [Utilities invertVector3:touchPoint withMatrix:self.modelMatrix];
-    Vec3d displace = Vec3d(touchPoint.x - mousePoint.x, touchPoint.y - mousePoint.y, touchPoint.z - mousePoint.z);
+    Vec displace = Vec(touchPoint.x - mousePoint.x, touchPoint.y - mousePoint.y, touchPoint.z - mousePoint.z);
 
     VertexID vID = [self closestVertexID:mousePoint];
-    Vec3d norm = HMesh::normal(_manifold, vID);
+    Vec norm = HMesh::normal(_manifold, vID);
     
 //    float angle = acos(dot(normalize(displace), normalize(norm)));
-    Vec3d c;
+    Vec c;
     float r;
     bsphere(_manifold, c, r);
     
     if (length(displace) > r*0.05) {
 //        NSLog(@"MOVED PERPENDICULAR WAS %f", GLKMathRadiansToDegrees(angle));
         VertexID newPoleID;
-        Vec3d mouseVertex = _manifold.pos(vID);
+        Vec mouseVertex = _manifold.pos(vID);
 
         BOOL result = [self createBranchAtPoint:GLKVector3Make(mouseVertex[0], mouseVertex[1], mouseVertex[2]) width:self.branchWidth vertexID:&newPoleID];
         if (result) {
@@ -762,7 +805,7 @@ using namespace HMesh;
     
     //Walk towards pole and collect vertex ids for every ring
     vector<vector<VertexID>> rings;
-    vector<Vec3d> centroids;
+    vector<Vec> centroids;
     Walker spineWalker = _manifold.walker(poleDirectionHalfEdge);
     spineWalker = spineWalker.next().opp().next(); //advance to the next spine
     for (; !is_pole(_manifold, spineWalker.vertex()); spineWalker = spineWalker.next().opp().next())
@@ -770,7 +813,7 @@ using namespace HMesh;
         assert(_edgeInfo[spineWalker.next().halfedge()].edge_type == RIB);
         
         vector<VertexID> vIDs;
-        Vec3d centroid = Vec3d(0,0,0);
+        Vec centroid = Vec(0,0,0);
         Walker ribWalker = _manifold.walker(spineWalker.next().halfedge());
         
         for (;!ribWalker.full_circle(); ribWalker = ribWalker.next().opp().next())
@@ -813,13 +856,13 @@ using namespace HMesh;
         float weight = gaussian_weights[i];
         for (int j = 0; j < vIDs.size(); j++) {
             VertexID vID = vIDs[j];
-            Vec3d v_pos = _manifold.pos(vID);
-            GLKVector3 v_pos_glk_model = GLKVector3MakeWithVec3d(v_pos);
+            Vec v_pos = _manifold.pos(vID);
+            GLKVector3 v_pos_glk_model = GLKVector3MakeWithVec(v_pos);
             GLKVector3 v_pos_glk_world = GLKMatrix4MultiplyVector3Custom(self.modelViewMatrix, v_pos_glk_model);
             v_pos_glk_world.x += weight * displacement.x;
             v_pos_glk_world.y += weight * displacement.y;
             v_pos_glk_model = [Utilities invertVector3:v_pos_glk_world withMatrix:self.modelViewMatrix];
-            v_pos = Vec3d(v_pos_glk_model.x, v_pos_glk_model.y, v_pos_glk_model.z);
+            v_pos = Vec(v_pos_glk_model.x, v_pos_glk_model.y, v_pos_glk_model.z);
             _manifold.pos(vID) = v_pos;
         }
     }
@@ -843,7 +886,6 @@ using namespace HMesh;
         }
     }
     
-    
     Walker w1 = _manifold.walker(_scaleRibFace1);
     Walker w2 = _manifold.walker(_scaleRibFace2);
     
@@ -859,12 +901,12 @@ using namespace HMesh;
     }
     assert(_edgeInfo[w2.halfedge()].edge_type == SPINE);
     
-    //test which direction to go from face1 to  reach face2
+    //test which direction to go from face1 to reach face2
     //i.e. find out rib edges in between fingers
-    Vec3d w1pos1 = _manifold.pos(w1.vertex());
-    Vec3d w1pos2 = _manifold.pos(w1.opp().vertex());
-    Vec3d w2pos1 = _manifold.pos(w2.vertex());
-    Vec3d w2pos2 = _manifold.pos(w2.opp().vertex());
+    Vec w1pos1 = _manifold.pos(w1.vertex());
+    Vec w1pos2 = _manifold.pos(w1.opp().vertex());
+    Vec w2pos1 = _manifold.pos(w2.vertex());
+    Vec w2pos2 = _manifold.pos(w2.opp().vertex());
     
     if ((w1pos2 - w2pos1).length() < (w1pos1 - w2pos1).length()) {
         //w1.opp is closer
@@ -880,21 +922,25 @@ using namespace HMesh;
     
 //    Manifold temp_mani = _manifold;
     _edges_to_scale.clear();
-    vector<VertexID> all_vector_vid;
+    _all_vector_vid.clear();
+//    vector<VertexID> all_vector_vid;
     while (!lie_on_same_rib(_manifold, w1.next().halfedge(), finalRib, _edgeInfo)) {
         _edges_to_scale.push_back(w1.next().halfedge());
-        vector<VertexID> vector_vid = change_rib_radius(_manifold, w1.next().halfedge(), 1.0);
-        all_vector_vid.insert(all_vector_vid.end(), vector_vid.begin(), vector_vid.end());
+        vector<VertexID> vector_vid = verticies_along_the_rib(_manifold, w1.next().halfedge(), _edgeInfo);
+        _all_vector_vid.insert(_all_vector_vid.end(), vector_vid.begin(), vector_vid.end());
         w1 =  w1.next().opp().next();
     }
     _edges_to_scale.push_back(w1.next().halfedge());
-    vector<VertexID> vector_vid =change_rib_radius(_manifold, w1.next().halfedge(), 1.0); //last one
-    all_vector_vid.insert(all_vector_vid.end(), vector_vid.begin(), vector_vid.end());
+    vector<VertexID> vector_vid = verticies_along_the_rib(_manifold, w1.next().halfedge(), _edgeInfo); //last one
+    _all_vector_vid.insert(_all_vector_vid.end(), vector_vid.begin(), vector_vid.end());
     
-    //    [self rebuffer];
-    [self subBufferForVertexIDs:all_vector_vid mani:_manifold];
+    _current_scale_position = VertexAttributeVector<Vec>(_manifold.no_vertices());
     
-    _accumScale = 1.0;
+//    [self rebuffer];
+//    [self subBufferForVertexIDs:all_vector_vid mani:_manifold];
+
+
+    NSLog(@"Finished calling begin scalling funtion");
     
 //    touchPoint = [Utilities invertVector3:touchPoint withMatrix:self.modelMatrix];
 //    VertexID vID = [self closestVertexID:touchPoint];
@@ -917,19 +963,20 @@ using namespace HMesh;
     }
 //    dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0ul);
 //    dispatch_async(queue, ^{
-        float k;
-        if (scale < 1)
-            k = 0.9;
-        else
-            k = 1.1;
-        vector<VertexID> all_vector_vid;
-        for (HalfEdgeID hID: _edges_to_scale) {
-       
-            vector<VertexID> vector_vid = change_rib_radius(_manifold, hID, k);
-            all_vector_vid.insert(all_vector_vid.end(), vector_vid.begin(), vector_vid.end());
-        }
+//        float k;
+//        if (scale < 1)
+//            k = 0.9;
+//        else
+//            k = 1.1;
+
+        _accumScale = scale;
+//        for (HalfEdgeID hID: _edges_to_scale) {
+//            scaled_pos_for_rib(_manifold, hID, _edgeInfo, scale, _current_scale_position);
+////            vector<VertexID> vector_vid = change_rib_radius(_manifold, hID, k);
+////            _all_vector_vid.insert(_all_vector_vid.end(), vector_vid.begin(), vector_vid.end());
+//        }
     //    [self rebuffer];
-        [self subBufferForVertexIDs:all_vector_vid mani:_manifold];
+
 //    });
     
 //
@@ -950,10 +997,10 @@ using namespace HMesh;
 //        
 //        //test which direction to go from face1 to  reach face2
 //        //i.e. find out rib edges in between fingers
-//        Vec3d w1pos1 = _manifold.pos(w1.vertex());
-//        Vec3d w1pos2 = _manifold.pos(w1.opp().vertex());
-//        Vec3d w2pos1 = _manifold.pos(w2.vertex());
-//        Vec3d w2pos2 = _manifold.pos(w2.opp().vertex());
+//        Vec w1pos1 = _manifold.pos(w1.vertex());
+//        Vec w1pos2 = _manifold.pos(w1.opp().vertex());
+//        Vec w2pos1 = _manifold.pos(w2.vertex());
+//        Vec w2pos2 = _manifold.pos(w2.opp().vertex());
 //        
 //        if ((w1pos2 - w2pos1).length() < (w1pos1 - w2pos1).length()) {
 //            //w1.opp is closer
@@ -985,14 +1032,18 @@ using namespace HMesh;
 }
 
 -(void)endScalingRibsWithScaleFactor:(float)scale {
+
     if (!_shouldBeginRibScaling) {
         return;
     }
     
     for (HalfEdgeID hID: _edges_to_scale) {
-        change_rib_radius(_manifold, hID, scale);
+        change_rib_radius(_manifold, hID, _edgeInfo, scale);
+//        scaled_pos_for_rib(_manifold, hID, _edgeInfo, scale, _current_scale_position);
     }
 
+    _edges_to_scale.clear();
+    _all_vector_vid.clear();
     [self rebuffer];
 }
 
@@ -1014,7 +1065,7 @@ using namespace HMesh;
 -(void)moveVertexCloseTo:(GLKVector3)touchPoint orthogonallyBy:(float)distance {
     touchPoint = [Utilities invertVector3:touchPoint withMatrix:self.modelMatrix];
     VertexID vID = [self closestVertexID:touchPoint];
-    Vec3d norm = HMesh::normal(_manifold, vID);
+    Vec norm = HMesh::normal(_manifold, vID);
     
     _manifold.pos(vID) = _manifold.pos(vID) + norm*distance;
     
@@ -1030,7 +1081,7 @@ using namespace HMesh;
 
 -(void)moveVertexOrthogonallyCloseTo:(GLKVector3)touchPoint {
     undoMani = _manifold;
-    Vec3d c;
+    Vec c;
     float r;
     bsphere(_manifold, c, r);
     [self moveVertexCloseTo:touchPoint orthogonallyBy:r * 0.05];
@@ -1039,31 +1090,68 @@ using namespace HMesh;
 #pragma mark - DRAWING
 
 -(void)draw {
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glUseProgram(self.drawShaderProgram.program);
+
+//    NSLog(@"Draw");
     
+//    if (current_buffer == 0) current_buffer = 1; else current_buffer = 0;
+
+    if (current_buffer == 0) {
+        [self.vertexDataBuffer bind];
+    } else {
+        [self.doubleVertexBuffer bind];
+    }
+    
+    glBufferData(GL_ARRAY_BUFFER, self.meshData.length, NULL, GL_DYNAMIC_DRAW);
+    GLvoid* temp = glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
+    [self subBufferForVertexIDs:_all_vector_vid mani:_manifold mappedData:temp];
+//    memcpy(temp, self.meshData.bytes, self.meshData.length);
+    glUnmapBufferOES(GL_ARRAY_BUFFER);
+    
+    glUseProgram(self.drawShaderProgram.program);
     glUniformMatrix4fv(uniforms[UNIFORM_MODELVIEWPROJECTION_MATRIX], 1, 0, self.modelViewProjectionMatrix.m);
     glUniform4f(uniforms[UNIFORM_LIGHT_DIRECTION], 0.0, 0.0, 0.0, 1.0);
     glUniform4f(uniforms[UNIFORM_LIGHT_COLOR], 1.0, 1.0, 1.0, 1.0);
-    
-    [self.vertexDataBuffer prepareToDrawWithAttrib:attrib[ATTRIB_POSITION]
-                               numberOfCoordinates:3
-                                      attribOffset:0
-                                          dataType:GL_FLOAT
-                                         normalize:GL_FALSE];
-    
-    [self.vertexDataBuffer prepareToDrawWithAttrib:attrib[ATTRIB_NORMAL]
-                               numberOfCoordinates:3
-                                      attribOffset:sizeof(PositionXYZ)
-                                          dataType:GL_FLOAT
-                                         normalize:GL_FALSE];
-    
-    [self.vertexDataBuffer prepareToDrawWithAttrib:attrib[ATTRIB_COLOR]
-                               numberOfCoordinates:4
-                                      attribOffset:2*sizeof(PositionXYZ)
-                                          dataType:GL_UNSIGNED_BYTE
-                                         normalize:GL_TRUE];
+    if (current_buffer == 0) {
+        [self.doubleVertexBuffer bind];
+        [self.doubleVertexBuffer prepareToDrawWithAttrib:attrib[ATTRIB_POSITION]
+                                   numberOfCoordinates:3
+                                          attribOffset:0
+                                              dataType:GL_FLOAT
+                                             normalize:GL_FALSE];
+        
+        [self.doubleVertexBuffer prepareToDrawWithAttrib:attrib[ATTRIB_NORMAL]
+                                   numberOfCoordinates:3
+                                          attribOffset:sizeof(PositionXYZ)
+                                              dataType:GL_FLOAT
+                                             normalize:GL_FALSE];
+        
+        [self.doubleVertexBuffer prepareToDrawWithAttrib:attrib[ATTRIB_COLOR]
+                                   numberOfCoordinates:4
+                                          attribOffset:2*sizeof(PositionXYZ)
+                                              dataType:GL_UNSIGNED_BYTE
+                                             normalize:GL_TRUE];
+    } else {
+        [self.vertexDataBuffer bind];
+        [self.vertexDataBuffer prepareToDrawWithAttrib:attrib[ATTRIB_POSITION]
+                                   numberOfCoordinates:3
+                                          attribOffset:0
+                                              dataType:GL_FLOAT
+                                             normalize:GL_FALSE];
+        
+        [self.vertexDataBuffer prepareToDrawWithAttrib:attrib[ATTRIB_NORMAL]
+                                   numberOfCoordinates:3
+                                          attribOffset:sizeof(PositionXYZ)
+                                              dataType:GL_FLOAT
+                                             normalize:GL_FALSE];
+        
+        [self.vertexDataBuffer prepareToDrawWithAttrib:attrib[ATTRIB_COLOR]
+                                   numberOfCoordinates:4
+                                          attribOffset:2*sizeof(PositionXYZ)
+                                              dataType:GL_UNSIGNED_BYTE
+                                             normalize:GL_TRUE];
+    }
 
+    current_buffer = !current_buffer;
     glEnable(GL_POLYGON_OFFSET_FILL);
     glPolygonOffset(2.0f, 2.0f);
     
@@ -1078,6 +1166,8 @@ using namespace HMesh;
     _wireFrame.projectionMatrix = self.projectionMatrix;
     
     [_wireFrame draw];
+    
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 -(void)drawToDepthBuffer {
@@ -1094,6 +1184,7 @@ using namespace HMesh;
     glUseProgram(self.depthShaderProgram.program);
     glUniformMatrix4fv(uniformsDepth[UNIFORM_MODELVIEWPROJECTION_MATRIX], 1, 0, self.modelViewProjectionMatrix.m);
     
+    [self.vertexDataBuffer bind];
     [self.vertexDataBuffer prepareToDrawWithAttrib:attribDepth[ATTRIB_POSITION]
                                numberOfCoordinates:3
                                       attribOffset:0

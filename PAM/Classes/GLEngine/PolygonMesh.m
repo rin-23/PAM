@@ -46,6 +46,8 @@
     glUniform4f(uniforms[UNIFORM_LIGHT_DIRECTION], 1.0, 0.75, 0.25, 1.0);
     glUniform4f(uniforms[UNIFORM_LIGHT_COLOR], 0.8, 0.8, 1.0, 1.0);
     
+    [self.vertexDataBuffer bind];
+    
     [self.vertexDataBuffer prepareToDrawWithAttrib:attrib[ATTRIB_POSITION]
                                numberOfCoordinates:3
                                       attribOffset:0
@@ -77,6 +79,7 @@
     glUseProgram(self.depthShaderProgram.program);
     glUniformMatrix4fv(uniformsDepth[UNIFORM_MODELVIEWPROJECTION_MATRIX], 1, 0, self.modelViewProjectionMatrix.m);
     
+    [self.vertexDataBuffer bind];
     [self.vertexDataBuffer prepareToDrawWithAttrib:attribDepth[ATTRIB_POSITION]
                                numberOfCoordinates:3
                                       attribOffset:0

@@ -10,7 +10,7 @@
 
 @implementation WireFrame
 
--(void)setVertexData:(NSMutableData*)vertexData vertexNum:(uint32_t)vertexNum {
+-(void)setVertexData:(NSMutableData*)vertexData vertexNum:(int)vertexNum {
     
     NSString* vShader = [[NSBundle mainBundle] pathForResource:@"PointCloudRGBAShader" ofType:@"vsh"];
     NSString* fShader = [[NSBundle mainBundle] pathForResource:@"PointCloudRGBAShader" ofType:@"fsh"];
@@ -36,8 +36,9 @@
     glUseProgram(self.drawShaderProgram.program);
     
     glUniformMatrix4fv(uniforms[UNIFORM_MODELVIEWPROJECTION_MATRIX], 1, 0, self.modelViewProjectionMatrix.m);
-    glUniform1f(uniforms[UNIFORM_POINT_SIZE], 5.0);
+    glUniform1f(uniforms[UNIFORM_POINT_SIZE], 5.0f);
     
+    [self.vertexDataBuffer bind];
     [self.vertexDataBuffer prepareToDrawWithAttrib:attrib[ATTRIB_POSITION]
                                numberOfCoordinates:3
                                       attribOffset:0

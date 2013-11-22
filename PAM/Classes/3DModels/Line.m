@@ -74,6 +74,7 @@
         glUniformMatrix4fv(uniforms[UNIFORM_MODELVIEWPROJECTION_MATRIX], 1, 0, self.modelViewProjectionMatrix.m);
         glUniform1f(uniforms[UNIFORM_POINT_SIZE], 2.0f);
         
+        [self.vertexDataBuffer bind];
         [self.vertexDataBuffer prepareToDrawWithAttrib:attrib[ATTRIB_POSITION]
                                    numberOfCoordinates:3
                                           attribOffset:0

@@ -39,7 +39,7 @@ using namespace HMesh;
     HMesh::HalfEdgeAttributeVector<EdgeInfo> _edgeInfo;
     BoundingBox _boundingBox;
     
-    GLKVector3 mousePoint;
+    GLKVector3 _initialTouch;
     
     //Undo
     HMesh::Manifold undoMani;
@@ -311,42 +311,55 @@ using namespace HMesh;
 //Create branch at a given vertex. Return VertexID of newly created pole.
 -(BOOL)createBranchAtVertex:(VertexID)vID width:(int)width vertexID:(VertexID*)newPoleID {
     [self saveState];
+    
+    //Do not add branhes at poles
     if (is_pole(_manifold, vID)) {
-        NSLog(@"Tried to create a branch at a pole");
+        NSLog(@"[WARNING]Tried to create a branch at a pole");
         return NO;
     }
     
+    //Find rib halfedge that points to a given vertex
     Walker walker = _manifold.walker(vID);
-    HalfEdgeID endHalfEdge = walker.halfedge();
+    if (_edgeInfo[walker.halfedge()].edge_type == SPINE) {
+        walker = walker.prev();
+    }
+    assert(_edgeInfo[walker.halfedge()].edge_type == RIB); //its a rib
+    assert(walker.vertex() == vID); //points to a given vertex
     
-    int num_rib_found = 0;
+    //Check that rib ring has enough verticeis to accomodate branch width
+    int num_of_rib_verticies = 0;
+    for (Walker ribWalker = _manifold.walker(walker.halfedge());
+         !ribWalker.full_circle();
+         ribWalker = ribWalker.next().opp().next(), num_of_rib_verticies++);
+
+    if (num_of_rib_verticies < 2*width + 1) {
+        NSLog(@"[WARNING]Not enough points to create branh");
+        return NO;
+    }
+    
     VertexAttributeVector<int> vs(_manifold.no_vertices(), 0);
     vs[vID] = 1;
     
-    vector<VertexID> ribs(2*width);
-    
-    walker = walker.next(); //advance one step to pass while loop test
-    while (walker.halfedge() != endHalfEdge) {
-        while (walker.vertex() != vID) {
-            walker = walker.next();
-        }
-        if (_edgeInfo[walker.halfedge()].edge_type == RIB) {
-            ribs[num_rib_found++] = walker.opp().vertex();
-            int side_width = 1;
-            //Advance until we reach desireed width
-            Walker sideWalker = walker.opp();
-            while (side_width != width) {
-                sideWalker = sideWalker.next().opp().next();
-                ribs[num_rib_found++] = sideWalker.vertex();
-                side_width++;
-            }
-        }
-        if (num_rib_found == 2*width) {
-            break;
-        }
-        walker = walker.opp();
+    vector<VertexID> ribs;
+
+    //walk right
+    int num_rib_found = 0;
+    for (Walker ribWalker = walker.next().opp().next();
+         num_rib_found < width;
+         ribWalker = ribWalker.next().opp().next(), num_rib_found++)
+    {
+        ribs.push_back(ribWalker.vertex());
     }
     
+    //walk left
+    num_rib_found = 0;
+    for (Walker ribWalker = walker.opp();
+         num_rib_found < width;
+         ribWalker = ribWalker.next().opp().next(), num_rib_found++)
+    {
+        ribs.push_back(ribWalker.vertex());
+    }
+
     //Set all verticies to be branched out
     for (int i = 0; i < ribs.size(); i++) {
         VertexID cur_vID = ribs[i];
@@ -371,24 +384,28 @@ using namespace HMesh;
 #pragma mark - HANDLE BRANCH CREATION TOUCHES OUTSIDE OF MODEL
 
 -(void)startCreateBranch:(GLKVector3)touchPoint {
-    mousePoint = touchPoint;
+    _initialTouch = touchPoint;
 }
 
--(void)endCreateBranch:(GLKVector3)touchPoint {
+-(void)endCreateBranch:(GLKVector3)touchPoint touchedModel:(BOOL)touchedModel{
     [self saveState];
 
-    //closest vertex in 2D space
-    //TODO make faster by using KDE tree
-    VertexID vID = [self closestVertexID_2D:mousePoint];
+    VertexID touchedVID;
+    if (touchedModel) {
+        //closest vertex in 3D space
+        touchedVID = [self closestVertexID:_initialTouch];
+    } else {
+        //closest vertex in 2D space
+        touchedVID = [self closestVertexID_2D:_initialTouch];
+    }
 
-    Vec norm = HMesh::normal(_manifold, vID);
-    float displace = GLKVector3Length(GLKVector3Subtract(touchPoint, mousePoint));
+    Vec norm = HMesh::normal(_manifold, touchedVID);
+    float displace = GLKVector3Length(GLKVector3Subtract(touchPoint, _initialTouch));
     Vec displace3d =  displace * norm ;
     
     VertexID newPoleID;
-    BOOL result = [self createBranchAtVertex:vID width:self.branchWidth vertexID:&newPoleID];
+    BOOL result = [self createBranchAtVertex:touchedVID width:self.branchWidth vertexID:&newPoleID];
     if (result) {
-        
         //add rib araound the pole
         add_rib(_manifold, _manifold.walker(newPoleID).halfedge(), _edgeInfo);
         
@@ -460,6 +477,35 @@ using namespace HMesh;
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
+
+
+-(void)drawToDepthBuffer {
+    if (self.depthShaderProgram == nil) {
+        NSString* vShader = [[NSBundle mainBundle] pathForResource:@"DepthShader" ofType:@"vsh"];
+        NSString* fShader = [[NSBundle mainBundle] pathForResource:@"DepthShader" ofType:@"fsh"];
+        self.depthShaderProgram = [[ShaderProgram alloc] initWithVertexShader:vShader fragmentShader:fShader];
+        
+        attribDepth[ATTRIB_POSITION] = [self.depthShaderProgram attributeLocation:"position"];
+        glEnableVertexAttribArray(attribDepth[ATTRIB_POSITION]);
+        uniformsDepth[UNIFORM_MODELVIEWPROJECTION_MATRIX] = [self.depthShaderProgram uniformLocation:"modelViewProjectionMatrix"];
+    }
+    
+    glUseProgram(self.depthShaderProgram.program);
+    glUniformMatrix4fv(uniformsDepth[UNIFORM_MODELVIEWPROJECTION_MATRIX], 1, 0, self.modelViewProjectionMatrix.m);
+    
+    [self.vertexDataBuffer bind];
+    [self.vertexDataBuffer prepareToDrawWithAttrib:attribDepth[ATTRIB_POSITION]
+                               numberOfCoordinates:3
+                                      attribOffset:0
+                                          dataType:GL_FLOAT
+                                         normalize:GL_FALSE];
+    
+    [self.indexDataBuffer bind];
+    [AGLKVertexAttribArrayBuffer drawPreparedArraysWithMode:GL_TRIANGLES
+                                                   dataType:GL_UNSIGNED_INT
+                                                 indexCount:self.numIndices];
+}
+
 
 
 

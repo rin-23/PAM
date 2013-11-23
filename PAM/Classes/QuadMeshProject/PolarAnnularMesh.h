@@ -13,7 +13,7 @@
 -(void)setMeshFromObjFile:(NSString*)objFile;
 
 -(void)startCreateBranch:(GLKVector3)touchPoint;
--(void)endCreateBranch:(GLKVector3)touchPoint;
+-(void)endCreateBranch:(GLKVector3)touchPoint touchedModel:(BOOL)touchedModel;
 
 @property (nonatomic, assign) int branchWidth;
 

@@ -29,6 +29,11 @@ static int VERTEX_SIZE =  3 * sizeof(float);
 static int COLOR_SIZE =  4 * sizeof(unsigned char);
 static int INDEX_SIZE  = sizeof(unsigned int);
 
+typedef enum {
+    MODIFICATION_NONE,
+    MODIFICATION_SCALING
+} CurrentModification;
+
 typedef CGLA::Vec3d Vec;
 typedef CGLA::Vec3f Vecf;
 
@@ -38,11 +43,24 @@ using namespace HMesh;
     HMesh::Manifold _manifold;
     HMesh::HalfEdgeAttributeVector<EdgeInfo> _edgeInfo;
     BoundingBox _boundingBox;
-    
+
     GLKVector3 _initialTouch;
+    
+    //Scaling of Rings
+    HMesh::FaceID _scaleRibFace1;
+    HMesh::FaceID _scaleRibFace2;
+    float _scaleFactor;
+        
+    //Selection
+    vector<HMesh::HalfEdgeID> _edges_to_scale;
+    vector<HMesh::VertexID> _all_vector_vid;
+
+    HMesh::VertexAttributeVector<Vecf> _current_scale_position;
     
     //Undo
     HMesh::Manifold undoMani;
+    
+    CurrentModification modState;
 }
 
 @property (nonatomic) AGLKVertexAttribArrayBuffer* normalDataBuffer;
@@ -65,6 +83,7 @@ using namespace HMesh;
 -(void)setMeshFromObjFile:(NSString*)objFilePath {
 
     _branchWidth = 1;
+    modState = MODIFICATION_NONE;
     
     //Load manifold
     _manifold = HMesh::Manifold();
@@ -249,7 +268,7 @@ using namespace HMesh;
     undoMani = _manifold;
 }
 
-#pragma mark - FINE VERTEX NEAR TOUCH POINT
+#pragma mark - FIND VERTEX/FACE NEAR TOUCH POINT
 
 -(VertexID)closestVertexID_2D:(GLKVector3)touchPoint {
     float distance = FLT_MAX;
@@ -275,7 +294,7 @@ using namespace HMesh;
     return closestVertex;
 }
 
--(VertexID)closestVertexID:(GLKVector3)touchPoint {
+-(VertexID)closestVertexID_3D:(GLKVector3)touchPoint {
     //iterate over every face
     float distance = FLT_MAX;
     HMesh::VertexID closestVertex;
@@ -295,18 +314,89 @@ using namespace HMesh;
     return closestVertex;
 }
 
-#pragma mark - BRANCH CREATION METHODS
+-(FaceID)closestFaceForRayOrigin:(GLKVector3)rayOrigin direction:(GLKVector3)rayDirection didHitModel:(BOOL*)didHitModel
+{
+    FaceID closestFace;
+    float closestFaceDistance = FLT_MAX;
+    
+    vector<FaceID> hitFaces;
+    
+    //Bring ray to the world space
+    rayOrigin = [Utilities matrix4:self.viewMatrix multiplyVector3:rayOrigin];
+    
+    //rayDirection in View coordinates is pointing down the z axis. Original rayDirection doesnt preserve translation
+    rayDirection = GLKVector3Make(0, 0, -1);
+    
+    //Iterate over every face and see if ray hits any
+    for (FaceIDIterator fid = _manifold.faces_begin(); fid != _manifold.faces_end(); ++fid) {
+        GLKVector3 faceVerticies[4];
+        GLKVector3 centroid = GLKVector3Make(0, 0, 0);
+        int num_edges = 0;
 
-//Create branch near touch point and refine
--(BOOL)createBranchAtTouchPointAndRefine:(GLKVector3)touchPoint {
-    VertexID newPoleID;
-    BOOL result = [self createBranchAtTouchPoint:touchPoint branchWidth:self.branchWidth vertexID:&newPoleID];
-    if (result) {
-        add_rib(_manifold, _manifold.walker(newPoleID).halfedge(), _edgeInfo);
-        [self rebuffer];
+        for(Walker w = _manifold.walker(*fid); !w.full_circle(); w = w.circulate_face_cw()) {
+            Vec v = _manifold.pos(w.vertex());
+            //bring manifold vertex coordinates to world space
+            GLKVector3 glV_world = [Utilities matrix4:self.modelViewMatrix multiplyVector3:GLKVector3Make(v[0], v[1], v[2])];
+
+            centroid = GLKVector3Add(centroid, glV_world);
+            faceVerticies[num_edges] = glV_world;
+            num_edges++;
+        }
+        centroid = GLKVector3DivideScalar(centroid, num_edges);
+        
+        //Find the closest vertex based on centroid in 2D porjection
+        float cur_distance = GLKVector2Distance(GLKVector2Make(rayOrigin.x, rayOrigin.y),
+                                                GLKVector2Make(centroid.x, centroid.y));
+        
+        if  (cur_distance < closestFaceDistance) {
+            closestFaceDistance = cur_distance;
+            closestFace = *fid;
+        }
+        
+        BOOL hit = NO;
+        if (num_edges == 3) {
+            hit = [Utilities hitTestTriangle:faceVerticies withRayStart:rayOrigin rayDirection:rayDirection];
+        } else { //quad
+            hit = [Utilities hitTestQuad:faceVerticies withRayStart:rayOrigin rayDirection:rayDirection];
+        }
+        
+        if (hit) {
+            hitFaces.push_back(*fid);
+        }
     }
-    return result;
+    
+    if (hitFaces.size() == 0) {
+        //Didn't hit any faces, so return the closest face
+        if (didHitModel!=NULL)
+            *didHitModel = NO;
+        return closestFace;
+    } else if (hitFaces.size() == 1) { //hit just one
+        if (didHitModel!=NULL)
+            *didHitModel = YES;
+        return hitFaces[0];
+    } else {
+        if (didHitModel!=NULL)
+            *didHitModel = YES;
+        //sort the faces by depth. Return the closest to the viewer
+        float farvestFaceDist = -1*FLT_MAX;
+        FaceID farvestFaceID;
+        for (FaceID fid: hitFaces) {
+            Walker w = _manifold.walker(fid);
+            Vec v = _manifold.pos(w.vertex());
+            //bring manifold vertex coordinates to world space
+            GLKVector3 glV_world = [Utilities matrix4:self.modelViewMatrix multiplyVector3:GLKVector3Make(v[0], v[1], v[2])];
+            if  (glV_world.z >= farvestFaceDist ) {
+                farvestFaceDist = glV_world.z;
+                farvestFaceID = fid;
+            }
+        }
+        
+        return farvestFaceID;
+    }
 }
+
+
+#pragma mark - BRANCH CREATION METHODS
 
 //Create branch at a given vertex. Return VertexID of newly created pole.
 -(BOOL)createBranchAtVertex:(VertexID)vID width:(int)width vertexID:(VertexID*)newPoleID {
@@ -372,16 +462,7 @@ using namespace HMesh;
     return YES;
 }
 
-//Create branch at a vertex near touch point. Return VertexID of newly created pole.
--(BOOL)createBranchAtTouchPoint:(GLKVector3)touchPoint
-                    branchWidth:(int)width
-                       vertexID:(VertexID*)newPoleID
-{
-    VertexID vID = [self closestVertexID:touchPoint];
-    return [self createBranchAtVertex:vID width:width vertexID:newPoleID];
-}
-
-#pragma mark - HANDLE BRANCH CREATION TOUCHES OUTSIDE OF MODEL
+#pragma mark - TOUCHES: BRANCH CREATION
 
 -(void)startCreateBranch:(GLKVector3)touchPoint {
     _initialTouch = touchPoint;
@@ -389,11 +470,11 @@ using namespace HMesh;
 
 -(void)endCreateBranch:(GLKVector3)touchPoint touchedModel:(BOOL)touchedModel{
     [self saveState];
-
+ 
     VertexID touchedVID;
     if (touchedModel) {
         //closest vertex in 3D space
-        touchedVID = [self closestVertexID:_initialTouch];
+        touchedVID = [self closestVertexID_3D:_initialTouch];
     } else {
         //closest vertex in 2D space
         touchedVID = [self closestVertexID_2D:_initialTouch];
@@ -426,9 +507,168 @@ using namespace HMesh;
     }
 }
 
-#pragma mark - DRAWING
+#pragma mark - TOUCHES: FACE PICKING
 
+-(void)endSelectFaceWithRay:(GLKVector3)rayOrigin rayDirection:(GLKVector3)rayDir
+{
+    BOOL didHitModel;
+    FaceID fid = [self closestFaceForRayOrigin:rayOrigin direction:rayDir didHitModel:&didHitModel];
+    if (didHitModel) {
+        [self changeFaceColorToSelected:fid toSelected:YES];
+    }
+}
+
+
+#pragma mark - TOUCHES: SCALING
+-(void)startScalingRibsWithRayOrigin1:(GLKVector3)rayOrigin1
+                           rayOrigin2:(GLKVector3)rayOrigin2
+                        rayDirection1:(GLKVector3)rayDir1
+                        rayDirection2:(GLKVector3)rayDir2
+{
+    _scaleRibFace1 = [self closestFaceForRayOrigin:rayOrigin1 direction:rayDir1 didHitModel:NULL];
+    _scaleRibFace2 = [self closestFaceForRayOrigin:rayOrigin2 direction:rayDir2 didHitModel:NULL];
+    
+    Walker w1 = _manifold.walker(_scaleRibFace1);
+    Walker w2 = _manifold.walker(_scaleRibFace2);
+    
+    //TODO handle triangles
+    if (_edgeInfo[w1.halfedge()].edge_type != SPINE) {
+        w1 = w1.next();
+    }
+    assert(_edgeInfo[w1.halfedge()].edge_type == SPINE);
+    
+    if (_edgeInfo[w2.halfedge()].edge_type != SPINE) {
+        w2 = w2.next();
+    }
+    assert(_edgeInfo[w2.halfedge()].edge_type == SPINE);
+    
+    //test which direction to go from face1 to reach face2
+    //i.e. find out rib edges in between fingers
+    Vec w1pos1 = _manifold.pos(w1.vertex());
+    Vec w1pos2 = _manifold.pos(w1.opp().vertex());
+    Vec w2pos1 = _manifold.pos(w2.vertex());
+    Vec w2pos2 = _manifold.pos(w2.opp().vertex());
+    
+    if ((w1pos2 - w2pos1).length() < (w1pos1 - w2pos1).length()) {
+        //w1.opp is closer
+        w1 = w1.opp();
+    }
+    
+    if ((w2pos2 - w1pos1).length() < (w2pos1 - w1pos1).length()) {
+        //w2.opp is closer
+        w2 = w2.opp();
+    }
+    
+    HalfEdgeID finalRib = w2.next().halfedge();
+
+    _edges_to_scale.clear();
+    _all_vector_vid.clear();
+
+    while (!lie_on_same_rib(_manifold, w1.next().halfedge(), finalRib, _edgeInfo)) {
+        _edges_to_scale.push_back(w1.next().halfedge());
+        vector<VertexID> vector_vid = verticies_along_the_rib(_manifold, w1.next().halfedge(), _edgeInfo);
+        _all_vector_vid.insert(_all_vector_vid.end(), vector_vid.begin(), vector_vid.end());
+        w1 =  w1.next().opp().next();
+    }
+    _edges_to_scale.push_back(w1.next().halfedge());
+    vector<VertexID> vector_vid = verticies_along_the_rib(_manifold, w1.next().halfedge(), _edgeInfo); //last one
+    _all_vector_vid.insert(_all_vector_vid.end(), vector_vid.begin(), vector_vid.end());
+
+    _current_scale_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
+    
+    _scaleFactor = 1.0;
+    modState = MODIFICATION_SCALING;
+    [self changeFacesColor:_all_vector_vid toSelected:YES];
+
+    NSLog(@"Finished calling begin scalling funtion");
+}
+
+-(void)changeScalingRibsWithScaleFactor:(float)scale {
+    _scaleFactor = scale;
+}
+
+-(void)endScalingRibsWithScaleFactor:(float)scale {
+    for (HalfEdgeID hID: _edges_to_scale) {
+        change_rib_radius(_manifold, hID, _edgeInfo, _scaleFactor); //update _manifold
+    }
+
+    [self changeFacesColor:_all_vector_vid toSelected:NO];
+    
+    modState = MODIFICATION_NONE;
+
+    _edges_to_scale.clear();
+    _all_vector_vid.clear();
+}
+
+#pragma mark - SELECTION
+-(void)changeFacesColor:(vector<HMesh::VertexID>) vertecies toSelected:(BOOL)isSelected {
+    
+    Vec4uc selectColor;
+    if (isSelected) {
+        selectColor = Vec4uc(240, 0, 0, 255);
+    } else {
+        selectColor = Vec4uc(0,0,0,255);
+    }
+    
+    [self.wireframeColorDataBuffer bind];
+    unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
+    for (VertexID vid: vertecies) {
+        int index = vid.index;
+        memcpy(temp + index*COLOR_SIZE, selectColor.get(), COLOR_SIZE);
+    }
+    glUnmapBufferOES(GL_ARRAY_BUFFER);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+
+-(void)changeFaceColorToSelected:(FaceID)fid  toSelected:(BOOL)isSelected {
+
+    vector<int> indicies;
+    for(Walker w = _manifold.walker(fid); !w.full_circle(); w = w.circulate_face_cw()) {
+        VertexID vid = w.vertex();
+        int index = vid.index;
+        indicies.push_back(index);
+    }
+    
+    Vec4uc selectColor;
+    if (isSelected) {
+        selectColor =  Vec4uc(240, 0, 0, 255);
+    } else {
+        selectColor = Vec4uc(200,200,200,255);
+    }
+    
+    [self.wireframeColorDataBuffer bind];
+    unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
+    for (int index: indicies) {
+        memcpy(temp + index*COLOR_SIZE, selectColor.get(), COLOR_SIZE);
+    }
+    glUnmapBufferOES(GL_ARRAY_BUFFER);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+#pragma mark - DRAWING
+-(void)updateMesh {
+    if (modState == MODIFICATION_SCALING) {
+        for (HalfEdgeID hID: _edges_to_scale) {
+            scaled_pos_for_rib(_manifold, hID, _edgeInfo, _scaleFactor, _current_scale_position);
+        }
+        
+        [self.vertexDataBuffer bind];
+        glBufferData(GL_ARRAY_BUFFER, self.numVertices*VERTEX_SIZE, NULL, GL_DYNAMIC_DRAW);
+        unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
+        for (VertexID vid: _all_vector_vid) {
+            Vecf pos = _current_scale_position[vid];
+            int index = vid.index;
+            memcpy(temp + index*VERTEX_SIZE, pos.get(), VERTEX_SIZE);
+        }
+        glUnmapBufferOES(GL_ARRAY_BUFFER);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+    }
+}
 -(void)draw {
+    
+    [self updateMesh];
+    
     glUseProgram(self.drawShaderProgram.program);
     glUniformMatrix4fv(uniforms[UNIFORM_MODELVIEWPROJECTION_MATRIX], 1, 0, self.modelViewProjectionMatrix.m);
     glUniformMatrix3fv(uniforms[UNIFORM_NORMAL_MATRIX], 1, 0, self.normalMatrix.m);

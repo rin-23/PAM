@@ -244,17 +244,15 @@ typedef enum {
                 NSLog(@"[WARNING] Couldn't determine touch area");
                 return;
             }
-//            [_pMesh beginScalingRibsWithRayOrigin1:rayOrigin1 
-//                                        rayOrigin2:rayOrigin2
-//                                     rayDirection1:rayDir1 
-//                                     rayDirection2:rayDir2];
+            [_pMesh startScalingRibsWithRayOrigin1:rayOrigin1
+                                        rayOrigin2:rayOrigin2
+                                     rayDirection1:rayDir1 
+                                     rayDirection2:rayDir2];
             
         } else if (sender.state == UIGestureRecognizerStateChanged) {
-//            [_pMesh changeScalingRibsWithScaleFactor:pinch.scale];
-        }
-        
-        else if (sender.state == UIGestureRecognizerStateEnded) {
-//            [_pMesh endScalingRibsWithScaleFactor:pinch.scale*0.9];
+            [_pMesh changeScalingRibsWithScaleFactor:pinch.scale];
+        } else if (sender.state == UIGestureRecognizerStateEnded) {
+            [_pMesh endScalingRibsWithScaleFactor:pinch.scale*0.9];
 
 //            if (pinch.scale <= 1) {
 
@@ -369,18 +367,27 @@ typedef enum {
 }
 
 -(void)handleDoubleTapGesture:(UIGestureRecognizer*)sender {
-    
-    return;
-    
-    NSMutableData* pixelData = [self renderToOffscreenDepthBuffer:@[_pMesh]];
-    CGPoint touchPoint = [self scaleTouchPoint:[sender locationInView:sender.view] inView:(GLKView*)sender.view];
-    GLKVector3 startPoint;
-    BOOL result = [self modelCoordinates:&startPoint forTouchPoint:touchPoint depthBuffer:pixelData];
-    
-    if (!result) {
-        NSLog(@"[WARNING] Couldn determine touch area");
-        return;
+    if (sender.state == UIGestureRecognizerStateEnded) {
+        CGPoint touchPoint = [self touchPointFromGesture:sender];
+        GLKVector3 rayOrgin, rayDir;
+        BOOL result = [self rayOrigin:&rayOrgin rayDirection:&rayDir forTouchPoint:touchPoint];
+        if (!result) {
+            NSLog(@"[WARNING] Couldn determine touch area");
+            return;
+        }
+        [_pMesh endSelectFaceWithRay:rayOrgin rayDirection:rayDir];
     }
+    
+    
+//    NSMutableData* pixelData = [self renderToOffscreenDepthBuffer:@[_pMesh]];
+//    CGPoint touchPoint = [self scaleTouchPoint:[sender locationInView:sender.view] inView:(GLKView*)sender.view];
+//    GLKVector3 startPoint;
+//    BOOL result = [self modelCoordinates:&startPoint forTouchPoint:touchPoint depthBuffer:pixelData];
+//    
+//    if (!result) {
+//        NSLog(@"[WARNING] Couldn determine touch area");
+//        return;
+//    }
    
 //    [_pMesh createBranchAtPointAndRefine:startPoint];
 

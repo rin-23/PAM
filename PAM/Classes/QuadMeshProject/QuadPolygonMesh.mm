@@ -556,10 +556,10 @@ using namespace HMesh;
 -(void)subBufferForVertexIDs:(vector<HMesh::VertexID>)vector_of_vid mani:(HMesh::Manifold) mani mappedData:(GLvoid*)ptr {
     
     for (HalfEdgeID hID: _edges_to_scale) {
-        scaled_pos_for_rib(_manifold, hID, _edgeInfo, _accumScale, _current_scale_position);
+//        scaled_pos_for_rib(_manifold, hID, _edgeInfo, _accumScale, _current_scale_position);
         //            vector<VertexID> vector_vid = change_rib_radius(_manifold, hID, k);
         //            _all_vector_vid.insert(_all_vector_vid.end(), vector_vid.begin(), vector_vid.end());
-    }
+    } 
     
     set<FaceID> set_of_faces;
     

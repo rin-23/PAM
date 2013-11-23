@@ -33,7 +33,7 @@
 
     GLKView* view = [[GLKView alloc] initWithFrame:CGRectMake(0, 20, self.view.frame.size.width, self.view.frame.size.height - 44)];
     view.multipleTouchEnabled = YES;
-    view.contentScaleFactor = 1.0f;
+//    view.contentScaleFactor = 1.0f;
     view.drawableDepthFormat = GLKViewDrawableDepthFormat16;
     self.view = view;
     

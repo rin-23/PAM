@@ -7,6 +7,8 @@
 //
 
 #import "ShaderProgram.h"
+#import <OpenGLES/ES2/gl.h>
+#import <OpenGLES/ES2/glext.h>
 
 static NSMutableDictionary* cachedShaders = nil;
 static NSMutableDictionary* cachedShadersCount;

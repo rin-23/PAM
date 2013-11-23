@@ -33,7 +33,8 @@
     self.vertexDataBuffer = [[AGLKVertexAttribArrayBuffer alloc] initWithAttribStride:sizeof(VertexNormRGBA)
                                                                      numberOfVertices:self.numVertices
                                                                                 bytes:self.meshData.bytes
-                                                                                usage:GL_STATIC_DRAW];
+                                                                                usage:GL_STATIC_DRAW
+                                                                               target:GL_ARRAY_BUFFER];
     glEnableVertexAttribArray(attrib[ATTRIB_POSITION]);
     glEnableVertexAttribArray(attrib[ATTRIB_NORMAL]);
 }

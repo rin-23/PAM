@@ -10,4 +10,11 @@
 
 @interface PolarAnnularMesh : Mesh
 
+-(void)setMeshFromObjFile:(NSString*)objFile;
+
+-(void)startCreateBranch:(GLKVector3)touchPoint;
+-(void)endCreateBranch:(GLKVector3)touchPoint;
+
+@property (nonatomic, assign) int branchWidth;
+
 @end

@@ -5,59 +5,45 @@
 
 #import <GLKit/GLKit.h>
 
-@class AGLKElementIndexArrayBuffer;
-
-/////////////////////////////////////////////////////////////////
-// 
-typedef enum {
-    AGLKVertexAttribPosition = GLKVertexAttribPosition,
-    AGLKVertexAttribNormal = GLKVertexAttribNormal,
-    AGLKVertexAttribColor = GLKVertexAttribColor,
-    AGLKVertexAttribTexCoord0 = GLKVertexAttribTexCoord0,
-    AGLKVertexAttribTexCoord1 = GLKVertexAttribTexCoord1,
-} AGLKVertexAttrib;
-
-
 @interface AGLKVertexAttribArrayBuffer : NSObject
 {
-   GLsizeiptr   stride;
-   GLsizeiptr   bufferSizeBytes;
-   GLuint       name;
+    GLsizeiptr stride;
+    GLsizeiptr bufferSizeBytes;
+    GLuint name;
+    GLenum target;
 }
 
-@property (nonatomic, readonly) GLuint
-   name;
-@property (nonatomic, readonly) GLsizeiptr
-   bufferSizeBytes;
-@property (nonatomic, readonly) GLsizeiptr
-   stride;
+@property (nonatomic, readonly) GLuint name;
+@property (nonatomic, readonly) GLsizeiptr bufferSizeBytes;
+@property (nonatomic, readonly) GLsizeiptr stride;
+@property (nonatomic, assign) BOOL errorChecking;
 
-+ (void)drawPreparedArraysWithMode:(GLenum)mode
-   startVertexIndex:(GLint)first
-   numberOfVertices:(GLsizei)count;
-
-- (id)initWithAttribStride:(GLsizeiptr)stride
-   numberOfVertices:(GLsizei)count
-   bytes:(const GLvoid *)dataPtr
-   usage:(GLenum)usage;
+- (id)initWithAttribStride:(GLsizeiptr)aStride
+          numberOfVertices:(GLsizei)count
+                     bytes:(const GLvoid *)dataPtr
+                     usage:(GLenum)usage
+                    target:(GLenum)aTarget;
 
 - (void)bufferSubDataWithOffset:(GLintptr)offset
                            size:(GLsizeiptr)size
                            data:(const GLvoid *)dataPtr;
 
 - (void)prepareToDrawWithAttrib:(GLuint)index
-   numberOfCoordinates:(GLint)count
-   attribOffset:(GLsizeiptr)offset
-       dataType:(GLenum)type
-      normalize:(GLboolean)normalized;
-
-- (void)drawArrayWithMode:(GLenum)mode
-   startVertexIndex:(GLint)first
-   numberOfVertices:(GLsizei)count;
+            numberOfCoordinates:(GLint)count
+                   attribOffset:(GLsizeiptr)offset
+                       dataType:(GLenum)type
+                      normalize:(GLboolean)normalized;
 
 -(void)enableAttribute:(GLuint)index;
 
 -(void)bind;
 
++ (void)drawPreparedArraysWithMode:(GLenum)mode
+                  startVertexIndex:(GLint)first
+                  numberOfVertices:(GLsizei)count;
+
++ (void)drawPreparedArraysWithMode:(GLenum)mode
+                          dataType:(GLenum)dataType
+                        indexCount:(GLsizei)numIndcies;
 
 @end

@@ -11,6 +11,7 @@
 
 @interface Utilities : NSObject
 
+
 +(CGPoint)invertY:(CGPoint)cocoaCoord forGLKView:(GLKView*)view;
 void gluPerspective(GLfloat fovy, GLfloat aspect, GLfloat zNear, GLfloat zFar);
 
@@ -56,5 +57,7 @@ double triangleAngleWithSides(double a, double b, double c);
 +(GLKVector3)invertVector3:(GLKVector3)vector3 withMatrix:(GLKMatrix4)matrix4;
 +(GLKVector3)invertVector4:(GLKVector4)vector4 withMatrix:(GLKMatrix4)matrix4;
 
-//GLKVector3 GLKMatrix4MultiplyVector3Custom(GLKMatrix4 matrix, GLKVector3 vector);
++(GLKVector3) matrix4:(GLKMatrix4)matrix multiplyVector3:(GLKVector3)vector3;
+
++(GLKVector2) GLKVector2MakeWithVector3:(GLKVector3) vector3;
 @end

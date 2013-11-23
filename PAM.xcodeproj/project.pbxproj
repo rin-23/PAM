@@ -28,6 +28,11 @@
 		153B4E5918206CF400962DB2 /* TextureShader.fsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E3418206CC200962DB2 /* TextureShader.fsh */; };
 		153B4E5A18206CF400962DB2 /* TextureShader.vsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E3518206CC200962DB2 /* TextureShader.vsh */; };
 		1551ED6E18348F7F00855993 /* Line.m in Sources */ = {isa = PBXBuildFile; fileRef = 1551ED6D18348F7F00855993 /* Line.m */; };
+		1553C239183EFFB300839072 /* simpleshader.vsh in Resources */ = {isa = PBXBuildFile; fileRef = 1553C232183EFF9300839072 /* simpleshader.vsh */; };
+		1553C23A183EFFB300839072 /* simpleshader.fsh in Resources */ = {isa = PBXBuildFile; fileRef = 1553C237183EFF9B00839072 /* simpleshader.fsh */; };
+		1553C23D183F00A100839072 /* PolarAnnularMesh.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1553C23C183F00A100839072 /* PolarAnnularMesh.mm */; };
+		155746931840052700401921 /* Shader.fsh in Resources */ = {isa = PBXBuildFile; fileRef = 1557468C1840051400401921 /* Shader.fsh */; };
+		155746941840052700401921 /* Shader.vsh in Resources */ = {isa = PBXBuildFile; fileRef = 1557468D1840051400401921 /* Shader.vsh */; };
 		156463EB1820266E0000B985 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 156463EA1820266E0000B985 /* Foundation.framework */; };
 		156463ED1820266E0000B985 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 156463EC1820266E0000B985 /* CoreGraphics.framework */; };
 		156463EF1820266E0000B985 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 156463EE1820266E0000B985 /* UIKit.framework */; };
@@ -140,6 +145,13 @@
 		153B4E3518206CC200962DB2 /* TextureShader.vsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = TextureShader.vsh; sourceTree = "<group>"; };
 		1551ED6C18348F7F00855993 /* Line.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Line.h; sourceTree = "<group>"; };
 		1551ED6D18348F7F00855993 /* Line.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = Line.m; sourceTree = "<group>"; };
+		1553C232183EFF9300839072 /* simpleshader.vsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = simpleshader.vsh; sourceTree = "<group>"; };
+		1553C237183EFF9B00839072 /* simpleshader.fsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = simpleshader.fsh; sourceTree = "<group>"; };
+		1553C23B183F00A100839072 /* PolarAnnularMesh.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PolarAnnularMesh.h; sourceTree = "<group>"; };
+		1553C23C183F00A100839072 /* PolarAnnularMesh.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = PolarAnnularMesh.mm; sourceTree = "<group>"; };
+		1557468C1840051400401921 /* Shader.fsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = Shader.fsh; sourceTree = "<group>"; };
+		1557468D1840051400401921 /* Shader.vsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = Shader.vsh; sourceTree = "<group>"; };
+		155746951840267000401921 /* Util.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Util.h; sourceTree = "<group>"; };
 		156463E71820266E0000B985 /* PAM.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PAM.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		156463EA1820266E0000B985 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		156463EC1820266E0000B985 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
@@ -286,6 +298,8 @@
 		153B4E2918206CC100962DB2 /* Shaders */ = {
 			isa = PBXGroup;
 			children = (
+				1557468C1840051400401921 /* Shader.fsh */,
+				1557468D1840051400401921 /* Shader.vsh */,
 				153B4E2A18206CC100962DB2 /* DirectionalLight.fsh */,
 				153B4E2B18206CC100962DB2 /* DirectionalLight.vsh */,
 				153B4E2E18206CC200962DB2 /* DepthShader.fsh */,
@@ -294,6 +308,8 @@
 				153B4E3318206CC200962DB2 /* PointCloudRGBAShader.vsh */,
 				153B4E3418206CC200962DB2 /* TextureShader.fsh */,
 				153B4E3518206CC200962DB2 /* TextureShader.vsh */,
+				1553C237183EFF9B00839072 /* simpleshader.fsh */,
+				1553C232183EFF9300839072 /* simpleshader.vsh */,
 			);
 			name = Shaders;
 			path = Classes/Shaders;
@@ -402,6 +418,8 @@
 				1564660B182033920000B985 /* QuadPolygonMesh.mm */,
 				1564660C182033920000B985 /* WireFrame.h */,
 				1564660D182033920000B985 /* WireFrame.m */,
+				1553C23B183F00A100839072 /* PolarAnnularMesh.h */,
+				1553C23C183F00A100839072 /* PolarAnnularMesh.mm */,
 			);
 			name = QuadMeshProject;
 			path = Classes/QuadMeshProject;
@@ -428,6 +446,7 @@
 			children = (
 				1A9438AB1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.h */,
 				1A9438AC1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m */,
+				155746951840267000401921 /* Util.h */,
 			);
 			name = Helpers;
 			sourceTree = "<group>";
@@ -545,6 +564,10 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				155746931840052700401921 /* Shader.fsh in Resources */,
+				155746941840052700401921 /* Shader.vsh in Resources */,
+				1553C239183EFFB300839072 /* simpleshader.vsh in Resources */,
+				1553C23A183EFFB300839072 /* simpleshader.fsh in Resources */,
 				153B4E4F18206CF400962DB2 /* DirectionalLight.fsh in Resources */,
 				153B4E5018206CF400962DB2 /* DirectionalLight.vsh in Resources */,
 				153B4E5318206CF400962DB2 /* DepthShader.fsh in Resources */,
@@ -598,6 +621,7 @@
 				153B4E3718206CC200962DB2 /* AGLKContext.m in Sources */,
 				153B4E4218206CC200962DB2 /* Utilities.m in Sources */,
 				1551ED6E18348F7F00855993 /* Line.m in Sources */,
+				1553C23D183F00A100839072 /* PolarAnnularMesh.mm in Sources */,
 				1564660F182033920000B985 /* MeshLoader.mm in Sources */,
 				156463F71820266E0000B985 /* main.m in Sources */,
 				15646615182033920000B985 /* QuadMeshViewController.mm in Sources */,

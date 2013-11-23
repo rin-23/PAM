@@ -30,7 +30,7 @@
         self.vertexDataBuffer = [[AGLKVertexAttribArrayBuffer alloc] initWithAttribStride:sizeof(VertexRGBA)
                                                                          numberOfVertices:self.numVertices
                                                                                     bytes:self.meshData.bytes
-                                                                                    usage:GL_DYNAMIC_DRAW];
+                                                                                    usage:GL_DYNAMIC_DRAW target:GL_ARRAY_BUFFER];
         [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_COLOR]];
         [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_POSITION]];
 
@@ -45,7 +45,7 @@
     self.vertexDataBuffer = [[AGLKVertexAttribArrayBuffer alloc] initWithAttribStride:sizeof(VertexRGBA)
                                                                      numberOfVertices:self.numVertices
                                                                                 bytes:self.meshData.bytes
-                                                                                usage:GL_DYNAMIC_DRAW];
+                                                                                usage:GL_DYNAMIC_DRAW target:GL_ARRAY_BUFFER];
     [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_COLOR]];
     [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_POSITION]];
 }
@@ -62,7 +62,8 @@
     self.vertexDataBuffer = [[AGLKVertexAttribArrayBuffer alloc] initWithAttribStride:sizeof(VertexRGBA)
                                                                      numberOfVertices:self.numVertices
                                                                                 bytes:self.meshData.bytes
-                                                                                usage:GL_DYNAMIC_DRAW];
+                                                                                usage:GL_DYNAMIC_DRAW
+                                                                               target:GL_ARRAY_BUFFER];
     [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_COLOR]];
     [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_POSITION]];
 }

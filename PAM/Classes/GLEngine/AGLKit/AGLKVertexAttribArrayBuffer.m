@@ -11,6 +11,7 @@
 
 @property (nonatomic, assign) GLsizeiptr bufferSizeBytes;
 @property (nonatomic, assign) GLsizeiptr stride;
+@property (nonatomic, assign) GLenum target;
 
 @end
 
@@ -20,62 +21,73 @@
 @synthesize name;
 @synthesize bufferSizeBytes;
 @synthesize stride;
+@synthesize target;
 
-/////////////////////////////////////////////////////////////////
-// This method creates a vertex attribute array buffer in
-// the current OpenGL ES context for the thread upon which this 
-// method is called.
+-(void)errorCheck {
+    // Report any errors
+    if (!self.errorChecking) {
+        return;
+    }
+    GLenum error = glGetError();
+    if (GL_NO_ERROR != error) {
+        NSLog(@"GL Error: 0x%x", error);
+    }
+    
+}
+
 - (id)initWithAttribStride:(GLsizeiptr)aStride
-   numberOfVertices:(GLsizei)count
-   bytes:(const GLvoid *)dataPtr
-   usage:(GLenum)usage;
+          numberOfVertices:(GLsizei)count
+                     bytes:(const GLvoid *)dataPtr
+                     usage:(GLenum)usage
+                    target:(GLenum)aTarget
 {
     NSParameterAssert(0 < aStride);
     NSAssert((0 < count && NULL != dataPtr) ||
              (0 == count && NULL == dataPtr),
              @"data must not be NULL or count > 0");
     
-    if(nil != (self = [super init]))
+    self = [super init];
+    if (self)
     {
+        _errorChecking = YES;
         stride = aStride;
         bufferSizeBytes = stride * count;
+        target = aTarget;
         
         glGenBuffers(1, &name);                // STEP 1
-        glBindBuffer(GL_ARRAY_BUFFER, self.name); // STEP 2
+        glBindBuffer(target, self.name); // STEP 2
         glBufferData(                  // STEP 3
-                     GL_ARRAY_BUFFER,  // Initialize buffer contents
+                     target,  // Initialize buffer contents
                      bufferSizeBytes,  // Number of bytes to copy
                      dataPtr,          // Address of bytes to copy
                      usage);           // Hint: cache in GPU memory
         
         NSAssert(0 != name, @"Failed to generate name");
+        [self errorCheck];
     }
-    
-    // Report any errors
-    GLenum error = glGetError();
-    if (GL_NO_ERROR != error) {
-        NSLog(@"GL Error: 0x%x", error);
-    }   
-    
+   
     return self;
+
 }
 
-- (void)bufferSubDataWithOffset:(GLintptr)offset size:(GLsizeiptr)size data:(const GLvoid *)dataPtr
+- (void)bufferSubDataWithOffset:(GLintptr)offset
+                           size:(GLsizeiptr)size
+                           data:(const GLvoid *)dataPtr
 {
     NSAssert((offset + size <= self.bufferSizeBytes), @"Offest and size exceed curent buffer size");
-
-    glBindBuffer(GL_ARRAY_BUFFER, self.name); // STEP 2
-    glBufferSubData(GL_ARRAY_BUFFER, 0, self.bufferSizeBytes, dataPtr);
+    glBufferSubData(self.target, 0, self.bufferSizeBytes, dataPtr);
 }
 
 
 -(void)enableAttribute:(GLuint)index {
     glEnableVertexAttribArray(index);
+    [self errorCheck];
 }
 
 
 -(void)bind {
-       glBindBuffer(GL_ARRAY_BUFFER,self.name);
+    glBindBuffer(self.target, self.name);
+    [self errorCheck];
 }
 /////////////////////////////////////////////////////////////////
 // A vertex attribute array buffer must be prepared when your 
@@ -92,10 +104,6 @@
    NSParameterAssert(offset < self.stride);
    NSAssert(0 != name, @"Invalid name");
 
-
-
-//    glVertexAttribPointer (GLuint indx, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const GLvoid* ptr)
-    
    glVertexAttribPointer(
       index,               // Identifies the attribute to use
       count,               // number of coordinates for attribute
@@ -105,29 +113,7 @@
       (char*)NULL + offset);      // offset from start of each vertex to
                            // first coord for attribute
 
-   {  // Report any errors 
-      GLenum error = glGetError();
-      if(GL_NO_ERROR != error)
-      {
-         NSLog(@"GL Error: 0x%x", error);
-      }
-   }
-}
-
-
-/////////////////////////////////////////////////////////////////
-// Submits the drawing command identified by mode and instructs
-// OpenGL ES to use count vertices from the buffer starting from
-// the vertex at index first. Vertex indices start at 0.
-- (void)drawArrayWithMode:(GLenum)mode
-   startVertexIndex:(GLint)first
-   numberOfVertices:(GLsizei)count
-{
-   NSAssert(self.bufferSizeBytes >= 
-      ((first + count) * self.stride),
-      @"Attempt to draw more vertex data than available.");
-      
-   glDrawArrays(mode, first, count); // Step 6
+    [self errorCheck];
 }
 
 
@@ -138,11 +124,17 @@
 // prepared buffers
 + (void)drawPreparedArraysWithMode:(GLenum)mode
    startVertexIndex:(GLint)first
-   numberOfVertices:(GLsizei)count;
+   numberOfVertices:(GLsizei)count
 {
    glDrawArrays(mode, first, count); // Step 6
 }
 
++ (void)drawPreparedArraysWithMode:(GLenum)mode
+                  dataType:(GLenum)dataType
+                  indexCount:(GLsizei)numIndcies
+{
+    glDrawElements(mode, numIndcies, dataType, 0);
+}
 
 /////////////////////////////////////////////////////////////////
 // This method deletes the receiver's buffer from the current

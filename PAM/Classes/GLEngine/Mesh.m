@@ -62,13 +62,7 @@
 }
 
 -(GLKMatrix3)normalMatrix {
-    bool isInvert;
-    GLKMatrix3 mvpInverseMatrix =  GLKMatrix3Invert(GLKMatrix4GetMatrix3(self.modelViewMatrix), &isInvert);
-    if (isInvert) {
-        GLKMatrix3 mvpInverseTransposeMatrix = GLKMatrix3Transpose(mvpInverseMatrix);
-        return mvpInverseTransposeMatrix;
-    }
-    return GLKMatrix3Identity;
+    return GLKMatrix3InvertAndTranspose(GLKMatrix4GetMatrix3(self.modelViewMatrix), NULL);
 }
 
 @end

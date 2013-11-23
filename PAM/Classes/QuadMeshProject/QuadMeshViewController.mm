@@ -10,7 +10,8 @@
 #import "RotationManager.h"
 #import "TranslationManager.h"
 #import "ZoomManager.h"
-#import "QuadPolygonMesh.h"
+//#import "QuadPolygonMesh.h"
+#import "PolarAnnularMesh.h"
 #import "AGLKContext.h"
 #import "Utilities.h"
 #import "MeshLoader.h"
@@ -30,7 +31,8 @@ typedef enum {
     GLKMatrix4 projectionMatrix;
     GLKMatrix4 modelViewProjectionMatrix;
     
-    QuadPolygonMesh* _pMesh;
+//    QuadPolygonMesh* _pMesh;
+    PolarAnnularMesh* _pMesh;
     
     //Off Screen framebuffers and renderbuffers
     GLuint _offScreenFrameBuffer;
@@ -242,17 +244,17 @@ typedef enum {
                 NSLog(@"[WARNING] Couldn't determine touch area");
                 return;
             }
-            [_pMesh beginScalingRibsWithRayOrigin1:rayOrigin1 
-                                        rayOrigin2:rayOrigin2
-                                     rayDirection1:rayDir1 
-                                     rayDirection2:rayDir2];
+//            [_pMesh beginScalingRibsWithRayOrigin1:rayOrigin1 
+//                                        rayOrigin2:rayOrigin2
+//                                     rayDirection1:rayDir1 
+//                                     rayDirection2:rayDir2];
             
         } else if (sender.state == UIGestureRecognizerStateChanged) {
-            [_pMesh changeScalingRibsWithScaleFactor:pinch.scale];
+//            [_pMesh changeScalingRibsWithScaleFactor:pinch.scale];
         }
         
         else if (sender.state == UIGestureRecognizerStateEnded) {
-            [_pMesh endScalingRibsWithScaleFactor:pinch.scale*0.9];
+//            [_pMesh endScalingRibsWithScaleFactor:pinch.scale*0.9];
 
 //            if (pinch.scale <= 1) {
 
@@ -305,7 +307,7 @@ typedef enum {
                     NSLog(@"[WARNING] Couldn't determine touch area");
                     return;
                 }
-                [_pMesh branchCreateMovementStart:modelCoord];
+                [_pMesh startCreateBranch:modelCoord];
                 
                 _state = TOUCHED_BACKGROUND;
             } else { //clicked on a model
@@ -316,7 +318,7 @@ typedef enum {
                     NSLog(@"[WARNING] Couldn't determine touch area");
                     return;
                 }
-                [_pMesh gaussianStart:modelCoord];
+//                [_pMesh gaussianStart:modelCoord];
                 
                 _state = TOUCHED_MODEL;
             }
@@ -346,7 +348,7 @@ typedef enum {
                     NSLog(@"[WARNING] Couldn determine touch area");
                     return;
                 }
-                [_pMesh gaussianMove:modelCoord];
+//                [_pMesh gaussianMove:modelCoord];
             } else if (_state == TOUCHED_BACKGROUND){
                 GLKVector3 modelCoord;
                 BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, 0)];
@@ -354,7 +356,7 @@ typedef enum {
                     NSLog(@"[WARNING] Couldn't determine touch area");
                     return;
                 }
-                [_pMesh branchCreateMovementEnd:modelCoord];
+                [_pMesh endCreateBranch:modelCoord];
             }
             _state = TOUCHED_NONE;
             _selectionLine = nil;
@@ -387,7 +389,7 @@ typedef enum {
         return;
     }
    
-    [_pMesh createBranchAtPointAndRefine:startPoint];
+//    [_pMesh createBranchAtPointAndRefine:startPoint];
 
     
 //    [_pMesh createNewRibAtPoint:startPoint];
@@ -419,7 +421,7 @@ typedef enum {
             NSLog(@"[WARNING] Couldn't determine touch area");
             return;
         }
-        [_pMesh bendBranchBeginWithFirstTouchRayOrigin:rayOrgin rayDirection:rayDir secondTouchPoint:touchPointViewCoord];        
+//        [_pMesh bendBranchBeginWithFirstTouchRayOrigin:rayOrgin rayDirection:rayDir secondTouchPoint:touchPointViewCoord];        
     } else if (sender.state == UIGestureRecognizerStateChanged) {
         NSLog(@"Two finger bending Changed");
     } else if (sender.state == UIGestureRecognizerStateEnded) {
@@ -432,7 +434,7 @@ typedef enum {
             NSLog(@"[WARNING] Couldn't determine touch area");
             return;
         }
-        [_pMesh bendBranchEnd:touchPointViewCoord];
+//        [_pMesh bendBranchEnd:touchPointViewCoord];
     } else if (sender.state == UIGestureRecognizerStateFailed) {
         NSLog(@"Two finger bending Failed ");
     } else {
@@ -486,7 +488,7 @@ typedef enum {
     
     projectionMatrix = GLKMatrix4MakeOrtho(-bbox.width/2, bbox.width/2,
                                            -(bbox.height/2)*aspectRatio, (bbox.height/2)*aspectRatio,
-                                           -bbox.depth, bbox.depth);
+                                           -4*bbox.depth, 4*bbox.depth);
     
     viewMatrix = GLKMatrix4Identity;
     
@@ -504,17 +506,18 @@ typedef enum {
 
 //Draw callback
 - (void)glkView:(GLKView *)view drawInRect:(CGRect)rect {
+
     [(AGLKContext *)view.context clear:GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT];
 
-//    glLineWidth(1.0f);
+    glLineWidth(1.0f);
     _pMesh.viewMatrix = viewMatrix;
     _pMesh.projectionMatrix = projectionMatrix;
     [_pMesh draw];
     
-//    glLineWidth(3.0f);
-//    _selectionLine.viewMatrix = viewMatrix;
-//    _selectionLine.projectionMatrix = projectionMatrix;
-//    [_selectionLine draw];
+    glLineWidth(3.0f);
+    _selectionLine.viewMatrix = viewMatrix;
+    _selectionLine.projectionMatrix = projectionMatrix;
+    [_selectionLine draw];
     
 //    _meshTouchPoint.viewMatrix = viewMatrix;
 //    _meshTouchPoint.projectionMatrix = projectionMatrix;
@@ -536,7 +539,7 @@ typedef enum {
     [self showLoadingIndicator];
     
     if (_pMesh == nil) {
-        _pMesh = [[QuadPolygonMesh alloc] init];
+        _pMesh = [[PolarAnnularMesh alloc] init];
     }
 
     //Load obj file
@@ -701,7 +704,7 @@ typedef enum {
 }
 
 -(void)skeletonSwitchChanged:(id)sender {
-    [_pMesh showSkeleton:_skeletonSwitch.isOn];
+//    [_pMesh showSkeleton:_skeletonSwitch.isOn];
 }
 
 
@@ -709,7 +712,7 @@ typedef enum {
 - (void)alertView:(UIAlertView *)alertView clickedButtonAtIndex:(NSInteger)buttonIndex {
     if ([alertView.title isEqualToString:@"Undo?"]) {
         if (buttonIndex == 0) {
-            [_pMesh undo];
+//            [_pMesh undo];
         }
         [alertView dismissWithClickedButtonIndex:buttonIndex animated:YES];
     }

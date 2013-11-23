@@ -334,5 +334,14 @@ double triangleAngleWithSides(double a, double b, double c) {
     return [self invertVector4:vector4 withMatrix:matrix4];
 }
 
++(GLKVector3) matrix4:(GLKMatrix4)matrix multiplyVector3:(GLKVector3) vector3 {
+    GLKVector4 vector4 = GLKVector4MakeWithVector3(vector3, 1.0f);
+    vector4 = GLKMatrix4MultiplyVector4(matrix, vector4);
+    return GLKVector3Make(vector4.x, vector4.y, vector4.z);
+}
+
++(GLKVector2) GLKVector2MakeWithVector3:(GLKVector3) vector3 {
+    return GLKVector2Make(vector3.x, vector3.y);
+}
 
 @end

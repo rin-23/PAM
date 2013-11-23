@@ -76,7 +76,9 @@ typedef struct _BoundingBox {
 
 @property (nonatomic) ShaderProgram* drawShaderProgram; //shader used for displaying
 @property (nonatomic) ShaderProgram* depthShaderProgram; //shader used for getting depth
+
 @property (nonatomic) AGLKVertexAttribArrayBuffer *vertexDataBuffer;
+@property (nonatomic) AGLKVertexAttribArrayBuffer *indexDataBuffer;
 @property (nonatomic) AGLKVertexAttribArrayBuffer *doubleVertexBuffer;
 
 
@@ -85,7 +87,9 @@ typedef struct _BoundingBox {
 @property (nonatomic, assign) GLKVector3 centroid;
 
 @property (nonatomic) NSMutableData* meshData;
+@property (nonatomic) NSMutableData* indexData;
 @property (nonatomic, assign) GLsizei numVertices;
+@property (nonatomic, assign) GLsizei numIndices;
 
 @property (nonatomic, assign, readonly) GLKMatrix4 modelMatrix;
 @property (nonatomic, assign) GLKMatrix4 viewMatrix;

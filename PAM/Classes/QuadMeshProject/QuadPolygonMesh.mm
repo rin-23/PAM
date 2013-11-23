@@ -21,9 +21,12 @@
 #include "Mat4x4d.h"
 #include <map>
 #include <set>
+#import "Vec4uc.h"
 
-typedef CGLA::Vec3d Vec; 
+typedef CGLA::Vec3d Vec;
 typedef CGLA::Vec3f Vecf;
+
+
 @interface QuadPolygonMesh() {
     int current_buffer;
     HMesh::Manifold _manifold;
@@ -126,16 +129,17 @@ using namespace HMesh;
 
     //Load data
     NSMutableData* vertexData = [[NSMutableData alloc] init];
-    NSMutableData* wireframeData = [[NSMutableData alloc] init];
-    [self triangulateManifold:_manifold trianglMeshData:&vertexData wireframeData:&wireframeData];
+    NSMutableData* indexData = [[NSMutableData alloc] init];
+    [self triangulateManifold:_manifold vertexPositionData:&vertexData vertexPositionIndexData:&indexData];
 
     self.numVertices = vertexData.length / sizeof(VertexNormRGBA);
     self.meshData = vertexData;
     
-    self.vertexDataBuffer = [[AGLKVertexAttribArrayBuffer alloc] initWithAttribStride:sizeof(VertexNormRGBA)
+    self.vertexDataBuffer = [[AGLKVertexAttribArrayBuffer alloc]     initWithAttribStride:sizeof(VertexNormRGBA)
                                                                      numberOfVertices:self.numVertices
                                                                                 bytes:vertexData.bytes
-                                                                                usage:GL_DYNAMIC_DRAW];
+                                                                                usage:GL_DYNAMIC_DRAW
+                                                                               target:GL_ARRAY_BUFFER];
     [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_POSITION]];
     [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_NORMAL]];
     [self.vertexDataBuffer enableAttribute:attrib[ATTRIB_COLOR]];
@@ -143,7 +147,8 @@ using namespace HMesh;
     self.doubleVertexBuffer = [[AGLKVertexAttribArrayBuffer alloc] initWithAttribStride:sizeof(VertexNormRGBA)
                                                                      numberOfVertices:self.numVertices
                                                                                 bytes:vertexData.bytes
-                                                                                usage:GL_DYNAMIC_DRAW];
+                                                                                usage:GL_DYNAMIC_DRAW
+                                                                                target:GL_ARRAY_BUFFER];
     [self.doubleVertexBuffer enableAttribute:attrib[ATTRIB_POSITION]];
     [self.doubleVertexBuffer enableAttribute:attrib[ATTRIB_NORMAL]];
     [self.doubleVertexBuffer enableAttribute:attrib[ATTRIB_COLOR]];
@@ -153,7 +158,7 @@ using namespace HMesh;
     _wireFrame = [[WireFrame alloc]  init];
     _wireFrame.centerAtBoundingBox = YES;
     _wireFrame.boundingBox = _boundingBox;
-    [_wireFrame setVertexData:wireframeData vertexNum:wireframeData.length/sizeof(VertexNormRGBA)];
+//    [_wireFrame setVertexData:wireframeData vertexNum:wireframeData.length/sizeof(VertexNormRGBA)];
 }
 
 //Create branch at a point near touch point.
@@ -163,7 +168,7 @@ using namespace HMesh;
     if (result) {
         HMesh::VertexAttributeVector<int> poles(_manifold.no_vertices(), 0);
         poles[newPoleID] = 1;
-        refine_poles(_manifold, poles);
+//        refine_poles(_manifold, poles);
         [self rebuffer];
     }
     return result;
@@ -187,9 +192,9 @@ using namespace HMesh;
     if (_edgeInfo[walker.halfedge()].edge_type != SPINE) {
         walker = walker.next();
     }
-    HalfEdgeID newEdge = add_rib(_manifold, walker.halfedge());
-    add_rib(_manifold, walker.halfedge());
-    add_rib(_manifold, newEdge);
+    HalfEdgeID newEdge = add_rib(_manifold, walker.halfedge(), _edgeInfo);
+    add_rib(_manifold, walker.halfedge(), _edgeInfo);
+    add_rib(_manifold, newEdge, _edgeInfo);
     [self rebuffer];
 }
 
@@ -423,9 +428,10 @@ using namespace HMesh;
 //}
 
 -(void)rebuffer {
+    
     NSMutableData* vertexData = [[NSMutableData alloc] init];
     NSMutableData* wireframeData = [[NSMutableData alloc] init];
-    [self triangulateManifold:_manifold trianglMeshData:&vertexData wireframeData:&wireframeData];
+//    [self triangulateManifold:_manifold trianglMeshData:&vertexData wireframeData:&wireframeData];
     
     self.numVertices = vertexData.length / sizeof(VertexNormRGBA);
     self.meshData = vertexData;
@@ -433,7 +439,8 @@ using namespace HMesh;
     self.vertexDataBuffer = [[AGLKVertexAttribArrayBuffer alloc] initWithAttribStride:sizeof(VertexNormRGBA)
                                                                      numberOfVertices:self.numVertices
                                                                                 bytes:self.meshData.bytes
-                                                                                usage:GL_DYNAMIC_DRAW];
+                                                                                usage:GL_DYNAMIC_DRAW
+                                                                               target:GL_ARRAY_BUFFER] ;
     
     glEnableVertexAttribArray(attrib[ATTRIB_POSITION]);
     glEnableVertexAttribArray(attrib[ATTRIB_NORMAL]);
@@ -442,7 +449,8 @@ using namespace HMesh;
     self.doubleVertexBuffer = [[AGLKVertexAttribArrayBuffer alloc] initWithAttribStride:sizeof(VertexNormRGBA)
                                                                      numberOfVertices:self.numVertices
                                                                                 bytes:self.meshData.bytes
-                                                                                usage:GL_DYNAMIC_DRAW];
+                                                                                usage:GL_DYNAMIC_DRAW
+                                                                                 target:GL_ARRAY_BUFFER];
     
     glEnableVertexAttribArray(attrib[ATTRIB_POSITION]);
     glEnableVertexAttribArray(attrib[ATTRIB_NORMAL]);
@@ -454,96 +462,92 @@ using namespace HMesh;
 
 //Triangulate manifold for display in case it has quads. GLES doesnt handle quads.
 -(void)triangulateManifold:(HMesh::Manifold&)mani
-       trianglMeshData:(NSMutableData**)verticies
-         wireframeData:(NSMutableData**)wireframe
+        vertexPositionData:(NSMutableData**)vertexPosition
+   vertexPositionIndexData:(NSMutableData**)vertexPositionIndex
 {
-    if (*verticies == nil) {
-        *verticies = [[NSMutableData alloc] init];
-    }
-    
-    if (*wireframe == nil) {
-        *wireframe = [[NSMutableData alloc] init];
-    }
-
     //clear dictionaries
-    dic_vertex_to_face.clear();
-    dic_face_to_buffer.clear();
-    dic_wireframe_vertex_to_buffer.clear();
+//    dic_vertex_to_face.clear();
+//    dic_face_to_buffer.clear();
+//    dic_wireframe_vertex_to_buffer.clear();
     
     //iterate over every face
+    
+    for (VertexIDIterator vid = mani.vertices_begin(); vid != mani.vertices_end(); ++vid) {
+        Vecf positionf = mani.posf(*vid);
+        [*vertexPosition appendBytes:positionf.get() length:sizeof(float) * positionf.get_dim()];
+    }
+    
     for(FaceIDIterator fid = mani.faces_begin(); fid != mani.faces_end(); ++fid) {
         int vertexNum = 0;
-        VertexNormRGBA facet[4];
+        int facet[4];
         
-        Vec norm = HMesh::normal(mani, *fid);
-        
-        PositionXYZ normGL = {(GLfloat)norm[0], (GLfloat)norm[1], (GLfloat)norm[2]};
-        
-        ColorRGBA vertexColor = {200,200,200,255};
-        
-        //Populate face to buffer offset dictionary
-        dic_face_to_buffer[*fid] = (*verticies).length;
+//        Vecf norm = HMesh::normalf(mani, *fid);
+//        Vec4uc color(200,200,200,255);
+//        PositionXYZ normGL = {(GLfloat)norm[0], (GLfloat)norm[1], (GLfloat)norm[2]};
+//        ColorRGBA vertexColor = {200,200,200,255};
+//        dic_face_to_buffer[*fid] = (*verticies).length;
         
         //iterate over every vertex of the face
         for(Walker w = mani.walker(*fid); !w.full_circle(); w = w.circulate_face_ccw()) {
-
-//            Vec norm = HMesh::normal(mani, w.vertex());
-//            PositionXYZ normGL = {(GLfloat)norm[0], (GLfloat)norm[1], (GLfloat)norm[2]};
-            
             //add vertex to the data array
             VertexID vID = w.vertex();
-            Vec c = mani.pos(vID);
+            int index = vID.index;
 
-            PositionXYZ positionDCM = {(GLfloat)c[0], (GLfloat)c[1], (GLfloat)c[2]};
-            VertexNormRGBA vertexMono = {positionDCM, normGL, vertexColor};
+//            Vecf c = mani.posf(vID);
+//            PositionXYZ positionDCM = {(GLfloat)c[0], (GLfloat)c[1], (GLfloat)c[2]};
+//            VertexNormRGBA vertexMono = {positionDCM, normGL, vertexColor};
+            facet[vertexNum] = index;
 
-            facet[vertexNum] = vertexMono;
             vertexNum++;
         
             if (vertexNum == 4) {
                 //Create a second triangle
+                [*vertexPositionIndex appendBytes:&facet[0] length:sizeof(int)];
+                [*vertexPositionIndex appendBytes:&facet[2] length:sizeof(int)];
 
-                [*verticies appendBytes:&facet[0] length:sizeof(VertexNormRGBA)];
-                [*verticies appendBytes:&facet[2] length:sizeof(VertexNormRGBA)];
+//                [*verticies appendBytes:&facet[0] length:sizeof(VertexNormRGBA)];
+//                [*verticies appendBytes:&facet[2] length:sizeof(VertexNormRGBA)];
             }
             
-            [*verticies appendBytes:&vertexMono length:sizeof(VertexNormRGBA)];
+            [*vertexPositionIndex appendBytes:&index length:sizeof(int)];
             
-            //Populate vertex to face dictionary
-            if (dic_vertex_to_face.count(vID) == 0) {
-                vector<HMesh::FaceID> faces;
-                faces.push_back(*fid);
-                dic_vertex_to_face.insert(pair<VertexID, vector<FaceID>>(vID, faces));
-            } else {
-                vector<HMesh::FaceID> faces = dic_vertex_to_face[vID];
-                faces.push_back(*fid);
-                dic_vertex_to_face[vID] = faces;
-            }
+//            [*verticies appendBytes:&vertexMono length:sizeof(VertexNormRGBA)];
+            
+//            //Populate vertex to face dictionary
+//            if (dic_vertex_to_face.count(vID) == 0) {
+//                vector<HMesh::FaceID> faces;
+//                faces.push_back(*fid);
+//                dic_vertex_to_face.insert(pair<VertexID, vector<FaceID>>(vID, faces));
+//            } else {
+//                vector<HMesh::FaceID> faces = dic_vertex_to_face[vID];
+//                faces.push_back(*fid);
+//                dic_vertex_to_face[vID] = faces;
+//            }
             
         }
         
-        //add wireframe data
-        ColorRGBA wireframeColor = {0,0,0,255};
-        if (vertexNum == 3 || vertexNum == 4) {
-            facet[0].color = wireframeColor;
-            facet[1].color = wireframeColor;
-            facet[2].color = wireframeColor;
-            
-            [*wireframe appendBytes:&facet[0] length:sizeof(VertexNormRGBA)];
-            [*wireframe appendBytes:&facet[1] length:sizeof(VertexNormRGBA)];
-            [*wireframe appendBytes:&facet[1] length:sizeof(VertexNormRGBA)];
-            [*wireframe appendBytes:&facet[2] length:sizeof(VertexNormRGBA)];
-            if (vertexNum == 3) {
-                [*wireframe appendBytes:&facet[2] length:sizeof(VertexNormRGBA)];
-                [*wireframe appendBytes:&facet[0] length:sizeof(VertexNormRGBA)];
-            } else if (vertexNum == 4) {
-                facet[3].color = wireframeColor;
-                [*wireframe appendBytes:&facet[2] length:sizeof(VertexNormRGBA)];
-                [*wireframe appendBytes:&facet[3] length:sizeof(VertexNormRGBA)];
-                [*wireframe appendBytes:&facet[3] length:sizeof(VertexNormRGBA)];
-                [*wireframe appendBytes:&facet[0] length:sizeof(VertexNormRGBA)];
-            }
-        }
+//        //add wireframe data
+//        ColorRGBA wireframeColor = {0,0,0,255};
+//        if (vertexNum == 3 || vertexNum == 4) {
+//            facet[0].color = wireframeColor;
+//            facet[1].color = wireframeColor;
+//            facet[2].color = wireframeColor;
+//            
+//            [*wireframe appendBytes:&facet[0] length:sizeof(VertexNormRGBA)];
+//            [*wireframe appendBytes:&facet[1] length:sizeof(VertexNormRGBA)];
+//            [*wireframe appendBytes:&facet[1] length:sizeof(VertexNormRGBA)];
+//            [*wireframe appendBytes:&facet[2] length:sizeof(VertexNormRGBA)];
+//            if (vertexNum == 3) {
+//                [*wireframe appendBytes:&facet[2] length:sizeof(VertexNormRGBA)];
+//                [*wireframe appendBytes:&facet[0] length:sizeof(VertexNormRGBA)];
+//            } else if (vertexNum == 4) {
+//                facet[3].color = wireframeColor;
+//                [*wireframe appendBytes:&facet[2] length:sizeof(VertexNormRGBA)];
+//                [*wireframe appendBytes:&facet[3] length:sizeof(VertexNormRGBA)];
+//                [*wireframe appendBytes:&facet[3] length:sizeof(VertexNormRGBA)];
+//                [*wireframe appendBytes:&facet[0] length:sizeof(VertexNormRGBA)];
+//            }
+//        }
     }
     
     _edgeInfo = trace_spine_edges(_manifold);
@@ -658,7 +662,7 @@ using namespace HMesh;
     if (result) {
         HMesh::VertexAttributeVector<int> poles(_manifold.no_vertices(), 0);
         poles[newPoleID] = 1;
-        refine_poles(_manifold, poles);
+//        refine_poles(_manifold, poles);
 
         Vec displace3d =  norm * displace.length();
         
@@ -673,7 +677,7 @@ using namespace HMesh;
         //Add ribs for the new branch
         Walker walker = _manifold.walker(newPoleID);
         HalfEdgeID ID_1 = walker.next().opp().next().halfedge();
-        recursively_add_rib(_manifold, ID_1, 5);
+        recursively_add_rib(_manifold, ID_1, 5, _edgeInfo);
 
         [self rebuffer];
     }
@@ -720,7 +724,7 @@ using namespace HMesh;
         if (result) {
             HMesh::VertexAttributeVector<int> poles(_manifold.no_vertices(), 0);
             poles[newPoleID] = 1;
-            refine_poles(_manifold, poles);
+//            refine_poles(_manifold, poles);
             
 //            float proj = dot(norm, displace)/length(norm);
             displace = norm * displace.length();
@@ -736,7 +740,7 @@ using namespace HMesh;
             //Add ribs for the new branch
             Walker walker = _manifold.walker(newPoleID);
             HalfEdgeID ID_1 = walker.next().opp().next().halfedge();
-            recursively_add_rib(_manifold, ID_1, 5);
+            recursively_add_rib(_manifold, ID_1, 5, _edgeInfo);
 //            HalfEdgeID ID_2 = add_rib(_manifold, ID_1);
 //            add_rib(_manifold, ID_1);
 //            add_rib(_manifold, ID_2);

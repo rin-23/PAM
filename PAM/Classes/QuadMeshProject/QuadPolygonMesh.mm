@@ -1042,7 +1042,7 @@ using namespace HMesh;
     }
     
     for (HalfEdgeID hID: _edges_to_scale) {
-        change_rib_radius(_manifold, hID, _edgeInfo, scale);
+//        change_rib_radius(_manifold, hID, _edgeInfo, scale);
 //        scaled_pos_for_rib(_manifold, hID, _edgeInfo, scale, _current_scale_position);
     }
 

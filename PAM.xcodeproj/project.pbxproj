@@ -58,6 +58,7 @@
 		15646615182033920000B985 /* QuadMeshViewController.mm in Sources */ = {isa = PBXBuildFile; fileRef = 15646609182033920000B985 /* QuadMeshViewController.mm */; };
 		15646616182033920000B985 /* QuadPolygonMesh.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1564660B182033920000B985 /* QuadPolygonMesh.mm */; };
 		15646617182033920000B985 /* WireFrame.m in Sources */ = {isa = PBXBuildFile; fileRef = 1564660D182033920000B985 /* WireFrame.m */; };
+		158D8BB51841765C00FA8AFB /* sphere_mid_res.obj in Resources */ = {isa = PBXBuildFile; fileRef = 158D8BB41841765C00FA8AFB /* sphere_mid_res.obj */; };
 		1A408F3918357A8D0044E48E /* sphere.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1A408F3818357A8D0044E48E /* sphere.obj */; };
 		1A408F3E18357BAB0044E48E /* quad_sphere.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1A408F3D18357BAB0044E48E /* quad_sphere.obj */; };
 		1A408F4018357CAA0044E48E /* quad_sphere_high_res.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1A408F3F18357CAA0044E48E /* quad_sphere_high_res.obj */; };
@@ -186,6 +187,7 @@
 		1564660B182033920000B985 /* QuadPolygonMesh.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = QuadPolygonMesh.mm; sourceTree = "<group>"; };
 		1564660C182033920000B985 /* WireFrame.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WireFrame.h; sourceTree = "<group>"; };
 		1564660D182033920000B985 /* WireFrame.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WireFrame.m; sourceTree = "<group>"; };
+		158D8BB41841765C00FA8AFB /* sphere_mid_res.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = sphere_mid_res.obj; sourceTree = "<group>"; };
 		1A408F3818357A8D0044E48E /* sphere.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = sphere.obj; sourceTree = "<group>"; };
 		1A408F3D18357BAB0044E48E /* quad_sphere.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = quad_sphere.obj; sourceTree = "<group>"; };
 		1A408F3F18357CAA0044E48E /* quad_sphere_high_res.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = quad_sphere_high_res.obj; sourceTree = "<group>"; };
@@ -428,6 +430,7 @@
 		15646602182033920000B985 /* ObjFiles */ = {
 			isa = PBXGroup;
 			children = (
+				158D8BB41841765C00FA8AFB /* sphere_mid_res.obj */,
 				1A408F3F18357CAA0044E48E /* quad_sphere_high_res.obj */,
 				1A408F3D18357BAB0044E48E /* quad_sphere.obj */,
 				1A408F3818357A8D0044E48E /* sphere.obj */,
@@ -586,6 +589,7 @@
 				15646614182033920000B985 /* teapot.obj in Resources */,
 				15646612182033920000B985 /* newPolars.obj in Resources */,
 				156463FD1820266E0000B985 /* Images.xcassets in Resources */,
+				158D8BB51841765C00FA8AFB /* sphere_mid_res.obj in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

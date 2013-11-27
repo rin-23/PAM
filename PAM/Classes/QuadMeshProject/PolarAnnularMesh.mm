@@ -50,15 +50,20 @@ using namespace HMesh;
     HMesh::FaceID _scaleRibFace1;
     HMesh::FaceID _scaleRibFace2;
     float _scaleFactor;
+    vector<float> _scale_weight_vector;
+    HMesh::VertexAttributeVector<Vecf> _current_scale_position;
         
     //Selection
     vector<HMesh::HalfEdgeID> _edges_to_scale;
     vector<HMesh::VertexID> _all_vector_vid;
-
-    HMesh::VertexAttributeVector<Vecf> _current_scale_position;
+    vector<CGLA::Vec3f> _centroids;
+    vector<GLKVector3> _touchPoints;
     
     //Undo
     HMesh::Manifold undoMani;
+    
+    
+    
     
     CurrentModification modState;
 }
@@ -184,6 +189,8 @@ using namespace HMesh;
                                                                                     bytes:wireframeIndexData.bytes
                                                                                     usage:GL_STATIC_DRAW
                                                                                    target:GL_ELEMENT_ARRAY_BUFFER];
+    
+    _edgeInfo = trace_spine_edges(_manifold);
 
 }
 
@@ -257,7 +264,6 @@ using namespace HMesh;
             }
         }
     }
-    _edgeInfo = trace_spine_edges(_manifold);
 }
 
 -(BoundingBox)boundingBox {
@@ -268,6 +274,9 @@ using namespace HMesh;
     undoMani = _manifold;
 }
 
+-(void)undo {
+    _manifold = undoMani;
+}
 #pragma mark - FIND VERTEX/FACE NEAR TOUCH POINT
 
 -(VertexID)closestVertexID_2D:(GLKVector3)touchPoint {
@@ -465,7 +474,13 @@ using namespace HMesh;
 #pragma mark - TOUCHES: BRANCH CREATION
 
 -(void)startCreateBranch:(GLKVector3)touchPoint {
+    _touchPoints.clear();
+    _touchPoints.push_back(touchPoint);
     _initialTouch = touchPoint;
+}
+
+-(void)continueCreateBranch:(GLKVector3)touchPoint {
+    _touchPoints.push_back(touchPoint);
 }
 
 -(void)endCreateBranch:(GLKVector3)touchPoint touchedModel:(BOOL)touchedModel{
@@ -482,6 +497,7 @@ using namespace HMesh;
 
     Vec norm = HMesh::normal(_manifold, touchedVID);
     float displace = GLKVector3Length(GLKVector3Subtract(touchPoint, _initialTouch));
+    NSLog(@"displace %f", displace);
     Vec displace3d =  displace * norm ;
     
     VertexID newPoleID;
@@ -524,6 +540,7 @@ using namespace HMesh;
                            rayOrigin2:(GLKVector3)rayOrigin2
                         rayDirection1:(GLKVector3)rayDir1
                         rayDirection2:(GLKVector3)rayDir2
+                                scale:(float)scale
 {
     _scaleRibFace1 = [self closestFaceForRayOrigin:rayOrigin1 direction:rayDir1 didHitModel:NULL];
     _scaleRibFace2 = [self closestFaceForRayOrigin:rayOrigin2 direction:rayDir2 didHitModel:NULL];
@@ -576,10 +593,39 @@ using namespace HMesh;
 
     _current_scale_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
     
-    _scaleFactor = 1.0;
+    _scaleFactor = scale;
+    
+    //Calculate centroids and gaussian weights
+    _centroids = centroid_for_ribs(_manifold, _edges_to_scale, _edgeInfo);
+    Vec3f base;
+    if (_centroids.size() % 2 == 0) {
+        Vec3f b1 = _centroids[_centroids.size()/2 -1];
+        Vec3f b2 = _centroids[_centroids.size()/2];
+        base = 0.5*(b1 + b2);
+    } else {
+        base = _centroids[_centroids.size()/2];
+    }
+    
+    
+    _scale_weight_vector.clear();
+    if (_centroids.size() == 1) {
+        _scale_weight_vector.push_back(1.0f);
+    } else {
+        float r = (base - _centroids[0]).length();
+        for(int i = 0; i < _centroids.size(); i++)
+        {
+            CGLA::Vec3f c = _centroids[i];
+            float l = sqr_length(base - c);
+            _scale_weight_vector.push_back(exp(-l/(2*r*r)));
+        }
+    }
+    
+
+
+    
     modState = MODIFICATION_SCALING;
     [self changeFacesColor:_all_vector_vid toSelected:YES];
-
+    
     NSLog(@"Finished calling begin scalling funtion");
 }
 
@@ -588,8 +634,9 @@ using namespace HMesh;
 }
 
 -(void)endScalingRibsWithScaleFactor:(float)scale {
-    for (HalfEdgeID hID: _edges_to_scale) {
-        change_rib_radius(_manifold, hID, _edgeInfo, _scaleFactor); //update _manifold
+    
+    for (int i = 0; i < _edges_to_scale.size(); i++) {
+        change_rib_radius(_manifold, _edges_to_scale[i], _centroids[i], _edgeInfo, 1 + (_scaleFactor - 1)*_scale_weight_vector[i]); //update _manifold
     }
 
     [self changeFacesColor:_all_vector_vid toSelected:NO];
@@ -598,8 +645,10 @@ using namespace HMesh;
 
     _edges_to_scale.clear();
     _all_vector_vid.clear();
+    
+    [self rebuffer];
 }
-
+ 
 #pragma mark - SELECTION
 -(void)changeFacesColor:(vector<HMesh::VertexID>) vertecies toSelected:(BOOL)isSelected {
     
@@ -649,12 +698,18 @@ using namespace HMesh;
 #pragma mark - DRAWING
 -(void)updateMesh {
     if (modState == MODIFICATION_SCALING) {
-        for (HalfEdgeID hID: _edges_to_scale) {
-            scaled_pos_for_rib(_manifold, hID, _edgeInfo, _scaleFactor, _current_scale_position);
+        
+        for (int i = 0; i < _edges_to_scale.size(); i ++) {
+            scaled_pos_for_rib(_manifold,
+                               _edges_to_scale[i],
+                               _centroids[i],
+                               _edgeInfo,
+                               1 + (_scaleFactor - 1)*_scale_weight_vector[i],
+                               _current_scale_position);
         }
         
         [self.vertexDataBuffer bind];
-        glBufferData(GL_ARRAY_BUFFER, self.numVertices*VERTEX_SIZE, NULL, GL_DYNAMIC_DRAW);
+//        glBufferData(GL_ARRAY_BUFFER, self.numVertices*VERTEX_SIZE, NULL, GL_DYNAMIC_DRAW);
         unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
         for (VertexID vid: _all_vector_vid) {
             Vecf pos = _current_scale_position[vid];
@@ -665,6 +720,7 @@ using namespace HMesh;
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 }
+
 -(void)draw {
     
     [self updateMesh];

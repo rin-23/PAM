@@ -7,6 +7,7 @@
 //
 
 #import "Mesh.h"
+#include <vector>
 
 @interface PolarAnnularMesh : Mesh
 
@@ -14,9 +15,16 @@
 
 -(void)setMeshFromObjFile:(NSString*)objFile;
 
-#pragma mark - TOUCHES: BRANCH CREATION
+#pragma mark - TOUCHES: BRANCH CREATION ONE FINGER
 -(void)startCreateBranch:(GLKVector3)touchPoint;
 -(void)endCreateBranch:(GLKVector3)touchPoint touchedModel:(BOOL)touchedModel;
+
+
+#pragma mark - TOUCHES: BRANCH CREATION TWO FINGERS
+-(void)startCreateBranchFinger1:(GLKVector3)touchPoint1 finger2:(GLKVector3)touchPoint2;
+-(void)continueCreateBranchFinger1:(GLKVector3)touchPoint1 finger2:(GLKVector3)touchPoint2;
+-(std::vector<GLKVector3>)endCreateBranchTwoFingers;
+-(std::vector<GLKVector3>)endCreateNewBodyTwoFingers;
 
 #pragma mark - TOUCHES: FACE PICKING
 -(void)endSelectFaceWithRay:(GLKVector3)rayOrigin rayDirection:(GLKVector3)rayDir;

@@ -18,6 +18,7 @@
 #import "PlateStartPoint.h"
 #import "UITwoFingerHoldGestureRecognizer.h"
 #import "Line.h"
+#include <vector>
 
 typedef enum {
     TOUCHED_NONE,
@@ -33,6 +34,7 @@ typedef enum {
     
 //    QuadPolygonMesh* _pMesh;
     PolarAnnularMesh* _pMesh;
+    BoundingBox _bbox;
     
     //Off Screen framebuffers and renderbuffers
     GLuint _offScreenFrameBuffer;
@@ -49,13 +51,16 @@ typedef enum {
     UITwoFingerHoldGestureRecognizer* _twoFingerBending;
     UIPanGestureRecognizer* _oneFingerPanning;
     
-    Line* _selectionLine;
-    Line* _selectionLine2;
-    
     DrawingState _state;
     float _gaussianDepth;
     
     NSArray* _ingnoredViews;
+    
+    //Branch creation
+    Line* _selectionLine;
+    Line* _selectionLine2;
+    Line* _selectionLine3;
+    std::vector<GLKVector3> _branchPoint;
 }
 @end
 
@@ -82,6 +87,7 @@ typedef enum {
     [super viewDidLoad];
 	// Do any additional setup after loading the view.
     [self loadMeshData];
+//    [self loadEmptyWorspace];
     
     [self setupGL];
     [self addGestureRecognizersToView:self.view];
@@ -348,9 +354,12 @@ typedef enum {
     if (!_transformSwitch.isOn) {
         [_translationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity];
     } else {
-        
+   
         if (sender.state == UIGestureRecognizerStateBegan) {
-            if (sender.numberOfTouches!=2) return;
+            _selectionLine = nil;
+            _selectionLine2 = nil;
+            _selectionLine3 = nil;
+            if (sender.numberOfTouches != 2) return;
             CGPoint touchPoint1 = [self scaleTouchPoint:[sender locationOfTouch:0 inView:(GLKView*)sender.view]
                                                  inView:(GLKView*)sender.view];
             CGPoint touchPoint2 = [self scaleTouchPoint:[sender locationOfTouch:1 inView:(GLKView*)sender.view]
@@ -372,6 +381,8 @@ typedef enum {
             VertexRGBA vertex2 = {{rayOrigin2.x, rayOrigin2.y, rayOrigin2.z}, {255,0,0,255}};
             NSMutableData* lineData2 = [[NSMutableData alloc] initWithBytes:&vertex2 length:sizeof(VertexRGBA)];
             _selectionLine2 = [[Line alloc] initWithVertexData:lineData2];
+            
+            [_pMesh startCreateBranchFinger1:rayOrigin1 finger2:rayOrigin2];
         } else if (sender.state == UIGestureRecognizerStateChanged) {
             if (sender.numberOfTouches!=2) return;
             CGPoint touchPoint1 = [self scaleTouchPoint:[sender locationOfTouch:0 inView:(GLKView*)sender.view]
@@ -390,9 +401,20 @@ typedef enum {
             rayOrigin2 = GLKVector3Add(rayOrigin2, rayDir2);
             [_selectionLine addVertex:rayOrigin1];
             [_selectionLine2 addVertex:rayOrigin2];
+
+            [_pMesh continueCreateBranchFinger1:rayOrigin1 finger2:rayOrigin2];
         } else if (sender.state == UIGestureRecognizerStateEnded) {
-            _selectionLine = nil;
-            _selectionLine2 = nil;
+//            _selectionLine = nil;
+//            _selectionLine2 = nil;
+            
+            std::vector<GLKVector3> skeleton = [_pMesh endCreateBranchTwoFingers];
+            NSMutableData* vData = [[NSMutableData alloc] init];
+            for (GLKVector3 v: skeleton) {
+                VertexRGBA vertex1 = {{v.x, v.y, v.z}, {0,255,0,255}};
+                [vData appendBytes:&vertex1 length:sizeof(VertexRGBA)];
+            }
+            _selectionLine3 = [[Line alloc] initWithVertexData:vData];
+
         }
     }
 }
@@ -519,11 +541,9 @@ typedef enum {
     //Projection
     const GLfloat aspectRatio = (GLfloat)_glHeight / (GLfloat)_glWidth;
     
-    BoundingBox bbox = _pMesh.boundingBox;
-    
-    projectionMatrix = GLKMatrix4MakeOrtho(-bbox.width/2, bbox.width/2,
-                                           -(bbox.height/2)*aspectRatio, (bbox.height/2)*aspectRatio,
-                                           -4*bbox.depth, 4*bbox.depth);
+    projectionMatrix = GLKMatrix4MakeOrtho(-_bbox.width/2, _bbox.width/2,
+                                           -(_bbox.height/2)*aspectRatio, (_bbox.height/2)*aspectRatio,
+                                           -4*_bbox.depth, 4*_bbox.depth);
     
     viewMatrix = GLKMatrix4Identity;
     
@@ -558,6 +578,10 @@ typedef enum {
     _selectionLine2.projectionMatrix = projectionMatrix;
     [_selectionLine2 draw];
     
+    _selectionLine3.viewMatrix = viewMatrix;
+    _selectionLine3.projectionMatrix = projectionMatrix;
+    [_selectionLine3 draw];
+    
 //    _meshTouchPoint.viewMatrix = viewMatrix;
 //    _meshTouchPoint.projectionMatrix = projectionMatrix;
 //    [_meshTouchPoint draw];
@@ -571,6 +595,7 @@ typedef enum {
 
 //Load initial mesh from OBJ file
 -(void)loadMeshData {
+    
     [self setPaused:YES]; //pause rendering
     
     //Reset all transformations. Remove all previous screws and plates
@@ -584,11 +609,42 @@ typedef enum {
     //Load obj file
     NSString* objPath = [[NSBundle mainBundle] pathForResource:@"sphere_mid_res" ofType:@"obj"];
     [_pMesh setMeshFromObjFile:objPath];
-    _translationManager.scaleFactor = _pMesh.boundingBox.radius;
+    _bbox = _pMesh.boundingBox;
+    _translationManager.scaleFactor = _bbox.radius;
     
     //Read vertex data from the file
     [self hideLoadingIndicator];
     [self setPaused:NO];
+}
+
+-(void)loadEmptyWorspace {
+    [self setPaused:YES]; //pause rendering
+    
+    //Reset all transformations. Remove all previous screws and plates
+    [self resetClicked:nil];
+    [self showLoadingIndicator];
+    
+    if (_pMesh == nil) {
+        _pMesh = [[PolarAnnularMesh alloc] init];
+    }
+    
+    //Load obj file
+    _bbox.minBound = GLKVector3Make(-1, -1, -1);
+    _bbox.maxBound = GLKVector3Make(1, 1, 1);
+    _bbox.center =  GLKVector3MultiplyScalar(GLKVector3Add(_bbox.minBound, _bbox.maxBound), 0.5f);
+    
+    GLKVector3 mid = GLKVector3MultiplyScalar(GLKVector3Subtract(_bbox.maxBound, _bbox.minBound), 0.5f);
+    _bbox.radius = GLKVector3Length(mid);
+    _bbox.width = fabsf(_bbox.maxBound.x - _bbox.minBound.x);
+    _bbox.height = fabsf(_bbox.maxBound.y - _bbox.minBound.y);
+    _bbox.depth = fabsf(_bbox.maxBound.z - _bbox.minBound.z);
+    
+    _translationManager.scaleFactor = _bbox.radius;
+    
+    //Read vertex data from the file
+    [self hideLoadingIndicator];
+    [self setPaused:NO];
+
 }
 
 #pragma mark - OffScreen depth buffer 

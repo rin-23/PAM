@@ -40,6 +40,7 @@ typedef CGLA::Vec3f Vecf;
 using namespace HMesh;
 
 @interface PolarAnnularMesh() {
+    
     HMesh::Manifold _manifold;
     HMesh::HalfEdgeAttributeVector<EdgeInfo> _edgeInfo;
     BoundingBox _boundingBox;
@@ -62,9 +63,6 @@ using namespace HMesh;
     //Undo
     HMesh::Manifold undoMani;
     
-    
-    
-    
     CurrentModification modState;
 }
 
@@ -80,10 +78,27 @@ using namespace HMesh;
 @implementation PolarAnnularMesh
 
 
-
 //GLKVector3 GLKVector3MakeWithVec(Vec v) {
 //    return GLKVector3Make(v[0], v[1], v[2]);
 //}
+
+-(id)init {
+    self = [super init];
+    if (self) {
+        //Load shader
+        NSString* vShader = [[NSBundle mainBundle] pathForResource:@"Shader" ofType:@"vsh"];
+        NSString* fShader = [[NSBundle mainBundle] pathForResource:@"Shader" ofType:@"fsh"];
+        self.drawShaderProgram = [[ShaderProgram alloc] initWithVertexShader:vShader fragmentShader:fShader];
+        
+        attrib[ATTRIB_POSITION] = [self.drawShaderProgram attributeLocation:"position"];
+        attrib[ATTRIB_NORMAL] = [self.drawShaderProgram attributeLocation:"normal"];
+        attrib[ATTRIB_COLOR] = [self.drawShaderProgram attributeLocation:"color"];
+        
+        uniforms[UNIFORM_MODELVIEWPROJECTION_MATRIX] = [self.drawShaderProgram uniformLocation:"modelViewProjectionMatrix"];
+        uniforms[UNIFORM_NORMAL_MATRIX] = [self.drawShaderProgram uniformLocation:"normalMatrix"];
+    }
+    return self;
+}
 
 -(void)setMeshFromObjFile:(NSString*)objFilePath {
 
@@ -110,17 +125,7 @@ using namespace HMesh;
     _boundingBox.height = fabsf(_boundingBox.maxBound.y - _boundingBox.minBound.y);
     _boundingBox.depth = fabsf(_boundingBox.maxBound.z - _boundingBox.minBound.z);
     
-    //Load shader
-    NSString* vShader = [[NSBundle mainBundle] pathForResource:@"Shader" ofType:@"vsh"];
-    NSString* fShader = [[NSBundle mainBundle] pathForResource:@"Shader" ofType:@"fsh"];
-    self.drawShaderProgram = [[ShaderProgram alloc] initWithVertexShader:vShader fragmentShader:fShader];
-
-    attrib[ATTRIB_POSITION] = [self.drawShaderProgram attributeLocation:"position"];
-    attrib[ATTRIB_NORMAL] = [self.drawShaderProgram attributeLocation:"normal"];
-    attrib[ATTRIB_COLOR] = [self.drawShaderProgram attributeLocation:"color"];
     
-    uniforms[UNIFORM_MODELVIEWPROJECTION_MATRIX] = [self.drawShaderProgram uniformLocation:"modelViewProjectionMatrix"];
-    uniforms[UNIFORM_NORMAL_MATRIX] = [self.drawShaderProgram uniformLocation:"normalMatrix"];
     
     [self rebuffer];
 }
@@ -471,7 +476,7 @@ using namespace HMesh;
     return YES;
 }
 
-#pragma mark - TOUCHES: BRANCH CREATION
+#pragma mark - TOUCHES: BRANCH CREATION ONE FINGER
 
 -(void)startCreateBranch:(GLKVector3)touchPoint {
     _touchPoints.clear();
@@ -521,6 +526,113 @@ using namespace HMesh;
         
         [self rebuffer];
     }
+}
+
+#pragma mark - TOUCHES: BRANCH CREATION TWO FINGERS
+
+-(void)startCreateBranchFinger1:(GLKVector3)touchPoint1 finger2:(GLKVector3)touchPoint2 {
+    _touchPoints.clear();
+    _touchPoints.push_back(touchPoint1);
+    _touchPoints.push_back(touchPoint2);
+}
+
+-(void)continueCreateBranchFinger1:(GLKVector3)touchPoint1 finger2:(GLKVector3)touchPoint2 {
+    _touchPoints.push_back(touchPoint1);
+    _touchPoints.push_back(touchPoint2);
+}
+
+-(std::vector<GLKVector3>)endCreateBranchTwoFingers {
+    [self saveState];
+    
+    if (_touchPoints.size() < 6) {
+        NSLog(@"[PolarAnnularMesh][WARNING] Not enough touch points given");
+    }
+    
+    //closest to the first centroid between two fingers vertex in 2D space
+    GLKVector3 firstCentroid = GLKVector3Lerp(_touchPoints[0], _touchPoints[1], 0.5f);
+    VertexID touchedVID = [self closestVertexID_2D:firstCentroid];
+    Vecf touchedV = _manifold.posf(touchedVID);
+    GLKVector3 touchedV_world = [Utilities matrix4:self.modelViewMatrix
+                                   multiplyVector3:GLKVector3Make(touchedV[0], touchedV[1], touchedV[2])];
+    
+    assert(_touchPoints.size()%2 == 0);
+    
+    float sampleLen = 0.2f; //TODO:Should be base on current bbox
+    float accumLen = 0.0f;
+    GLKVector3 lastCentroid = firstCentroid;
+    vector<GLKVector3> branchSkeleton;
+    vector<float> branchSkeletonWidth;
+    
+    //Add first centroid
+    GLKVector3 centroid_world = [Utilities matrix4:self.viewMatrix multiplyVector3:firstCentroid];
+    centroid_world.z = touchedV_world.z;
+    GLKVector3 centroid_model = [Utilities invertVector3:centroid_world withMatrix:self.modelViewMatrix];
+    branchSkeleton.push_back(centroid_model);
+    branchSkeletonWidth.push_back(0.5f * GLKVector3Distance(_touchPoints[0], _touchPoints[1]));
+    
+    //Add all other centroids
+    for (int i = 2; i < _touchPoints.size(); i +=2) {
+        GLKVector3 centroid = GLKVector3Lerp(_touchPoints[i], _touchPoints[i+1], 0.5f);
+        float curLen = GLKVector3Distance(lastCentroid, centroid);
+        accumLen += curLen;
+        if (accumLen >= sampleLen) {
+            centroid_world = [Utilities matrix4:self.viewMatrix multiplyVector3:centroid];
+            centroid_world.z = touchedV_world.z;
+            centroid_model = [Utilities invertVector3:centroid_world withMatrix:self.modelViewMatrix];
+            branchSkeleton.push_back(centroid_model);
+            branchSkeletonWidth.push_back(0.5f * GLKVector3Distance(_touchPoints[i], _touchPoints[i+1]));
+            
+            accumLen = 0;
+            lastCentroid = centroid;
+        }
+    }
+    return branchSkeleton;
+}
+
+
+-(std::vector<GLKVector3>)endCreateNewBodyTwoFingers {
+    
+    if (_touchPoints.size() < 6) {
+        NSLog(@"[PolarAnnularMesh][WARNING] Not enough touch points given");
+    }
+    
+    [self saveState];
+    
+    //closest to the first centroid between two fingers vertex in 2D space
+    GLKVector3 firstCentroid = GLKVector3Lerp(_touchPoints[0], _touchPoints[1], 0.5f);
+    assert(_touchPoints.size()%2 == 0);
+    
+    float sampleLen = 0.2f;
+    float accumLen = 0.0f;
+    GLKVector3 lastCentroid = firstCentroid;
+    vector<GLKVector3> branchSkeleton;
+    vector<float> branchSkeletonWidth;
+    
+    //Add first centroid
+    GLKVector3 centroid_world = [Utilities matrix4:self.viewMatrix multiplyVector3:firstCentroid];
+    centroid_world.z = 0;
+    GLKVector3 centroid_model = [Utilities invertVector3:centroid_world withMatrix:self.modelViewMatrix];
+    branchSkeleton.push_back(centroid_model);
+    branchSkeletonWidth.push_back(0.5f * GLKVector3Distance(_touchPoints[0], _touchPoints[1]));
+    
+    //Add all other centroids
+    for (int i = 2; i < _touchPoints.size(); i +=2) {
+        GLKVector3 centroid = GLKVector3Lerp(_touchPoints[i], _touchPoints[i+1], 0.5f);
+        float curLen = GLKVector3Distance(lastCentroid, centroid);
+        accumLen += curLen;
+
+        if (accumLen >= sampleLen) {
+            centroid_world = [Utilities matrix4:self.viewMatrix multiplyVector3:centroid];
+            centroid_world.z = 0;
+            centroid_model = [Utilities invertVector3:centroid_world withMatrix:self.modelViewMatrix];
+            branchSkeleton.push_back(centroid_model);
+            branchSkeletonWidth.push_back(0.5f * GLKVector3Distance(_touchPoints[i], _touchPoints[i+1]));
+            
+            accumLen = 0;
+            lastCentroid = centroid;
+        }
+    }
+    return branchSkeleton;
 }
 
 #pragma mark - TOUCHES: FACE PICKING
@@ -801,8 +913,6 @@ using namespace HMesh;
                                                    dataType:GL_UNSIGNED_INT
                                                  indexCount:self.numIndices];
 }
-
-
 
 
 @end

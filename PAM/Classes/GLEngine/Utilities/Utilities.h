@@ -60,4 +60,8 @@ double triangleAngleWithSides(double a, double b, double c);
 +(GLKVector3) matrix4:(GLKMatrix4)matrix multiplyVector3:(GLKVector3)vector3;
 
 +(GLKVector2) GLKVector2MakeWithVector3:(GLKVector3) vector3;
+
+
+
+
 @end

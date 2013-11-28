@@ -344,4 +344,9 @@ double triangleAngleWithSides(double a, double b, double c) {
     return GLKVector2Make(vector3.x, vector3.y);
 }
 
++(GLKVector3)projectVector:(GLKVector3)vec ontoLine:(GLKVector3)line {
+    float c = GLKVector3DotProduct(vec, line) / GLKVector3DotProduct(line, line);
+    return GLKVector3MultiplyScalar(line, c);
+}
+
 @end

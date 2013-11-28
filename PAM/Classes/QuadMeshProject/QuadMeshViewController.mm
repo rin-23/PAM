@@ -60,6 +60,7 @@ typedef enum {
     Line* _selectionLine;
     Line* _selectionLine2;
     Line* _selectionLine3;
+    NSMutableArray* _ribsLines;
     std::vector<GLKVector3> _branchPoint;
 }
 @end
@@ -86,8 +87,8 @@ typedef enum {
 {
     [super viewDidLoad];
 	// Do any additional setup after loading the view.
-    [self loadMeshData];
-//    [self loadEmptyWorspace];
+//    [self loadMeshData];
+    [self loadEmptyWorspace];
     
     [self setupGL];
     [self addGestureRecognizersToView:self.view];
@@ -237,6 +238,7 @@ typedef enum {
     if (!_transformSwitch.isOn) {
         [_zoomManager handlePinchGesture:sender];
     } else {
+        return;
         UIPinchGestureRecognizer* pinch = (UIPinchGestureRecognizer*) sender;
 //        NSLog(@"Scale %f", pinch.scale);
         if (sender.state == UIGestureRecognizerStateBegan) {
@@ -271,6 +273,7 @@ typedef enum {
     if (!_transformSwitch.isOn) {
         [_rotationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity isOrthogonal:NO];
     } else {
+        return; 
         if (sender.state == UIGestureRecognizerStateBegan)
         {
             CGPoint touchPoint = [self touchPointFromGesture:sender];
@@ -384,7 +387,9 @@ typedef enum {
             
             [_pMesh startCreateBranchFinger1:rayOrigin1 finger2:rayOrigin2];
         } else if (sender.state == UIGestureRecognizerStateChanged) {
-            if (sender.numberOfTouches!=2) return;
+            if (sender.numberOfTouches!=2) {
+                return;
+            }
             CGPoint touchPoint1 = [self scaleTouchPoint:[sender locationOfTouch:0 inView:(GLKView*)sender.view]
                                                  inView:(GLKView*)sender.view];
             CGPoint touchPoint2 = [self scaleTouchPoint:[sender locationOfTouch:1 inView:(GLKView*)sender.view]
@@ -406,15 +411,30 @@ typedef enum {
         } else if (sender.state == UIGestureRecognizerStateEnded) {
 //            _selectionLine = nil;
 //            _selectionLine2 = nil;
-            
-            std::vector<GLKVector3> skeleton = [_pMesh endCreateBranchTwoFingers];
-            NSMutableData* vData = [[NSMutableData alloc] init];
-            for (GLKVector3 v: skeleton) {
-                VertexRGBA vertex1 = {{v.x, v.y, v.z}, {0,255,0,255}};
-                [vData appendBytes:&vertex1 length:sizeof(VertexRGBA)];
-            }
-            _selectionLine3 = [[Line alloc] initWithVertexData:vData];
 
+            std::vector<std::vector<GLKVector3>> allRibs = [_pMesh endCreateNewBodyTwoFingers];
+            _ribsLines = [[NSMutableArray alloc] initWithCapacity:allRibs.size()];
+            for (int i = 0; i <allRibs.size();i++) {
+                std::vector<GLKVector3> rib = allRibs[i];
+                NSMutableData* vData = [[NSMutableData alloc] init];
+//                for (GLKVector3 v: rib) {
+                
+                for (int j = 0; j < rib.size(); j++) {
+                    GLKVector3 v = rib[j];
+                    GLubyte b = 0;
+                    GLubyte r = 0;
+//                                            GLubyte b = j * (255.0f/rib.size());
+                    if (j%2 ==0) {
+                        r = 255;
+                    } else {
+                        b = 255;
+                    }
+                    VertexRGBA vertex1 = {{v.x, v.y, v.z}, {r,b,0,255}};
+                    [vData appendBytes:&vertex1 length:sizeof(VertexRGBA)];
+                }
+                Line* line = [[Line alloc] initWithVertexData:vData];
+                [_ribsLines addObject:line];
+            }
         }
     }
 }
@@ -581,6 +601,12 @@ typedef enum {
     _selectionLine3.viewMatrix = viewMatrix;
     _selectionLine3.projectionMatrix = projectionMatrix;
     [_selectionLine3 draw];
+    
+    for (Line* line in _ribsLines) {
+        line.viewMatrix = viewMatrix;
+        line.projectionMatrix = projectionMatrix;
+        [line draw];
+    }
     
 //    _meshTouchPoint.viewMatrix = viewMatrix;
 //    _meshTouchPoint.projectionMatrix = projectionMatrix;

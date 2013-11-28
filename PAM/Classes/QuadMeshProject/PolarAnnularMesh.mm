@@ -544,7 +544,7 @@ using namespace HMesh;
 -(std::vector<GLKVector3>)endCreateBranchTwoFingers {
     [self saveState];
     
-    if (_touchPoints.size() < 6) {
+    if (_touchPoints.size() < 8) {
         NSLog(@"[PolarAnnularMesh][WARNING] Not enough touch points given");
     }
     
@@ -560,15 +560,15 @@ using namespace HMesh;
     float sampleLen = 0.2f; //TODO:Should be base on current bbox
     float accumLen = 0.0f;
     GLKVector3 lastCentroid = firstCentroid;
-    vector<GLKVector3> branchSkeleton;
-    vector<float> branchSkeletonWidth;
+    vector<GLKVector3> skeleton;
+    vector<float> skeletonWidth;
     
     //Add first centroid
     GLKVector3 centroid_world = [Utilities matrix4:self.viewMatrix multiplyVector3:firstCentroid];
     centroid_world.z = touchedV_world.z;
     GLKVector3 centroid_model = [Utilities invertVector3:centroid_world withMatrix:self.modelViewMatrix];
-    branchSkeleton.push_back(centroid_model);
-    branchSkeletonWidth.push_back(0.5f * GLKVector3Distance(_touchPoints[0], _touchPoints[1]));
+    skeleton.push_back(centroid_model);
+    skeletonWidth.push_back(0.5f * GLKVector3Distance(_touchPoints[0], _touchPoints[1]));
     
     //Add all other centroids
     for (int i = 2; i < _touchPoints.size(); i +=2) {
@@ -579,20 +579,21 @@ using namespace HMesh;
             centroid_world = [Utilities matrix4:self.viewMatrix multiplyVector3:centroid];
             centroid_world.z = touchedV_world.z;
             centroid_model = [Utilities invertVector3:centroid_world withMatrix:self.modelViewMatrix];
-            branchSkeleton.push_back(centroid_model);
-            branchSkeletonWidth.push_back(0.5f * GLKVector3Distance(_touchPoints[i], _touchPoints[i+1]));
+            skeleton.push_back(centroid_model);
+            skeletonWidth.push_back(0.5f * GLKVector3Distance(_touchPoints[i], _touchPoints[i+1]));
             
             accumLen = 0;
             lastCentroid = centroid;
         }
     }
-    return branchSkeleton;
+    
+    return skeleton;
 }
 
 
--(std::vector<GLKVector3>)endCreateNewBodyTwoFingers {
+-(std::vector<vector<GLKVector3>>)endCreateNewBodyTwoFingers {
     
-    if (_touchPoints.size() < 6) {
+    if (_touchPoints.size() < 8) {
         NSLog(@"[PolarAnnularMesh][WARNING] Not enough touch points given");
     }
     
@@ -602,18 +603,18 @@ using namespace HMesh;
     GLKVector3 firstCentroid = GLKVector3Lerp(_touchPoints[0], _touchPoints[1], 0.5f);
     assert(_touchPoints.size()%2 == 0);
     
-    float sampleLen = 0.2f;
+    float sampleLen = 0.3f;
     float accumLen = 0.0f;
     GLKVector3 lastCentroid = firstCentroid;
-    vector<GLKVector3> branchSkeleton;
-    vector<float> branchSkeletonWidth;
+    vector<GLKVector3> skeleton;
+    vector<float> skeletonWidth;
     
     //Add first centroid
     GLKVector3 centroid_world = [Utilities matrix4:self.viewMatrix multiplyVector3:firstCentroid];
     centroid_world.z = 0;
     GLKVector3 centroid_model = [Utilities invertVector3:centroid_world withMatrix:self.modelViewMatrix];
-    branchSkeleton.push_back(centroid_model);
-    branchSkeletonWidth.push_back(0.5f * GLKVector3Distance(_touchPoints[0], _touchPoints[1]));
+    skeleton.push_back(centroid_model);
+    skeletonWidth.push_back(0.5f * GLKVector3Distance(_touchPoints[0], _touchPoints[1]));
     
     //Add all other centroids
     for (int i = 2; i < _touchPoints.size(); i +=2) {
@@ -625,14 +626,64 @@ using namespace HMesh;
             centroid_world = [Utilities matrix4:self.viewMatrix multiplyVector3:centroid];
             centroid_world.z = 0;
             centroid_model = [Utilities invertVector3:centroid_world withMatrix:self.modelViewMatrix];
-            branchSkeleton.push_back(centroid_model);
-            branchSkeletonWidth.push_back(0.5f * GLKVector3Distance(_touchPoints[i], _touchPoints[i+1]));
+            skeleton.push_back(centroid_model);
+            skeletonWidth.push_back(0.5f * GLKVector3Distance(_touchPoints[i], _touchPoints[i+1]));
             
             accumLen = 0;
             lastCentroid = centroid;
         }
     }
-    return branchSkeleton;
+    
+    if (skeleton.size() < 4 ) {
+        NSLog(@"[PolarAnnularMesh][WARNING] Not enough controids");
+    }
+
+//    vector<vector<GLKVector3>> allRibs;
+//    allRibs.push_back(skeleton);
+    
+    //Parse new skeleton and create ribs
+    //Ingore first and last centroids since they are poles
+    int numSpines = 10;
+    vector<vector<GLKVector3>> allRibs(skeleton.size());
+    vector<GLKVector3> firstPole;
+    firstPole.push_back(skeleton[0]);
+    allRibs[0] = firstPole;
+    for (int i = 1; i < skeleton.size() - 1; i++) {
+        GLKVector3 tangent = GLKVector3Subtract(skeleton[i+1], skeleton[i-1]);
+        GLKVector3 firstHalf = GLKVector3Subtract(skeleton[i], skeleton[i-1]);
+        GLKVector3 proj = [Utilities projectVector:firstHalf ontoLine:tangent];
+        GLKVector3 norm = GLKVector3Normalize(GLKVector3Subtract(proj, firstHalf));
+        norm = GLKVector3Subtract(norm, skeleton[i]);
+        float ribWidth = skeletonWidth[i];
+        
+        GLKVector3 initialRibPoint = GLKVector3MultiplyScalar(GLKVector3Add(skeleton[i], norm), ribWidth);
+        vector<GLKVector3> ribs(2);
+        ribs[0] = GLKVector3Add(skeleton[i], initialRibPoint);
+        ribs[1] = GLKVector3Add(skeleton[i], GLKVector3MultiplyScalar(initialRibPoint, -1.0f));
+        allRibs[i] = ribs;
+        
+//        GLKVector3 originVector = skeleton[i];
+//        GLKVector3 initialRibPointOrigin = GLKVector3Subtract(initialRibPoint, originVector);
+//        GLKVector3 orginTangent = GLKVector3Subtract(tangent, originVector);
+//        
+//        vector<GLKVector3> ribs(numSpines);
+//
+//        for (int j = 0; j < numSpines; j++) {
+//            float angle = j * (2*M_PI/(float)numSpines);
+//            GLKQuaternion quat = GLKQuaternionMakeWithAngleAndVector3Axis(angle, orginTangent);
+//            GLKVector3 newRibPoint = GLKQuaternionRotateVector3(quat, initialRibPointOrigin);
+//            newRibPoint = GLKVector3Add(newRibPoint, originVector);
+//            ribs[j] = newRibPoint;
+//        }
+//        allRibs[i] = ribs;
+    }
+    vector<GLKVector3> secondPole;
+    secondPole.push_back(skeleton[skeleton.size() - 1]);
+    allRibs[skeleton.size() - 1] = secondPole;
+    
+    allRibs.push_back(skeleton);
+    
+    return allRibs;
 }
 
 #pragma mark - TOUCHES: FACE PICKING

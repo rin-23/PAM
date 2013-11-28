@@ -24,7 +24,7 @@
 -(void)startCreateBranchFinger1:(GLKVector3)touchPoint1 finger2:(GLKVector3)touchPoint2;
 -(void)continueCreateBranchFinger1:(GLKVector3)touchPoint1 finger2:(GLKVector3)touchPoint2;
 -(std::vector<GLKVector3>)endCreateBranchTwoFingers;
--(std::vector<GLKVector3>)endCreateNewBodyTwoFingers;
+-(std::vector<std::vector<GLKVector3>>)endCreateNewBodyTwoFingers;
 
 #pragma mark - TOUCHES: FACE PICKING
 -(void)endSelectFaceWithRay:(GLKVector3)rayOrigin rayDirection:(GLKVector3)rayDir;

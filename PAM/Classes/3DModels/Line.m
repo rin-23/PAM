@@ -73,7 +73,7 @@
         glUseProgram(self.drawShaderProgram.program);
        
         glUniformMatrix4fv(uniforms[UNIFORM_MODELVIEWPROJECTION_MATRIX], 1, 0, self.modelViewProjectionMatrix.m);
-        glUniform1f(uniforms[UNIFORM_POINT_SIZE], 2.0f);
+        glUniform1f(uniforms[UNIFORM_POINT_SIZE], 10.0f);
         
         [self.vertexDataBuffer bind];
         [self.vertexDataBuffer prepareToDrawWithAttrib:attrib[ATTRIB_POSITION]
@@ -89,6 +89,10 @@
                                              normalize:GL_TRUE];
         
         [AGLKVertexAttribArrayBuffer drawPreparedArraysWithMode:GL_LINE_STRIP
+                                               startVertexIndex:0
+                                               numberOfVertices:self.numVertices];
+        
+        [AGLKVertexAttribArrayBuffer drawPreparedArraysWithMode:GL_POINTS
                                                startVertexIndex:0
                                                numberOfVertices:self.numVertices];
 

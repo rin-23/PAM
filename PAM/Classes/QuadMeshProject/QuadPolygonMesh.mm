@@ -181,7 +181,7 @@ using namespace HMesh;
     if (_edgeInfo[walker.halfedge()].edge_type != RIB) {
         walker = walker.next();
     }
-    add_spine(_manifold, walker.halfedge());
+    add_spine(_manifold, walker.halfedge(), _edgeInfo);
     [self rebuffer];
 }      
 

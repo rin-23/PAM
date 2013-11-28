@@ -603,7 +603,7 @@ using namespace HMesh;
     GLKVector3 firstCentroid = GLKVector3Lerp(_touchPoints[0], _touchPoints[1], 0.5f);
     assert(_touchPoints.size()%2 == 0);
     
-    float sampleLen = 0.3f;
+    float sampleLen = 0.4f;
     float accumLen = 0.0f;
     GLKVector3 lastCentroid = firstCentroid;
     vector<GLKVector3> skeleton;
@@ -637,9 +637,6 @@ using namespace HMesh;
     if (skeleton.size() < 4 ) {
         NSLog(@"[PolarAnnularMesh][WARNING] Not enough controids");
     }
-
-//    vector<vector<GLKVector3>> allRibs;
-//    allRibs.push_back(skeleton);
     
     //Parse new skeleton and create ribs
     //Ingore first and last centroids since they are poles
@@ -649,38 +646,31 @@ using namespace HMesh;
     firstPole.push_back(skeleton[0]);
     allRibs[0] = firstPole;
     for (int i = 1; i < skeleton.size() - 1; i++) {
-        GLKVector3 tangent = GLKVector3Subtract(skeleton[i+1], skeleton[i-1]);
-        GLKVector3 firstHalf = GLKVector3Subtract(skeleton[i], skeleton[i-1]);
-        GLKVector3 proj = [Utilities projectVector:firstHalf ontoLine:tangent];
-        GLKVector3 norm = GLKVector3Normalize(GLKVector3Subtract(proj, firstHalf));
-        norm = GLKVector3Subtract(norm, skeleton[i]);
+        GLKVector3 tangent = GLKVector3Subtract(skeleton[i+1], skeleton[i-1]); //i-1
+        GLKVector3 firstHalf = GLKVector3Subtract(skeleton[i], skeleton[i-1]); //i-1
+        GLKVector3 proj = [Utilities projectVector:firstHalf ontoLine:tangent]; //i-1
+        GLKVector3 norm = GLKVector3Normalize(GLKVector3Subtract(proj, firstHalf)); //i
         float ribWidth = skeletonWidth[i];
-        
-        GLKVector3 initialRibPoint = GLKVector3MultiplyScalar(GLKVector3Add(skeleton[i], norm), ribWidth);
-        vector<GLKVector3> ribs(2);
-        ribs[0] = GLKVector3Add(skeleton[i], initialRibPoint);
-        ribs[1] = GLKVector3Add(skeleton[i], GLKVector3MultiplyScalar(initialRibPoint, -1.0f));
-        allRibs[i] = ribs;
-        
-//        GLKVector3 originVector = skeleton[i];
-//        GLKVector3 initialRibPointOrigin = GLKVector3Subtract(initialRibPoint, originVector);
-//        GLKVector3 orginTangent = GLKVector3Subtract(tangent, originVector);
-//        
-//        vector<GLKVector3> ribs(numSpines);
-//
-//        for (int j = 0; j < numSpines; j++) {
-//            float angle = j * (2*M_PI/(float)numSpines);
-//            GLKQuaternion quat = GLKQuaternionMakeWithAngleAndVector3Axis(angle, orginTangent);
-//            GLKVector3 newRibPoint = GLKQuaternionRotateVector3(quat, initialRibPointOrigin);
-//            newRibPoint = GLKVector3Add(newRibPoint, originVector);
-//            ribs[j] = newRibPoint;
-//        }
+
+//        vector<GLKVector3> ribs(2);
+//        ribs[0] = GLKVector3Add(skeleton[i], initialRibPoint);
+//        ribs[1] = GLKVector3Add(skeleton[i], GLKVector3MultiplyScalar(initialRibPoint, -1.0f));
 //        allRibs[i] = ribs;
+
+        vector<GLKVector3> ribs(numSpines);
+        float rot_step = 360.0f/numSpines;
+        for (int j = 0; j < numSpines; j++) {
+            float angle = j * rot_step;
+            GLKQuaternion quat = GLKQuaternionMakeWithAngleAndVector3Axis(GLKMathDegreesToRadians(angle), GLKVector3Normalize(tangent));
+            GLKVector3 newNorm = GLKQuaternionRotateVector3(quat, norm);
+            GLKVector3 newRibPoint = GLKVector3Add(GLKVector3MultiplyScalar(newNorm, ribWidth), skeleton[i]);
+            ribs[j] = newRibPoint;
+        }
+        allRibs[i] = ribs;
     }
     vector<GLKVector3> secondPole;
     secondPole.push_back(skeleton[skeleton.size() - 1]);
     allRibs[skeleton.size() - 1] = secondPole;
-    
     allRibs.push_back(skeleton);
     
     return allRibs;

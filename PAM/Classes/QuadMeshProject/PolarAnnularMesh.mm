@@ -542,6 +542,8 @@ using namespace HMesh;
 }
 
 -(std::vector<GLKVector3>)endCreateBranchTwoFingers {
+    
+    //TODO NOT DONE YET
     [self saveState];
     
     if (_touchPoints.size() < 8) {
@@ -607,6 +609,7 @@ using namespace HMesh;
     float accumLen = 0.0f;
     GLKVector3 lastCentroid = firstCentroid;
     vector<GLKVector3> skeleton;
+    vector<GLKVector3> skeletonWorld;
     vector<float> skeletonWidth;
     
     //Add first centroid
@@ -614,6 +617,7 @@ using namespace HMesh;
     centroid_world.z = 0;
     GLKVector3 centroid_model = [Utilities invertVector3:centroid_world withMatrix:self.modelViewMatrix];
     skeleton.push_back(centroid_model);
+    skeletonWorld.push_back(centroid_world);
     skeletonWidth.push_back(0.5f * GLKVector3Distance(_touchPoints[0], _touchPoints[1]));
     
     //Add all other centroids
@@ -627,6 +631,7 @@ using namespace HMesh;
             centroid_world.z = 0;
             centroid_model = [Utilities invertVector3:centroid_world withMatrix:self.modelViewMatrix];
             skeleton.push_back(centroid_model);
+            skeletonWorld.push_back(centroid_world);
             skeletonWidth.push_back(0.5f * GLKVector3Distance(_touchPoints[i], _touchPoints[i+1]));
             
             accumLen = 0;
@@ -645,17 +650,25 @@ using namespace HMesh;
     vector<GLKVector3> firstPole;
     firstPole.push_back(skeleton[0]);
     allRibs[0] = firstPole;
+    BOOL isFirstLeft = YES;
     for (int i = 1; i < skeleton.size() - 1; i++) {
         GLKVector3 tangent = GLKVector3Subtract(skeleton[i+1], skeleton[i-1]); //i-1
         GLKVector3 firstHalf = GLKVector3Subtract(skeleton[i], skeleton[i-1]); //i-1
         GLKVector3 proj = [Utilities projectVector:firstHalf ontoLine:tangent]; //i-1
         GLKVector3 norm = GLKVector3Normalize(GLKVector3Subtract(proj, firstHalf)); //i
-        float ribWidth = skeletonWidth[i];
+        
+        //Make sure than norm points to the left
+        {
+            GLKVector3 tangentWolrd = GLKVector3Subtract(skeletonWorld[i+1], skeletonWorld[i-1]);
+            GLKVector3 firstHalfWorld = GLKVector3Subtract(skeletonWorld[i], skeletonWorld[i-1]); //i-1
+            BOOL isLeft = ((tangentWolrd.x)*(firstHalfWorld.y) - (tangentWolrd.y)*(firstHalfWorld.x)) > 0;
 
-//        vector<GLKVector3> ribs(2);
-//        ribs[0] = GLKVector3Add(skeleton[i], initialRibPoint);
-//        ribs[1] = GLKVector3Add(skeleton[i], GLKVector3MultiplyScalar(initialRibPoint, -1.0f));
-//        allRibs[i] = ribs;
+            if (isFirstLeft != isLeft) {
+                norm = GLKVector3MultiplyScalar(norm, -1);
+            }
+        }
+        
+        float ribWidth = skeletonWidth[i];
 
         vector<GLKVector3> ribs(numSpines);
         float rot_step = 360.0f/numSpines;

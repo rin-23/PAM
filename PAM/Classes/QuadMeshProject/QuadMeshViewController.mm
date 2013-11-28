@@ -238,7 +238,7 @@ typedef enum {
     if (!_transformSwitch.isOn) {
         [_zoomManager handlePinchGesture:sender];
     } else {
-
+        return;
         UIPinchGestureRecognizer* pinch = (UIPinchGestureRecognizer*) sender;
 //        NSLog(@"Scale %f", pinch.scale);
         if (sender.state == UIGestureRecognizerStateBegan) {
@@ -327,6 +327,7 @@ typedef enum {
             rayOrigin = GLKVector3Add(rayOrigin, rayDirection);
 
             [_selectionLine addVertex:rayOrigin];
+            [_pMesh continueCreateBranch:rayOrigin];
         }
         else if (sender.state == UIGestureRecognizerStateEnded)
         {
@@ -338,14 +339,14 @@ typedef enum {
                     NSLog(@"[WARNING] Couldn determine touch area");
                     return;
                 }
-                [_pMesh endCreateBranch:modelCoord touchedModel:YES];
+                [_pMesh endCreateBranchBended:modelCoord touchedModel:YES];
             } else if (_state == TOUCHED_BACKGROUND){
                 BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, 0)];
                 if (!result) {
                     NSLog(@"[WARNING] Couldn't determine touch area");
                     return;
                 }
-                [_pMesh endCreateBranch:modelCoord touchedModel:NO];
+                [_pMesh endCreateBranchBended:modelCoord touchedModel:NO];
             }
             _state = TOUCHED_NONE;
             _selectionLine = nil;
@@ -836,7 +837,7 @@ typedef enum {
 - (void)alertView:(UIAlertView *)alertView clickedButtonAtIndex:(NSInteger)buttonIndex {
     if ([alertView.title isEqualToString:@"Undo?"]) {
         if (buttonIndex == 0) {
-//            [_pMesh undo];
+            [_pMesh undo];
         }
         [alertView dismissWithClickedButtonIndex:buttonIndex animated:YES];
     }

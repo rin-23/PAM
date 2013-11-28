@@ -96,6 +96,7 @@ using namespace HMesh;
         
         uniforms[UNIFORM_MODELVIEWPROJECTION_MATRIX] = [self.drawShaderProgram uniformLocation:"modelViewProjectionMatrix"];
         uniforms[UNIFORM_NORMAL_MATRIX] = [self.drawShaderProgram uniformLocation:"normalMatrix"];
+        _manifold = HMesh::Manifold();
     }
     return self;
 }
@@ -130,7 +131,7 @@ using namespace HMesh;
     [self rebuffer];
 }
 
--(void)rebuffer{
+-(void)rebufferNoEdgetrace {
     //Load data
     NSMutableData* positionData = [[NSMutableData alloc] init];
     NSMutableData* normalData = [[NSMutableData alloc] init];
@@ -144,7 +145,7 @@ using namespace HMesh;
                  vertexNormal:&normalData
                   vertexColor:&colorData
                     indexData:&indexData
-           wireframeColorData:&wireframeColorData 
+           wireframeColorData:&wireframeColorData
            wireframeIndexData:&wireframeIndexData];
     
     //Buffer vertex data
@@ -194,7 +195,11 @@ using namespace HMesh;
                                                                                     bytes:wireframeIndexData.bytes
                                                                                     usage:GL_STATIC_DRAW
                                                                                    target:GL_ELEMENT_ARRAY_BUFFER];
-    
+}
+
+-(void)rebuffer{
+   
+    [self rebufferNoEdgetrace];
     _edgeInfo = trace_spine_edges(_manifold);
 
 }
@@ -281,6 +286,7 @@ using namespace HMesh;
 
 -(void)undo {
     _manifold = undoMani;
+    [self rebuffer];
 }
 
 -(BOOL)manifoldIsLoaded {
@@ -419,7 +425,7 @@ using namespace HMesh;
 
 //Create branch at a given vertex. Return VertexID of newly created pole.
 -(BOOL)createBranchAtVertex:(VertexID)vID width:(int)width vertexID:(VertexID*)newPoleID {
-    [self saveState];
+
     
     //Do not add branhes at poles
     if (is_pole(_manifold, vID)) {
@@ -489,7 +495,6 @@ using namespace HMesh;
     
     _touchPoints.clear();
     _touchPoints.push_back(touchPoint);
-    _initialTouch = touchPoint;
 }
 
 -(void)continueCreateBranch:(GLKVector3)touchPoint {
@@ -508,10 +513,10 @@ using namespace HMesh;
     VertexID touchedVID;
     if (touchedModel) {
         //closest vertex in 3D space
-        touchedVID = [self closestVertexID_3D:_initialTouch];
+        touchedVID = [self closestVertexID_3D:_touchPoints[0]];
     } else {
         //closest vertex in 2D space
-        touchedVID = [self closestVertexID_2D:_initialTouch];
+        touchedVID = [self closestVertexID_2D:_touchPoints[0]];
     }
 
     Vec norm = HMesh::normal(_manifold, touchedVID);
@@ -542,6 +547,111 @@ using namespace HMesh;
     }
 }
 
+-(void)endCreateBranchBended:(GLKVector3)touchPoint touchedModel:(BOOL)touchedModel {
+    if(![self manifoldIsLoaded])
+        return;
+    
+    [self saveState];
+    
+    VertexID touchedVID;
+    GLKVector3 firstCentroid = _touchPoints[0];
+    if (touchedModel) {
+        //closest vertex in 3D space
+        touchedVID = [self closestVertexID_3D:firstCentroid];
+    } else {
+        //closest vertex in 2D space
+        touchedVID = [self closestVertexID_2D:firstCentroid];
+    }
+    
+    //closest to the first centroid between two fingers vertex in 2D space
+    Vecf touchedV = _manifold.posf(touchedVID);
+    GLKVector3 touchedV_world = [Utilities matrix4:self.modelViewMatrix
+                                   multiplyVector3:GLKVector3Make(touchedV[0], touchedV[1], touchedV[2])];
+    float sampleLen = 0.1f;
+    float accumLen = 0.0f;
+    GLKVector3 lastCentroid = firstCentroid;
+    vector<GLKVector3> skeleton;
+    vector<GLKVector3> skeletonWorld;
+    vector<float> skeletonWidth;
+    
+    //Add first centroid
+    GLKVector3 centroid_world = [Utilities matrix4:self.viewMatrix multiplyVector3:firstCentroid];
+    centroid_world.z = touchedV_world.z;
+    GLKVector3 centroid_model = [Utilities invertVector3:centroid_world withMatrix:self.modelViewMatrix];
+    skeleton.push_back(centroid_model);
+    skeletonWorld.push_back(centroid_world);
+    skeletonWidth.push_back(0.05);
+    
+    //Add all other centroids
+    for (int i = 1; i < _touchPoints.size(); i += 1) {
+        GLKVector3 centroid = _touchPoints[i];
+        float curLen = GLKVector3Distance(lastCentroid, centroid);
+        accumLen += curLen;
+        
+        if (accumLen >= sampleLen) {
+            centroid_world = [Utilities matrix4:self.viewMatrix multiplyVector3:centroid];
+            centroid_world.z = touchedV_world.z;
+            centroid_model = [Utilities invertVector3:centroid_world withMatrix:self.modelViewMatrix];
+            skeleton.push_back(centroid_model);
+            skeletonWorld.push_back(centroid_world);
+            skeletonWidth.push_back(0.05);
+            
+            accumLen = 0;
+            lastCentroid = centroid;
+        }
+    }
+    
+    if (skeleton.size() < 4 ) {
+        NSLog(@"[PolarAnnularMesh][WARNING] Not enough controids");
+    }
+    
+    //Parse new skeleton and create ribs
+    //Ingore first and last centroids since they are poles
+    int numSpines = 20;
+    vector<vector<GLKVector3>> allRibs(skeleton.size());
+    
+    vector<GLKVector3> firstPole;
+    firstPole.push_back(skeleton[0]);
+    allRibs[0] = firstPole;
+    
+    BOOL isFirstLeft = YES;
+    for (int i = 1; i < skeleton.size() - 1; i++) {
+        GLKVector3 tangent = GLKVector3Subtract(skeleton[i+1], skeleton[i-1]); //i-1
+        GLKVector3 firstHalf = GLKVector3Subtract(skeleton[i], skeleton[i-1]); //i-1
+        GLKVector3 proj = [Utilities projectVector:firstHalf ontoLine:tangent]; //i-1
+        GLKVector3 norm = GLKVector3Normalize(GLKVector3Subtract(proj, firstHalf)); //i
+        
+        //Make sure than norm points to the left
+        {
+            GLKVector3 tangentWolrd = GLKVector3Subtract(skeletonWorld[i+1], skeletonWorld[i-1]);
+            GLKVector3 firstHalfWorld = GLKVector3Subtract(skeletonWorld[i], skeletonWorld[i-1]); //i-1
+            BOOL isLeft = ((tangentWolrd.x)*(firstHalfWorld.y) - (tangentWolrd.y)*(firstHalfWorld.x)) > 0;
+            if (isFirstLeft != isLeft) {
+                norm = GLKVector3MultiplyScalar(norm, -1);
+            }
+        }
+        
+        float ribWidth = skeletonWidth[i];
+        
+        vector<GLKVector3> ribs(numSpines);
+        float rot_step = 360.0f/numSpines;
+        for (int j = 0; j < numSpines; j++) {
+            float angle = j * rot_step;
+            GLKQuaternion quat = GLKQuaternionMakeWithAngleAndVector3Axis(GLKMathDegreesToRadians(angle), GLKVector3Normalize(tangent));
+            GLKVector3 newNorm = GLKQuaternionRotateVector3(quat, norm);
+            GLKVector3 newRibPoint = GLKVector3Add(GLKVector3MultiplyScalar(newNorm, ribWidth), skeleton[i]);
+            ribs[j] = newRibPoint;
+        }
+        allRibs[i] = ribs;
+    }
+    vector<GLKVector3> secondPole;
+    secondPole.push_back(skeleton[skeleton.size() - 1]);
+    allRibs[skeleton.size() - 1] = secondPole;
+
+    
+    [self populateNewLimb:allRibs];
+}
+
 #pragma mark - TOUCHES: BRANCH CREATION TWO FINGERS
 
 -(void)startCreateBranchFinger1:(GLKVector3)touchPoint1 finger2:(GLKVector3)touchPoint2 {
@@ -558,8 +668,7 @@ using namespace HMesh;
 
 -(std::vector<GLKVector3>)endCreateBranchTwoFingers {
     
-    
-    //TODO NOT DONE YET
+    // TODO NOT DONE YET
     [self saveState];
     
     if (_touchPoints.size() < 8) {
@@ -621,12 +730,11 @@ using namespace HMesh;
     GLKVector3 firstCentroid = GLKVector3Lerp(_touchPoints[0], _touchPoints[1], 0.5f);
     assert(_touchPoints.size()%2 == 0);
     
-    float sampleLen = 0.1f;
+    float sampleLen = 0.2f;
     float accumLen = 0.0f;
     GLKVector3 lastCentroid = firstCentroid;
     vector<GLKVector3> skeleton;
     vector<GLKVector3> skeletonWorld;
-    vector<float> skeletonWidth;
     
     //Add first centroid
     GLKVector3 centroid_world = [Utilities matrix4:self.viewMatrix multiplyVector3:firstCentroid];
@@ -634,7 +742,6 @@ using namespace HMesh;
     GLKVector3 centroid_model = [Utilities invertVector3:centroid_world withMatrix:self.modelViewMatrix];
     skeleton.push_back(centroid_model);
     skeletonWorld.push_back(centroid_world);
-    skeletonWidth.push_back(0.5f * GLKVector3Distance(_touchPoints[0], _touchPoints[1]));
     
     //Add all other centroids
     for (int i = 2; i < _touchPoints.size(); i +=2) {
@@ -648,8 +755,7 @@ using namespace HMesh;
             centroid_model = [Utilities invertVector3:centroid_world withMatrix:self.modelViewMatrix];
             skeleton.push_back(centroid_model);
             skeletonWorld.push_back(centroid_world);
-            skeletonWidth.push_back(0.5f * GLKVector3Distance(_touchPoints[i], _touchPoints[i+1]));
-            
+           
             accumLen = 0;
             lastCentroid = centroid;
         }
@@ -658,6 +764,33 @@ using namespace HMesh;
     if (skeleton.size() < 4 ) {
         NSLog(@"[PolarAnnularMesh][WARNING] Not enough controids");
     }
+
+    //Get norm vectors
+    vector<GLKVector3> normals;
+    vector<GLKVector3> normalsWorld;
+    for (int i = 1; i < skeleton.size() - 1; i++) {
+        GLKVector3 tangent = GLKVector3Subtract(skeleton[i+1], skeleton[i-1]); //i-1
+        GLKVector3 firstHalf = GLKVector3Subtract(skeleton[i], skeleton[i-1]); //i-1
+        GLKVector3 proj = [Utilities projectVector:firstHalf ontoLine:tangent]; //i-1
+        GLKVector3 norm = GLKVector3Normalize(GLKVector3Subtract(proj, firstHalf)); //i
+        GLKVector3 normWorld = [Utilities matrix4:self.modelViewMatrix multiplyVector3:norm];
+        normals.push_back(norm);
+        normalsWorld.push_back(normWorld);
+    }
+    
+    //Get width
+    vector<float> skeletonWidth;
+    vector<int> leftSkeletonIntersection;
+    vector<int> rightSkeletonIntersection;
+    for (int i = 1; i < skeleton.size() - 1; i++)
+    {
+        //Left norm
+        for (int i = 0; i < _touchPoints.size(); i += 2)
+        {
+            GLKVector3 v1 = GLKVector3Subtract(<#GLKVector3 vectorLeft#>, <#GLKVector3 vectorRight#>)
+        }
+    }
+    
     
     //Parse new skeleton and create ribs
     //Ingore first and last centroids since they are poles
@@ -706,6 +839,122 @@ using namespace HMesh;
     
     return allRibs;
 }
+
+-(void)populateNewLimb:(std::vector<vector<GLKVector3>>)allRibs {
+    vector<Vecf> vertices;
+    vector<int> faces;
+    vector<int> indices;
+    
+    //Add all verticies
+    for (int i = 0; i < allRibs.size(); i++) {
+        vector<GLKVector3> rib = allRibs[i];
+        for (int j = 0; j < rib.size(); j++) {
+            GLKVector3 v = rib[j];
+            vertices.push_back(Vecf(v.x, v.y, v.z));
+        }
+    }
+    
+    for (int i = 0; i < allRibs.size() - 1; i++) {
+        
+        if (i == 0) { //pole 1
+            vector<GLKVector3> pole = allRibs[i];
+            vector<GLKVector3> rib = allRibs[i+1];
+            int poleIndex = 0;
+            for (int j = 0; j < rib.size(); j++) {
+                indices.push_back(poleIndex);
+                if (j == rib.size() - 1) {
+                    int index1 = [self indexForCentroid:1 rib:j totalCentroid:allRibs.size() totalRib:rib.size()];
+                    int index2 = [self indexForCentroid:1 rib:0 totalCentroid:allRibs.size() totalRib:rib.size()];
+                    indices.push_back(index2);
+                    indices.push_back(index1);
+                } else {
+                    int index1 = [self indexForCentroid:1 rib:j totalCentroid:allRibs.size() totalRib:rib.size()];
+                    int index2 = [self indexForCentroid:1 rib:j+1 totalCentroid:allRibs.size() totalRib:rib.size()];
+                    indices.push_back(index2);
+                    indices.push_back(index1);
+                }
+                faces.push_back(3);
+            }
+        } else
+            if (i == allRibs.size() - 2) { //pole 2
+            vector<GLKVector3> pole = allRibs[i+1];
+            vector<GLKVector3> rib = allRibs[i];
+            int poleIndex = [self indexForCentroid:i+1 rib:0 totalCentroid:allRibs.size() totalRib:rib.size()];
+            for (int j = 0; j < rib.size(); j++) {
+                indices.push_back(poleIndex);
+                if (j == rib.size() - 1) {
+                    int index1 = [self indexForCentroid:i rib:j totalCentroid:allRibs.size() totalRib:rib.size()];
+                    int index2 = [self indexForCentroid:i rib:0 totalCentroid:allRibs.size() totalRib:rib.size()];
+                    indices.push_back(index1);
+                    indices.push_back(index2);
+                } else {
+                    int index1 = [self indexForCentroid:i rib:j totalCentroid:allRibs.size() totalRib:rib.size()];
+                    int index2 = [self indexForCentroid:i rib:j+1 totalCentroid:allRibs.size() totalRib:rib.size()];
+                    indices.push_back(index1);
+                    indices.push_back(index2);
+                }
+                faces.push_back(3);
+            }
+        } else {
+            vector<GLKVector3> rib1 = allRibs[i];
+            vector<GLKVector3> rib2 = allRibs[i+1];
+            
+            for (int j = 0; j < rib1.size(); j++) {
+                if (j == rib1.size() - 1) {
+                    int index1 = [self indexForCentroid:i rib:j totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    int index2 = [self indexForCentroid:i rib:0 totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    int index3 = [self indexForCentroid:i+1 rib:0 totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    int index4 = [self indexForCentroid:i+1 rib:j totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    indices.push_back(index1);
+                    indices.push_back(index2);
+                    indices.push_back(index3);
+                    indices.push_back(index4);
+                } else {
+                    int index1 = [self indexForCentroid:i rib:j totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    int index2 = [self indexForCentroid:i rib:j+1 totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    int index3 = [self indexForCentroid:i+1 rib:j+1 totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    int index4 = [self indexForCentroid:i+1 rib:j totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    indices.push_back(index1);
+                    indices.push_back(index2);
+                    indices.push_back(index3);
+                    indices.push_back(index4);
+                }
+                faces.push_back(4);
+            }
+        }
+    }
+    
+    
+//    _manifold.clear();
+    _manifold.build(vertices.size(),
+                    reinterpret_cast<float*>(&vertices[0]),
+                    faces.size(),
+                    &faces[0],
+                    &indices[0]);
+    
+//    _branchWidth = 1;
+//    modState = MODIFICATION_NONE;
+    
+    //Calculate Bounding Box
+//    Manifold::Vec pmin = Manifold::Vec();
+//    Manifold::Vec pmax = Manifold::Vec();
+//    HMesh::bbox(_manifold, pmin, pmax);
+    
+//    self.centerAtBoundingBox = YES;
+//    _boundingBox.minBound = GLKVector3Make(pmin[0], pmin[1], pmin[2]);
+//    _boundingBox.maxBound = GLKVector3Make(pmax[0], pmax[1], pmax[2]);
+//    _boundingBox.center = GLKVector3MultiplyScalar(GLKVector3Add(_boundingBox.minBound, _boundingBox.maxBound), 0.5f);
+//    
+//    GLKVector3 mid = GLKVector3MultiplyScalar(GLKVector3Subtract(_boundingBox.maxBound, _boundingBox.minBound), 0.5f);
+//    _boundingBox.radius = GLKVector3Length(mid);
+//    _boundingBox.width = fabsf(_boundingBox.maxBound.x - _boundingBox.minBound.x);
+//    _boundingBox.height = fabsf(_boundingBox.maxBound.y - _boundingBox.minBound.y);
+//    _boundingBox.depth = fabsf(_boundingBox.maxBound.z - _boundingBox.minBound.z);
+    
+    [self rebufferNoEdgetrace];
+}
+
+
 
 -(void)populateManifold:(std::vector<vector<GLKVector3>>)allRibs {
     vector<Vecf> vertices;
@@ -790,7 +1039,7 @@ using namespace HMesh;
         }
     }
     
-    _manifold = HMesh::Manifold();
+   
     _manifold.clear();
     _manifold.build(vertices.size(),
                     reinterpret_cast<float*>(&vertices[0]),

@@ -17,8 +17,9 @@
 
 #pragma mark - TOUCHES: BRANCH CREATION ONE FINGER
 -(void)startCreateBranch:(GLKVector3)touchPoint;
+-(void)continueCreateBranch:(GLKVector3)touchPoint;
 -(void)endCreateBranch:(GLKVector3)touchPoint touchedModel:(BOOL)touchedModel;
-
+-(void)endCreateBranchBended:(GLKVector3)touchPoint touchedModel:(BOOL)touchedModel;
 
 #pragma mark - TOUCHES: BRANCH CREATION TWO FINGERS
 -(void)startCreateBranchFinger1:(GLKVector3)touchPoint1 finger2:(GLKVector3)touchPoint2;
@@ -38,4 +39,6 @@
 -(void)changeScalingRibsWithScaleFactor:(float)scale;
 -(void)endScalingRibsWithScaleFactor:(float)scale;
 
+
+-(void)undo;
 @end

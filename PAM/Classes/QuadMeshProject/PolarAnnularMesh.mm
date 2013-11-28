@@ -662,7 +662,6 @@ using namespace HMesh;
             GLKVector3 tangentWolrd = GLKVector3Subtract(skeletonWorld[i+1], skeletonWorld[i-1]);
             GLKVector3 firstHalfWorld = GLKVector3Subtract(skeletonWorld[i], skeletonWorld[i-1]); //i-1
             BOOL isLeft = ((tangentWolrd.x)*(firstHalfWorld.y) - (tangentWolrd.y)*(firstHalfWorld.x)) > 0;
-
             if (isFirstLeft != isLeft) {
                 norm = GLKVector3MultiplyScalar(norm, -1);
             }
@@ -684,9 +683,136 @@ using namespace HMesh;
     vector<GLKVector3> secondPole;
     secondPole.push_back(skeleton[skeleton.size() - 1]);
     allRibs[skeleton.size() - 1] = secondPole;
-    allRibs.push_back(skeleton);
+
+//    allRibs.push_back(skeleton);
+    
+    [self populateManifold:allRibs];
     
     return allRibs;
+}
+
+-(void)populateManifold:(std::vector<vector<GLKVector3>>)allRibs {
+    vector<Vecf> vertices;
+    vector<int> faces;
+    vector<int> indices;
+    
+    //Add all verticies
+    for (int i = 0; i < allRibs.size(); i++) {
+        vector<GLKVector3> rib = allRibs[i];
+        for (int j = 0; j < rib.size(); j++) {
+            GLKVector3 v = rib[j];
+            vertices.push_back(Vecf(v.x, v.y, v.z));
+        }
+    }
+    
+    for (int i = 0; i < allRibs.size() - 1; i++) {
+
+        if (i == 0) { //pole 1
+            vector<GLKVector3> pole = allRibs[i];
+            vector<GLKVector3> rib = allRibs[i+1];
+            int poleIndex = 0;
+            for (int j = 0; j < rib.size(); j++) {
+                indices.push_back(poleIndex);
+                if (j == rib.size() - 1) {
+                    int index1 = [self indexForCentroid:1 rib:j totalCentroid:allRibs.size() totalRib:rib.size()];
+                    int index2 = [self indexForCentroid:1 rib:0 totalCentroid:allRibs.size() totalRib:rib.size()];
+                    indices.push_back(index2);
+                    indices.push_back(index1);
+                } else {
+                    int index1 = [self indexForCentroid:1 rib:j totalCentroid:allRibs.size() totalRib:rib.size()];
+                    int index2 = [self indexForCentroid:1 rib:j+1 totalCentroid:allRibs.size() totalRib:rib.size()];
+                    indices.push_back(index2);
+                    indices.push_back(index1);
+                }
+                faces.push_back(3);
+            }
+        } else if (i == allRibs.size() - 2) { //pole 2
+            vector<GLKVector3> pole = allRibs[i+1];
+            vector<GLKVector3> rib = allRibs[i];
+            int poleIndex = [self indexForCentroid:i+1 rib:0 totalCentroid:allRibs.size() totalRib:rib.size()];
+            for (int j = 0; j < rib.size(); j++) {
+                indices.push_back(poleIndex);
+                if (j == rib.size() - 1) {
+                    int index1 = [self indexForCentroid:i rib:j totalCentroid:allRibs.size() totalRib:rib.size()];
+                    int index2 = [self indexForCentroid:i rib:0 totalCentroid:allRibs.size() totalRib:rib.size()];
+                    indices.push_back(index1);
+                    indices.push_back(index2);
+                } else {
+                    int index1 = [self indexForCentroid:i rib:j totalCentroid:allRibs.size() totalRib:rib.size()];
+                    int index2 = [self indexForCentroid:i rib:j+1 totalCentroid:allRibs.size() totalRib:rib.size()];
+                    indices.push_back(index1);
+                    indices.push_back(index2);
+                }
+                faces.push_back(3);
+            }
+        } else {
+            vector<GLKVector3> rib1 = allRibs[i];
+            vector<GLKVector3> rib2 = allRibs[i+1];
+            
+            for (int j = 0; j < rib1.size(); j++) {
+                if (j == rib1.size() - 1) {
+                    int index1 = [self indexForCentroid:i rib:j totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    int index2 = [self indexForCentroid:i rib:0 totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    int index3 = [self indexForCentroid:i+1 rib:0 totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    int index4 = [self indexForCentroid:i+1 rib:j totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    indices.push_back(index1);
+                    indices.push_back(index2);
+                    indices.push_back(index3);
+                    indices.push_back(index4);
+                } else {
+                    int index1 = [self indexForCentroid:i rib:j totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    int index2 = [self indexForCentroid:i rib:j+1 totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    int index3 = [self indexForCentroid:i+1 rib:j+1 totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    int index4 = [self indexForCentroid:i+1 rib:j totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    indices.push_back(index1);
+                    indices.push_back(index2);
+                    indices.push_back(index3);
+                    indices.push_back(index4);
+                }
+                faces.push_back(4);
+            }
+        }
+    }
+    
+    _manifold = HMesh::Manifold();
+    _manifold.clear();
+    _manifold.build(vertices.size(),
+                    reinterpret_cast<float*>(&vertices[0]),
+                    faces.size(),
+                    &faces[0],
+                    &indices[0]);
+    
+    _branchWidth = 1;
+    modState = MODIFICATION_NONE;
+    
+    //Calculate Bounding Box
+    Manifold::Vec pmin = Manifold::Vec();
+    Manifold::Vec pmax = Manifold::Vec();
+    HMesh::bbox(_manifold, pmin, pmax);
+    
+    self.centerAtBoundingBox = YES;
+    _boundingBox.minBound = GLKVector3Make(pmin[0], pmin[1], pmin[2]);
+    _boundingBox.maxBound = GLKVector3Make(pmax[0], pmax[1], pmax[2]);
+    _boundingBox.center = GLKVector3MultiplyScalar(GLKVector3Add(_boundingBox.minBound, _boundingBox.maxBound), 0.5f);
+    
+    GLKVector3 mid = GLKVector3MultiplyScalar(GLKVector3Subtract(_boundingBox.maxBound, _boundingBox.minBound), 0.5f);
+    _boundingBox.radius = GLKVector3Length(mid);
+    _boundingBox.width = fabsf(_boundingBox.maxBound.x - _boundingBox.minBound.x);
+    _boundingBox.height = fabsf(_boundingBox.maxBound.y - _boundingBox.minBound.y);
+    _boundingBox.depth = fabsf(_boundingBox.maxBound.z - _boundingBox.minBound.z);
+    
+    [self rebuffer];
+}
+
+-(int)indexForCentroid:(int)centeroid rib:(int)rib totalCentroid:(int)totalCentroid totalRib:(int)totalRib
+{
+    if (centeroid == 0) {
+        return 0;
+    } else if (centeroid == totalCentroid - 1) {
+        return (totalCentroid - 2)*totalRib + 2 - 1;
+    } else {
+        return 1 + (centeroid - 1)*totalRib + rib;
+    }
 }
 
 #pragma mark - TOUCHES: FACE PICKING

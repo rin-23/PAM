@@ -409,32 +409,35 @@ typedef enum {
 
             [_pMesh continueCreateBranchFinger1:rayOrigin1 finger2:rayOrigin2];
         } else if (sender.state == UIGestureRecognizerStateEnded) {
-//            _selectionLine = nil;
-//            _selectionLine2 = nil;
+            _selectionLine = nil;
+            _selectionLine2 = nil;
 
             std::vector<std::vector<GLKVector3>> allRibs = [_pMesh endCreateNewBodyTwoFingers];
-            _ribsLines = [[NSMutableArray alloc] initWithCapacity:allRibs.size()];
-            for (int i = 0; i <allRibs.size();i++) {
-                std::vector<GLKVector3> rib = allRibs[i];
-                NSMutableData* vData = [[NSMutableData alloc] init];
-//                for (GLKVector3 v: rib) {
-                
-                for (int j = 0; j < rib.size(); j++) {
-                    GLKVector3 v = rib[j];
-                    GLubyte b = 0;
-                    GLubyte r = 0;
-//                                            GLubyte b = j * (255.0f/rib.size());
-                    if (j%2 ==0) {
-                        r = 255;
-                    } else {
-                        b = 255;
-                    }
-                    VertexRGBA vertex1 = {{v.x, v.y, v.z}, {r,b,0,255}};
-                    [vData appendBytes:&vertex1 length:sizeof(VertexRGBA)];
-                }
-                Line* line = [[Line alloc] initWithVertexData:vData];
-                [_ribsLines addObject:line];
-            }
+//            _ribsLines = [[NSMutableArray alloc] initWithCapacity:allRibs.size()];
+//            for (int i = 0; i <allRibs.size();i++) {
+//                std::vector<GLKVector3> rib = allRibs[i];
+//                NSMutableData* vData = [[NSMutableData alloc] init];
+////                for (GLKVector3 v: rib) {
+//                
+//                for (int j = 0; j < rib.size(); j++) {
+//                    GLKVector3 v = rib[j];
+//                    GLubyte b = 0;
+//                    GLubyte r = 0;
+////                                            GLubyte b = j * (255.0f/rib.size());
+//                    if (j%2 ==0) {
+//                        r = 255;
+//                    } else {
+//                        b = 255;
+//                    }
+//                    VertexRGBA vertex1 = {{v.x, v.y, v.z}, {r,b,0,255}};
+//                    [vData appendBytes:&vertex1 length:sizeof(VertexRGBA)];
+//                }
+//                Line* line = [[Line alloc] initWithVertexData:vData];
+//                [_ribsLines addObject:line];
+//            }
+            
+//            _bbox = _pMesh.boundingBox;
+//            _translationManager.scaleFactor = _bbox.radius;
         }
     }
 }
@@ -602,11 +605,11 @@ typedef enum {
     _selectionLine3.projectionMatrix = projectionMatrix;
     [_selectionLine3 draw];
     
-    for (Line* line in _ribsLines) {
-        line.viewMatrix = viewMatrix;
-        line.projectionMatrix = projectionMatrix;
-        [line draw];
-    }
+//    for (Line* line in _ribsLines) {
+//        line.viewMatrix = viewMatrix;
+//        line.projectionMatrix = projectionMatrix;
+//        [line draw];
+//    }
     
 //    _meshTouchPoint.viewMatrix = viewMatrix;
 //    _meshTouchPoint.projectionMatrix = projectionMatrix;

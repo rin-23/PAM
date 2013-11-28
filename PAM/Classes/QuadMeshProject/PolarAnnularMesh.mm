@@ -282,6 +282,11 @@ using namespace HMesh;
 -(void)undo {
     _manifold = undoMani;
 }
+
+-(BOOL)manifoldIsLoaded {
+    return _manifold.no_vertices() != 0;
+}
+
 #pragma mark - FIND VERTEX/FACE NEAR TOUCH POINT
 
 -(VertexID)closestVertexID_2D:(GLKVector3)touchPoint {
@@ -479,16 +484,25 @@ using namespace HMesh;
 #pragma mark - TOUCHES: BRANCH CREATION ONE FINGER
 
 -(void)startCreateBranch:(GLKVector3)touchPoint {
+    if (![self manifoldIsLoaded])
+        return;
+    
     _touchPoints.clear();
     _touchPoints.push_back(touchPoint);
     _initialTouch = touchPoint;
 }
 
 -(void)continueCreateBranch:(GLKVector3)touchPoint {
+    if (![self manifoldIsLoaded])
+        return;
+    
     _touchPoints.push_back(touchPoint);
 }
 
 -(void)endCreateBranch:(GLKVector3)touchPoint touchedModel:(BOOL)touchedModel{
+    if(![self manifoldIsLoaded])
+        return;
+    
     [self saveState];
  
     VertexID touchedVID;
@@ -537,11 +551,13 @@ using namespace HMesh;
 }
 
 -(void)continueCreateBranchFinger1:(GLKVector3)touchPoint1 finger2:(GLKVector3)touchPoint2 {
+    
     _touchPoints.push_back(touchPoint1);
     _touchPoints.push_back(touchPoint2);
 }
 
 -(std::vector<GLKVector3>)endCreateBranchTwoFingers {
+    
     
     //TODO NOT DONE YET
     [self saveState];
@@ -605,7 +621,7 @@ using namespace HMesh;
     GLKVector3 firstCentroid = GLKVector3Lerp(_touchPoints[0], _touchPoints[1], 0.5f);
     assert(_touchPoints.size()%2 == 0);
     
-    float sampleLen = 0.4f;
+    float sampleLen = 0.1f;
     float accumLen = 0.0f;
     GLKVector3 lastCentroid = firstCentroid;
     vector<GLKVector3> skeleton;
@@ -645,7 +661,7 @@ using namespace HMesh;
     
     //Parse new skeleton and create ribs
     //Ingore first and last centroids since they are poles
-    int numSpines = 10;
+    int numSpines = 40;
     vector<vector<GLKVector3>> allRibs(skeleton.size());
     vector<GLKVector3> firstPole;
     firstPole.push_back(skeleton[0]);
@@ -826,7 +842,6 @@ using namespace HMesh;
     }
 }
 
-
 #pragma mark - TOUCHES: SCALING
 -(void)startScalingRibsWithRayOrigin1:(GLKVector3)rayOrigin1
                            rayOrigin2:(GLKVector3)rayOrigin2
@@ -834,6 +849,9 @@ using namespace HMesh;
                         rayDirection2:(GLKVector3)rayDir2
                                 scale:(float)scale
 {
+    if (![self manifoldIsLoaded])
+        return;
+    
     _scaleRibFace1 = [self closestFaceForRayOrigin:rayOrigin1 direction:rayDir1 didHitModel:NULL];
     _scaleRibFace2 = [self closestFaceForRayOrigin:rayOrigin2 direction:rayDir2 didHitModel:NULL];
     
@@ -922,10 +940,16 @@ using namespace HMesh;
 }
 
 -(void)changeScalingRibsWithScaleFactor:(float)scale {
+    if (![self manifoldIsLoaded])
+        return;
+    
     _scaleFactor = scale;
 }
 
 -(void)endScalingRibsWithScaleFactor:(float)scale {
+    
+    if (![self manifoldIsLoaded])
+        return;
     
     for (int i = 0; i < _edges_to_scale.size(); i++) {
         change_rib_radius(_manifold, _edges_to_scale[i], _centroids[i], _edgeInfo, 1 + (_scaleFactor - 1)*_scale_weight_vector[i]); //update _manifold

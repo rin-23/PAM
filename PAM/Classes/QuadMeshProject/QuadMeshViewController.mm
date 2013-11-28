@@ -238,7 +238,7 @@ typedef enum {
     if (!_transformSwitch.isOn) {
         [_zoomManager handlePinchGesture:sender];
     } else {
-        return;
+
         UIPinchGestureRecognizer* pinch = (UIPinchGestureRecognizer*) sender;
 //        NSLog(@"Scale %f", pinch.scale);
         if (sender.state == UIGestureRecognizerStateBegan) {
@@ -273,7 +273,7 @@ typedef enum {
     if (!_transformSwitch.isOn) {
         [_rotationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity isOrthogonal:NO];
     } else {
-        return; 
+        
         if (sender.state == UIGestureRecognizerStateBegan)
         {
             CGPoint touchPoint = [self touchPointFromGesture:sender];

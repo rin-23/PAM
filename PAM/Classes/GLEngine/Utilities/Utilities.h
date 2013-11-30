@@ -61,6 +61,6 @@ double triangleAngleWithSides(double a, double b, double c);
 
 +(GLKVector2) GLKVector2MakeWithVector3:(GLKVector3) vector3;
 
-+(GLKVector3)projectVector:(GLKVector3)vec ontoLine:(GLKVector3)line;
-
++(GLKVector3)projectVector3:(GLKVector3)vec ontoLine:(GLKVector3)line;
++(GLKVector2)projectVector2:(GLKVector2)vec ontoLine:(GLKVector2)line;
 @end

@@ -334,6 +334,7 @@ double triangleAngleWithSides(double a, double b, double c) {
     return [self invertVector4:vector4 withMatrix:matrix4];
 }
 
+
 +(GLKVector3) matrix4:(GLKMatrix4)matrix multiplyVector3:(GLKVector3) vector3 {
     GLKVector4 vector4 = GLKVector4MakeWithVector3(vector3, 1.0f);
     vector4 = GLKMatrix4MultiplyVector4(matrix, vector4);
@@ -347,6 +348,10 @@ double triangleAngleWithSides(double a, double b, double c) {
 +(GLKVector3)projectVector:(GLKVector3)vec ontoLine:(GLKVector3)line {
     float c = GLKVector3DotProduct(vec, line) / GLKVector3DotProduct(line, line);
     return GLKVector3MultiplyScalar(line, c);
+}
++(GLKVector2)projectVector2:(GLKVector2)vec ontoLine:(GLKVector2)line {
+    float c = GLKVector2DotProduct(vec, line) / GLKVector2DotProduct(line, line);
+    return GLKVector2MultiplyScalar(line, c);
 }
 
 @end

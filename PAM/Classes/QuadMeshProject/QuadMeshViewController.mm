@@ -606,11 +606,11 @@ typedef enum {
     _selectionLine3.projectionMatrix = projectionMatrix;
     [_selectionLine3 draw];
     
-//    for (Line* line in _ribsLines) {
-//        line.viewMatrix = viewMatrix;
-//        line.projectionMatrix = projectionMatrix;
-//        [line draw];
-//    }
+    for (Line* line in _ribsLines) {
+        line.viewMatrix = viewMatrix;
+        line.projectionMatrix = projectionMatrix;
+        [line draw];
+    }
     
 //    _meshTouchPoint.viewMatrix = viewMatrix;
 //    _meshTouchPoint.projectionMatrix = projectionMatrix;

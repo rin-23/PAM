@@ -12,6 +12,23 @@
 
 @interface PAMUtilities : NSObject
 
--(std::vector<GLKVector3>)sampleBranch:(std::vector<GLKVector3>)inBranch;
+
++(void)centroids:(std::vector<GLKVector2>&)centroids
+        ribWidth:(std::vector<float>&)ribWidth
+   forTouchPoint:(std::vector<GLKVector2>)touchPointsWorld
+        withStep:(float)step;
+
++(void)normals:(std::vector<GLKVector2>&)normals
+      tangents:(std::vector<GLKVector2>&)tangents
+   forSkeleton:(std::vector<GLKVector2>)skeleton;
+
+//+(std::vector<float>)ribWidthForSkeleton:(std::vector<GLKVector2>)skeleton
+//                                 normals:(std::vector<GLKVector2>)normals
+//                                tangents:(std::vector<GLKVector2>)tangents
+//                             touchPoints:(std::vector<GLKVector2>)touchPoints;
+
++(std::vector<GLKVector2>)laplacianSmoothing:(std::vector<GLKVector2>)points
+                                  iterations:(int)iterations;
+
 
 @end

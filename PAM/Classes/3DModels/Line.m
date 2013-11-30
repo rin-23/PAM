@@ -92,9 +92,9 @@
                                                startVertexIndex:0
                                                numberOfVertices:self.numVertices];
         
-//        [AGLKVertexAttribArrayBuffer drawPreparedArraysWithMode:GL_POINTS
-//                                               startVertexIndex:0
-//                                               numberOfVertices:self.numVertices];
+        [AGLKVertexAttribArrayBuffer drawPreparedArraysWithMode:GL_POINTS
+                                               startVertexIndex:0
+                                               numberOfVertices:self.numVertices];
 
     }
 }

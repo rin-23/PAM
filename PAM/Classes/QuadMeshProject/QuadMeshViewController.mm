@@ -413,7 +413,8 @@ typedef enum {
             _selectionLine = nil;
             _selectionLine2 = nil;
 
-            std::vector<std::vector<GLKVector3>> allRibs = [_pMesh endCreateNewBodyTwoFingers];
+            std::vector<std::vector<GLKVector3>> allRibs = [_pMesh endCreateBranchTwoFingers];
+            
 //            _ribsLines = [[NSMutableArray alloc] initWithCapacity:allRibs.size()];
 //            for (int i = 0; i <allRibs.size();i++) {
 //                std::vector<GLKVector3> rib = allRibs[i];

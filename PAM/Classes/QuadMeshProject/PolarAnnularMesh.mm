@@ -667,13 +667,19 @@ using namespace HMesh;
     _touchPoints.push_back(touchPoint2);
 }
 
--(std::vector<GLKVector3>)endCreateBranchTwoFingers {
+
+-(std::vector<std::vector<GLKVector3>>)endCreateBranchTwoFingers {
+    
+    if (![self manifoldIsLoaded]) {
+        return [self endCreateNewBodyTwoFingers];
+    }
     
     // TODO NOT DONE YET
     [self saveState];
     
-    if (_touchPoints.size() < 8) {
-        NSLog(@"[PolarAnnularMesh][WARNING] Not enough touch points given");
+    if (_touchPoints.size() < 8 || _touchPoints.size() % 2 != 0) {
+        NSLog(@"[PolarAnnularMesh][WARNING] Garbage point data");
+        return vector<vector<GLKVector3>>();
     }
     
     //closest to the first centroid between two fingers vertex in 2D space
@@ -682,40 +688,91 @@ using namespace HMesh;
     Vecf touchedV = _manifold.posf(touchedVID);
     GLKVector3 touchedV_world = [Utilities matrix4:self.modelViewMatrix
                                    multiplyVector3:GLKVector3Make(touchedV[0], touchedV[1], touchedV[2])];
+    float zValueTouched = touchedV_world.z;
+
     
-    assert(_touchPoints.size()%2 == 0);
-    
-    float sampleLen = 0.2f; //TODO:Should be base on current bbox
-    float accumLen = 0.0f;
-    GLKVector3 lastCentroid = firstCentroid;
-    vector<GLKVector3> skeleton;
-    vector<float> skeletonWidth;
-    
-    //Add first centroid
-    GLKVector3 centroid_world = [Utilities matrix4:self.viewMatrix multiplyVector3:firstCentroid];
-    centroid_world.z = touchedV_world.z;
-    GLKVector3 centroid_model = [Utilities invertVector3:centroid_world withMatrix:self.modelViewMatrix];
-    skeleton.push_back(centroid_model);
-    skeletonWidth.push_back(0.5f * GLKVector3Distance(_touchPoints[0], _touchPoints[1]));
-    
-    //Add all other centroids
-    for (int i = 2; i < _touchPoints.size(); i +=2) {
-        GLKVector3 centroid = GLKVector3Lerp(_touchPoints[i], _touchPoints[i+1], 0.5f);
-        float curLen = GLKVector3Distance(lastCentroid, centroid);
-        accumLen += curLen;
-        if (accumLen >= sampleLen) {
-            centroid_world = [Utilities matrix4:self.viewMatrix multiplyVector3:centroid];
-            centroid_world.z = touchedV_world.z;
-            centroid_model = [Utilities invertVector3:centroid_world withMatrix:self.modelViewMatrix];
-            skeleton.push_back(centroid_model);
-            skeletonWidth.push_back(0.5f * GLKVector3Distance(_touchPoints[i], _touchPoints[i+1]));
-            
-            accumLen = 0;
-            lastCentroid = centroid;
-        }
+    //convert touch points to world space
+    vector<GLKVector2> touchPointsWorld(_touchPoints.size());
+    for (int i = 0; i < _touchPoints.size(); i++)
+    {
+        GLKVector3 worldSpace3 = [Utilities matrix4:self.viewMatrix multiplyVector3:_touchPoints[i]];
+        touchPointsWorld[i] = GLKVector2Make(worldSpace3.x, worldSpace3.y);
     }
     
-    return skeleton;
+    //Get skeleton aka joint points 
+    vector<GLKVector2> rawSkeleton;
+    vector<float> skeletonWidth;
+    [PAMUtilities centroids:rawSkeleton ribWidth:skeletonWidth forTouchPoint:touchPointsWorld withStep:0.1f];
+    if (rawSkeleton.size() < 4) {
+        NSLog(@"[PolarAnnularMesh][WARNING] Not enough controids");
+        return vector<vector<GLKVector3>>();
+    }
+    
+    //Smooth
+    vector<GLKVector2> skeleton = [PAMUtilities laplacianSmoothing:rawSkeleton iterations:3];
+    
+    //Get norm vectors for skeleton joints
+    vector<GLKVector2> skeletonNormals;
+    vector<GLKVector2> skeletonTangents;
+    [PAMUtilities normals:skeletonNormals tangents:skeletonTangents forSkeleton:skeleton];
+    
+    //    //Get width for skeleton joints
+    //    vector<float>skeletonWidth = [PAMUtilities ribWidthForSkeleton:skeleton
+    //                                                           normals:skeletonNormals
+    //                                                          tangents:skeletonTangents
+    //                                                       touchPoints:touchPointsWorld];
+    //
+    
+    //Parse new skeleton and create ribs
+    //Ingore first and last centroids since they are poles
+    int numSpines = 30;
+    vector<vector<GLKVector3>> allRibs(skeleton.size());
+    vector<GLKVector3> skeletonModel;
+    vector<GLKVector3> skeletonNormalsModel;
+    for (int i = 0; i < skeleton.size(); i++) {
+        GLKVector3 sModel = [Utilities invertVector3:GLKVector3Make(skeleton[i].x, skeleton[i].y, zValueTouched)
+                                          withMatrix:self.viewMatrix];
+        
+        //dont preserve translation for norma and tangent
+        float ribWidth = skeletonWidth[i];
+        GLKVector2 stretchedNorm = GLKVector2MultiplyScalar(skeletonNormals[i], ribWidth);
+        GLKVector3 nModel = [Utilities invertVector4:GLKVector4Make(stretchedNorm.x, stretchedNorm.y, 0, 0)
+                                          withMatrix:self.viewMatrix];
+        GLKVector3 tModel = [Utilities invertVector4:GLKVector4Make(skeletonTangents[i].x, skeletonTangents[i].y, 0, 0)
+                                          withMatrix:self.viewMatrix];
+        
+        
+        if (i == 0) {
+            vector<GLKVector3> firstPole;
+            firstPole.push_back(sModel);
+            allRibs[0] = firstPole;
+        } else if (i == skeleton.size() - 1) {
+            vector<GLKVector3> secondPole;
+            secondPole.push_back(sModel);
+            allRibs[i] = secondPole;
+        } else {
+            vector<GLKVector3> ribs(numSpines);
+            float rot_step = 360.0f/numSpines;
+            for (int j = 0; j < numSpines; j++) {
+                float angle = j * rot_step;
+                GLKQuaternion quat = GLKQuaternionMakeWithAngleAndVector3Axis(GLKMathDegreesToRadians(angle), GLKVector3Normalize(tModel));
+                GLKVector3 newNorm = GLKQuaternionRotateVector3(quat, nModel);
+                GLKVector3 newRibPoint = GLKVector3Add(newNorm, sModel);
+                ribs[j] = newRibPoint;
+            }
+            allRibs[i] = ribs;
+        }
+        skeletonModel.push_back(sModel);
+        skeletonNormalsModel.push_back(nModel);
+    }
+    
+    //    allRibs.push_back(skeletonModel);
+    //    allRibs.push_back(skeletonNormalsModel);
+    
+    [self populateNewLimb:allRibs];
+    
+    return allRibs;
+
 }
 
 -(std::vector<vector<GLKVector3>>)endCreateNewBodyTwoFingers {

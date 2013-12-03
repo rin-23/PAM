@@ -38,7 +38,7 @@
 }
 
 #pragma mark - ARCBALL ROTATION
-- (void)handlePanGesture:(UIGestureRecognizer*)sender withViewMatrix:(GLKMatrix4)viewMatrix isOrthogonal:(BOOL)isOrtho {
+- (void)handlePanGesture:(UIGestureRecognizer*)sender withViewMatrix:(GLKMatrix4)viewMatrix {
     UIPanGestureRecognizer* pan = (UIPanGestureRecognizer*)sender;
 
     if (pan.state == UIGestureRecognizerStateBegan) {
@@ -52,38 +52,14 @@
         bool isInvertible;
         
         GLKMatrix4 curModelView = GLKMatrix4Multiply(viewMatrix, _manualRotationMatrix);
+
+        GLKVector3 xAxis = GLKMatrix4MultiplyVector3(GLKMatrix4Invert(curModelView,&isInvertible),
+                                                     GLKVector3Make(1, 0, 0));
+        _manualRotationMatrix = GLKMatrix4RotateWithVector3(_manualRotationMatrix, rotX, xAxis);
+        GLKVector3 yAxis = GLKMatrix4MultiplyVector3(GLKMatrix4Invert(curModelView,&isInvertible),
+                                                     GLKVector3Make(0, 1, 0));
+        _manualRotationMatrix = GLKMatrix4RotateWithVector3(_manualRotationMatrix, rotY, yAxis);
         
-        if (isOrtho)
-        {
-            //Calculate angle between positive X and rotation direction
-            GLKVector3 positiveX = GLKVector3Make(1, 0, 0);
-            GLKVector3 transVectorNormalized = GLKVector3Normalize(GLKVector3Make(diff.x, diff.y, 0));
-            float angle = acosf(GLKVector3DotProduct(positiveX, transVectorNormalized));
-            
-            //            NSLog(@"V:(%f,%f) A:%f",transVectorNormalized.x, transVectorNormalized.y,GLKMathRadiansToDegrees(angle));
-            
-            if (angle<GLKMathDegreesToRadians(45.0) || angle>GLKMathDegreesToRadians(135.0) ) {
-                GLKVector3 yAxis = GLKMatrix4MultiplyVector3(GLKMatrix4Invert(curModelView, &isInvertible),
-                                                             GLKVector3Make(0, 1, 0));
-                _manualRotationMatrix = GLKMatrix4RotateWithVector3(_manualRotationMatrix, rotY, yAxis);
-                
-                
-            } else if (angle>GLKMathDegreesToRadians(45.0) && angle< GLKMathDegreesToRadians(135)) {
-                GLKVector3 xAxis = GLKMatrix4MultiplyVector3(GLKMatrix4Invert(curModelView,&isInvertible),
-                                                             GLKVector3Make(1, 0, 0));
-                _manualRotationMatrix = GLKMatrix4RotateWithVector3(_manualRotationMatrix, rotX, xAxis);
-            }
-            
-        }
-        else
-        {
-            GLKVector3 xAxis = GLKMatrix4MultiplyVector3(GLKMatrix4Invert(curModelView,&isInvertible),
-                                                         GLKVector3Make(1, 0, 0));
-            _manualRotationMatrix = GLKMatrix4RotateWithVector3(_manualRotationMatrix, rotX, xAxis);
-            GLKVector3 yAxis = GLKMatrix4MultiplyVector3(GLKMatrix4Invert(curModelView,&isInvertible),
-                                                         GLKVector3Make(0, 1, 0));
-            _manualRotationMatrix = GLKMatrix4RotateWithVector3(_manualRotationMatrix, rotY, yAxis);
-        }
         
         lastLoc = location;
     }

@@ -271,7 +271,7 @@ typedef enum {
 -(void)handleOneFingerPanGesture:(UIGestureRecognizer*)sender {
     
     if (!_transformSwitch.isOn) {
-        [_rotationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity isOrthogonal:NO];
+        [_rotationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity];
     } else {
         
         if (sender.state == UIGestureRecognizerStateBegan)

@@ -549,8 +549,14 @@ using namespace HMesh;
 }
 
 -(void)endCreateBranchBended:(GLKVector3)touchPoint touchedModel:(BOOL)touchedModel {
-    if(![self manifoldIsLoaded])
+    if(![self manifoldIsLoaded]) {
         return;
+    }
+    
+    if (_touchPoints.size() < 4) {
+        NSLog(@"[PolarAnnularMesh][WARNING] Garbage point data");
+        return;
+    }
     
     [self saveState];
     
@@ -568,88 +574,115 @@ using namespace HMesh;
     Vecf touchedV = _manifold.posf(touchedVID);
     GLKVector3 touchedV_world = [Utilities matrix4:self.modelViewMatrix
                                    multiplyVector3:GLKVector3Make(touchedV[0], touchedV[1], touchedV[2])];
-    float sampleLen = 0.1f;
-    float accumLen = 0.0f;
-    GLKVector3 lastCentroid = firstCentroid;
-    vector<GLKVector3> skeleton;
-    vector<GLKVector3> skeletonWorld;
-    vector<float> skeletonWidth;
+    float zValueTouched = touchedV_world.z;
     
-    //Add first centroid
-    GLKVector3 centroid_world = [Utilities matrix4:self.viewMatrix multiplyVector3:firstCentroid];
-    centroid_world.z = touchedV_world.z;
-    GLKVector3 centroid_model = [Utilities invertVector3:centroid_world withMatrix:self.modelViewMatrix];
-    skeleton.push_back(centroid_model);
-    skeletonWorld.push_back(centroid_world);
-    skeletonWidth.push_back(0.05);
-    
-    //Add all other centroids
-    for (int i = 1; i < _touchPoints.size(); i += 1) {
-        GLKVector3 centroid = _touchPoints[i];
-        float curLen = GLKVector3Distance(lastCentroid, centroid);
-        accumLen += curLen;
-        
-        if (accumLen >= sampleLen) {
-            centroid_world = [Utilities matrix4:self.viewMatrix multiplyVector3:centroid];
-            centroid_world.z = touchedV_world.z;
-            centroid_model = [Utilities invertVector3:centroid_world withMatrix:self.modelViewMatrix];
-            skeleton.push_back(centroid_model);
-            skeletonWorld.push_back(centroid_world);
-            skeletonWidth.push_back(0.05);
-            
-            accumLen = 0;
-            lastCentroid = centroid;
-        }
+    //convert touch points to world space
+    vector<GLKVector2> touchPointsWorld(_touchPoints.size());
+    for (int i = 0; i < _touchPoints.size(); i++)
+    {
+        GLKVector3 worldSpace3 = [Utilities matrix4:self.viewMatrix multiplyVector3:_touchPoints[i]];
+        touchPointsWorld[i] = GLKVector2Make(worldSpace3.x, worldSpace3.y);
     }
     
-    if (skeleton.size() < 4 ) {
+    //Get skeleton aka joint points
+    vector<GLKVector2> rawSkeleton;
+    [PAMUtilities centroids:rawSkeleton forOneFingerTouchPoint:touchPointsWorld withNextCentroidStep:0.1f];
+    if (rawSkeleton.size() < 4) {
         NSLog(@"[PolarAnnularMesh][WARNING] Not enough controids");
+        return;
     }
+    
+    //Smooth
+    vector<GLKVector2> skeleton = [PAMUtilities laplacianSmoothing:rawSkeleton iterations:1];
+
+    //Skeleton should start from the branch point
+    GLKVector2 translate = GLKVector2Subtract(GLKVector2Make(touchedV_world.x, touchedV_world.y), skeleton[0]);
+    for (int i = 0; i < skeleton.size(); i++) {
+        skeleton[i] = GLKVector2Add(skeleton[i], translate);
+    }
+
+    //Get norm vectors for skeleton joints
+    vector<GLKVector2> skeletonNormals;
+    vector<GLKVector2> skeletonTangents;
+    [PAMUtilities normals:skeletonNormals tangents:skeletonTangents forSkeleton:skeleton];
     
     //Parse new skeleton and create ribs
     //Ingore first and last centroids since they are poles
-    int numSpines = 20;
+    int numSpines = 30;
     vector<vector<GLKVector3>> allRibs(skeleton.size());
+    vector<GLKVector3> skeletonModel;
+    vector<GLKVector3> skeletonNormalsModel;
     
-    vector<GLKVector3> firstPole;
-    firstPole.push_back(skeleton[0]);
-    allRibs[0] = firstPole;
-    
-    BOOL isFirstLeft = YES;
-    for (int i = 1; i < skeleton.size() - 1; i++) {
-        GLKVector3 tangent = GLKVector3Subtract(skeleton[i+1], skeleton[i-1]); //i-1
-        GLKVector3 firstHalf = GLKVector3Subtract(skeleton[i], skeleton[i-1]); //i-1
-        GLKVector3 proj = [Utilities projectVector3:firstHalf ontoLine:tangent]; //i-1
-        GLKVector3 norm = GLKVector3Normalize(GLKVector3Subtract(proj, firstHalf)); //i
+    for (int i = 0; i < skeleton.size(); i++) {
+        GLKVector3 sModel = [Utilities invertVector3:GLKVector3Make(skeleton[i].x, skeleton[i].y, zValueTouched)
+                                          withMatrix:self.modelViewMatrix];
         
-        //Make sure than norm points to the left
-        {
-            GLKVector3 tangentWolrd = GLKVector3Subtract(skeletonWorld[i+1], skeletonWorld[i-1]);
-            GLKVector3 firstHalfWorld = GLKVector3Subtract(skeletonWorld[i], skeletonWorld[i-1]); //i-1
-            BOOL isLeft = ((tangentWolrd.x)*(firstHalfWorld.y) - (tangentWolrd.y)*(firstHalfWorld.x)) > 0;
-            if (isFirstLeft != isLeft) {
-                norm = GLKVector3MultiplyScalar(norm, -1);
+        //dont preserve translation for norma and tangent
+        float ribWidth = 0.1;
+        GLKVector3 nModel = [Utilities invertVector4:GLKVector4Make(skeletonNormals[i].x, skeletonNormals[i].y, 0, 0)
+                                          withMatrix:self.modelViewMatrix];
+        nModel = GLKVector3MultiplyScalar(GLKVector3Normalize(nModel), ribWidth);
+        GLKVector3 tModel = [Utilities invertVector4:GLKVector4Make(skeletonTangents[i].x, skeletonTangents[i].y, 0, 0)
+                                          withMatrix:self.modelViewMatrix];
+        
+        
+        if (i == 0) {
+            vector<GLKVector3> firstPole;
+            firstPole.push_back(sModel);
+            allRibs[0] = firstPole;
+        } else if (i == skeleton.size() - 1) {
+            vector<GLKVector3> secondPole;
+            secondPole.push_back(sModel);
+            allRibs[i] = secondPole;
+        } else {
+            vector<GLKVector3> ribs(numSpines);
+            float rot_step = 360.0f/numSpines;
+            for (int j = 0; j < numSpines; j++) {
+                float angle = j * rot_step;
+                GLKQuaternion quat = GLKQuaternionMakeWithAngleAndVector3Axis(GLKMathDegreesToRadians(angle), GLKVector3Normalize(tModel));
+                GLKVector3 newNorm = GLKQuaternionRotateVector3(quat, nModel);
+                GLKVector3 newRibPoint = GLKVector3Add(newNorm, sModel);
+                ribs[j] = newRibPoint;
             }
+            allRibs[i] = ribs;
         }
         
-        float ribWidth = skeletonWidth[i];
-        
-        vector<GLKVector3> ribs(numSpines);
-        float rot_step = 360.0f/numSpines;
-        for (int j = 0; j < numSpines; j++) {
-            float angle = j * rot_step;
-            GLKQuaternion quat = GLKQuaternionMakeWithAngleAndVector3Axis(GLKMathDegreesToRadians(angle), GLKVector3Normalize(tangent));
-            GLKVector3 newNorm = GLKQuaternionRotateVector3(quat, norm);
-            GLKVector3 newRibPoint = GLKVector3Add(GLKVector3MultiplyScalar(newNorm, ribWidth), skeleton[i]);
-            ribs[j] = newRibPoint;
-        }
-        allRibs[i] = ribs;
+        skeletonModel.push_back(sModel);
+        skeletonNormalsModel.push_back(nModel);
     }
-    vector<GLKVector3> secondPole;
-    secondPole.push_back(skeleton[skeleton.size() - 1]);
-    allRibs[skeleton.size() - 1] = secondPole;
-
     
+    //Rotate the whole branch to go along norm vector of the point touched
+    
+    {
+        Vec norm = HMesh::normal(_manifold, touchedVID);
+        GLKVector3 glk_norm = GLKVector3Make(norm[0], norm[1], norm[2]);
+        
+        int lastIndex = skeleton.size() - 1;
+        GLKVector3 c1 = [Utilities invertVector3:GLKVector3Make(skeleton[0].x, skeleton[0].y, zValueTouched)
+                                   withMatrix:self.modelViewMatrix];
+        GLKVector3 c2 = [Utilities invertVector3:GLKVector3Make(skeleton[lastIndex].x, skeleton[lastIndex].y, zValueTouched)
+                                      withMatrix:self.modelViewMatrix];
+
+        GLKVector3 cur_dir = GLKVector3Subtract(c2, c1);
+        GLKVector3 axisOfRotation = GLKVector3CrossProduct(cur_dir, glk_norm);
+        
+        float angle = [Utilities signedAngleBetweenReferenceVector3:cur_dir andVector:glk_norm];
+        
+        GLKQuaternion q_rotate = GLKQuaternionMakeWithAngleAndVector3Axis(angle, axisOfRotation);
+        
+        for (int i = 0; i < allRibs.size(); i++) {
+            vector<GLKVector3> ribs = allRibs[i];
+            for (int j = 0; j < ribs.size(); j++) {
+                GLKVector3 temp = GLKVector3Subtract(ribs[j], c1);
+                temp = GLKQuaternionRotateVector3(q_rotate, temp);
+                temp = GLKVector3Add(temp, c1);
+                ribs[j] = temp;
+            }
+            allRibs[i] = ribs;
+        }
+    }
+
+
     [self populateNewLimb:allRibs];
 }
 
@@ -674,13 +707,12 @@ using namespace HMesh;
         return [self endCreateNewBodyTwoFingers];
     }
     
-    // TODO NOT DONE YET
-    [self saveState];
-    
     if (_touchPoints.size() < 8 || _touchPoints.size() % 2 != 0) {
         NSLog(@"[PolarAnnularMesh][WARNING] Garbage point data");
         return vector<vector<GLKVector3>>();
     }
+    
+    [self saveState];
     
     //closest to the first centroid between two fingers vertex in 2D space
     GLKVector3 firstCentroid = GLKVector3Lerp(_touchPoints[0], _touchPoints[1], 0.5f);
@@ -702,7 +734,7 @@ using namespace HMesh;
     //Get skeleton aka joint points 
     vector<GLKVector2> rawSkeleton;
     vector<float> skeletonWidth;
-    [PAMUtilities centroids:rawSkeleton ribWidth:skeletonWidth forTouchPoint:touchPointsWorld withStep:0.1f];
+    [PAMUtilities centroids:rawSkeleton ribWidth:skeletonWidth forTwoFingerTouchPoint:touchPointsWorld withNextCentroidStep:0.1f];
     if (rawSkeleton.size() < 4) {
         NSLog(@"[PolarAnnularMesh][WARNING] Not enough controids");
         return vector<vector<GLKVector3>>();
@@ -731,15 +763,15 @@ using namespace HMesh;
     vector<GLKVector3> skeletonNormalsModel;
     for (int i = 0; i < skeleton.size(); i++) {
         GLKVector3 sModel = [Utilities invertVector3:GLKVector3Make(skeleton[i].x, skeleton[i].y, zValueTouched)
-                                          withMatrix:self.viewMatrix];
+                                          withMatrix:self.modelViewMatrix];
         
         //dont preserve translation for norma and tangent
         float ribWidth = skeletonWidth[i];
         GLKVector2 stretchedNorm = GLKVector2MultiplyScalar(skeletonNormals[i], ribWidth);
         GLKVector3 nModel = [Utilities invertVector4:GLKVector4Make(stretchedNorm.x, stretchedNorm.y, 0, 0)
-                                          withMatrix:self.viewMatrix];
+                                          withMatrix:self.modelViewMatrix];
         GLKVector3 tModel = [Utilities invertVector4:GLKVector4Make(skeletonTangents[i].x, skeletonTangents[i].y, 0, 0)
-                                          withMatrix:self.viewMatrix];
+                                          withMatrix:self.modelViewMatrix];
         
         
         if (i == 0) {
@@ -772,7 +804,6 @@ using namespace HMesh;
     [self populateNewLimb:allRibs];
     
     return allRibs;
-
 }
 
 -(std::vector<vector<GLKVector3>>)endCreateNewBodyTwoFingers {
@@ -795,7 +826,7 @@ using namespace HMesh;
     //Get skeleton aka joint points
     vector<GLKVector2> rawSkeleton;
     vector<float> skeletonWidth;
-    [PAMUtilities centroids:rawSkeleton ribWidth:skeletonWidth forTouchPoint:touchPointsWorld withStep:0.1f];
+    [PAMUtilities centroids:rawSkeleton ribWidth:skeletonWidth forTwoFingerTouchPoint:touchPointsWorld withNextCentroidStep:0.1f];
     if (rawSkeleton.size() < 4) {
         NSLog(@"[PolarAnnularMesh][WARNING] Not enough controids");
         return vector<vector<GLKVector3>>();
@@ -823,15 +854,15 @@ using namespace HMesh;
     vector<GLKVector3> skeletonNormalsModel;
     for (int i = 0; i < skeleton.size(); i++) {
         GLKVector3 sModel = [Utilities invertVector3:GLKVector3Make(skeleton[i].x, skeleton[i].y, 0)
-                                          withMatrix:self.viewMatrix];
+                                          withMatrix:self.modelViewMatrix];
         
         //dont preserve translation for norma and tangent
         float ribWidth = skeletonWidth[i];
         GLKVector2 stretchedNorm = GLKVector2MultiplyScalar(skeletonNormals[i], ribWidth);
         GLKVector3 nModel = [Utilities invertVector4:GLKVector4Make(stretchedNorm.x, stretchedNorm.y, 0, 0)
-                                          withMatrix:self.viewMatrix];
+                                          withMatrix:self.modelViewMatrix];
         GLKVector3 tModel = [Utilities invertVector4:GLKVector4Make(skeletonTangents[i].x, skeletonTangents[i].y, 0, 0)
-                                          withMatrix:self.viewMatrix];
+                                          withMatrix:self.modelViewMatrix];
 
         
         if (i == 0) {
@@ -865,6 +896,8 @@ using namespace HMesh;
     
     return allRibs;
 }
+
+#pragma mark - CREATE BRANCH FROM MESH
 
 -(void)populateNewLimb:(std::vector<vector<GLKVector3>>)allRibs {
     vector<Vecf> vertices;

@@ -25,7 +25,7 @@ typedef enum {
 
 -(void)setOrientation:(Orientation)orientation; //Force certain orientation
 
--(void)handlePanGesture:(UIGestureRecognizer*)sender withViewMatrix:(GLKMatrix4)viewMatrix isOrthogonal:(BOOL)isOrtho; //ArcBall Rotation
+-(void)handlePanGesture:(UIGestureRecognizer*)sender withViewMatrix:(GLKMatrix4)viewMatrix;
 -(void)handleRotationGesture:(UIGestureRecognizer *)sender withViewMatrix:(GLKMatrix4)viewMatrix; //Rotation in the plane of the screen
 -(void)reset;
 @end

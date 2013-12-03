@@ -58,9 +58,11 @@ double triangleAngleWithSides(double a, double b, double c);
 +(GLKVector3)invertVector4:(GLKVector4)vector4 withMatrix:(GLKMatrix4)matrix4;
 
 +(GLKVector3) matrix4:(GLKMatrix4)matrix multiplyVector3:(GLKVector3)vector3;
++(GLKVector3) matrix4:(GLKMatrix4)matrix multiplyVector4:(GLKVector4)vector4;
 
 +(GLKVector2) GLKVector2MakeWithVector3:(GLKVector3) vector3;
 
 +(GLKVector3)projectVector3:(GLKVector3)vec ontoLine:(GLKVector3)line;
 +(GLKVector2)projectVector2:(GLKVector2)vec ontoLine:(GLKVector2)line;
++(float)signedAngleBetweenReferenceVector3:(GLKVector3)refVector andVector:(GLKVector3)vector;
 @end

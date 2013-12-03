@@ -13,10 +13,12 @@
 @interface PAMUtilities : NSObject
 
 
-+(void)centroids:(std::vector<GLKVector2>&)centroids
-        ribWidth:(std::vector<float>&)ribWidth
-   forTouchPoint:(std::vector<GLKVector2>)touchPointsWorld
-        withStep:(float)step;
++(void)centroids:(std::vector<GLKVector2>&)centroids ribWidth:(std::vector<float>&)ribWidth
+                                       forTwoFingerTouchPoint:(std::vector<GLKVector2>)touchPointsWorld
+                                         withNextCentroidStep:(float)step;
+
++(void)centroids:(std::vector<GLKVector2>&)centroids forOneFingerTouchPoint:(std::vector<GLKVector2>)touchPointsWorld
+                                                       withNextCentroidStep:(float)step;
 
 +(void)normals:(std::vector<GLKVector2>&)normals
       tangents:(std::vector<GLKVector2>&)tangents

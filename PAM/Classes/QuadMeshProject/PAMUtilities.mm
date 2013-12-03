@@ -166,9 +166,32 @@
 }
 
 +(void)centroids:(std::vector<GLKVector2>&)centroids
+forOneFingerTouchPoint:(std::vector<GLKVector2>)touchPointsWorld
+        withNextCentroidStep:(float)step
+{
+    float accumLen = 0.0f;
+    //Add first centroid for pole
+    GLKVector2 lastCentroid = touchPointsWorld[0];
+    centroids.push_back(lastCentroid);
+    
+    //Add all other centroids
+    for (int i = 1; i < touchPointsWorld.size(); i++) {
+        GLKVector2 centroid = touchPointsWorld[i];
+        float curLen = GLKVector2Distance(lastCentroid, centroid);
+        accumLen += curLen;
+        
+        if (accumLen > step) {
+            centroids.push_back(centroid);
+            accumLen = 0.0f;
+            lastCentroid = centroid;
+        }
+    }
+}
+
++(void)centroids:(std::vector<GLKVector2>&)centroids
         ribWidth:(std::vector<float>&)ribWidth
-   forTouchPoint:(std::vector<GLKVector2>)touchPointsWorld
-        withStep:(float)step
+forTwoFingerTouchPoint:(std::vector<GLKVector2>)touchPointsWorld
+        withNextCentroidStep:(float)step
 {
     float accumLen = 0.0f;
     //Add first centroid for pole

@@ -337,6 +337,10 @@ double triangleAngleWithSides(double a, double b, double c) {
 
 +(GLKVector3) matrix4:(GLKMatrix4)matrix multiplyVector3:(GLKVector3) vector3 {
     GLKVector4 vector4 = GLKVector4MakeWithVector3(vector3, 1.0f);
+    return [self  matrix4:matrix multiplyVector4:vector4];
+}
+
++(GLKVector3) matrix4:(GLKMatrix4)matrix multiplyVector4:(GLKVector4)vector4 {
     vector4 = GLKMatrix4MultiplyVector4(matrix, vector4);
     return GLKVector3Make(vector4.x, vector4.y, vector4.z);
 }
@@ -345,7 +349,7 @@ double triangleAngleWithSides(double a, double b, double c) {
     return GLKVector2Make(vector3.x, vector3.y);
 }
 
-+(GLKVector3)projectVector:(GLKVector3)vec ontoLine:(GLKVector3)line {
++(GLKVector3)projectVector3:(GLKVector3)vec ontoLine:(GLKVector3)line {
     float c = GLKVector3DotProduct(vec, line) / GLKVector3DotProduct(line, line);
     return GLKVector3MultiplyScalar(line, c);
 }
@@ -354,4 +358,20 @@ double triangleAngleWithSides(double a, double b, double c) {
     return GLKVector2MultiplyScalar(line, c);
 }
 
++(float)signedAngleBetweenReferenceVector3:(GLKVector3)refVector andVector:(GLKVector3)vector
+{
+    float l = GLKVector3Length(refVector)*GLKVector3Length(vector);
+    GLKVector3 norm = GLKVector3CrossProduct(refVector, vector);
+    float cosa = GLKVector3DotProduct(refVector, vector)/l;
+    float sina = GLKVector3Length(GLKVector3CrossProduct(refVector, vector))/l;
+    
+    float angle = atan2(sina, cosa);
+    float sign = GLKVector3DotProduct(norm, GLKVector3CrossProduct(refVector, vector));
+
+    if (sign<0) {
+        angle = -angle;
+    }
+    
+    return angle;
+}
 @end

@@ -437,7 +437,6 @@ using namespace HMesh;
     }
 }
 
-
 //Create branch at a given vertex. Return VertexID of newly created pole.
 -(BOOL)createHoleAtVertex:(VertexID)vID
                     width:(int)width
@@ -445,6 +444,7 @@ using namespace HMesh;
               branchWidth:(float*)bWidth
                holeCenter:(GLKVector3*)holeCenter
                  holeNorm:(GLKVector3*)holeNorm
+         boundaryHalfEdge:(HalfEdgeID*)boundayHalfEdge
 {
     BOOL result = [self createBranchAtVertex:vID width:width vertexID:newPoleID branchWidth:bWidth];
     if (result) {
@@ -452,7 +452,14 @@ using namespace HMesh;
         Vec n = HMesh::normal(_manifold, *newPoleID);
         *holeCenter = GLKVector3Make(vf[0], vf[1], vf[2]);
         *holeNorm = GLKVector3Make(n[0], n[1], n[2]);
+        
+        Walker w = _manifold.walker(*newPoleID);
+        w = w.next().opp();
+        *boundayHalfEdge = w.halfedge();
+        
+        NSLog(@"%i", valency(_manifold, w.vertex()));
         _manifold.remove_vertex(*newPoleID);
+        
         return YES;
     }
     return NO;
@@ -615,13 +622,15 @@ using namespace HMesh;
     float bWidth;
     GLKVector3 holeCenter;
     GLKVector3 holeNorm;
+    HalfEdgeID boundaryHalfEdge;
     
     BOOL result = [self createHoleAtVertex:touchedVID
                                      width:self.branchWidth 
-                                  vertexID:&newPoleID 
+                                  vertexID:&newPoleID
                                branchWidth:&bWidth
                                 holeCenter:&holeCenter
-                                  holeNorm:&holeNorm];
+                                  holeNorm:&holeNorm
+                          boundaryHalfEdge:&boundaryHalfEdge];
     
     if (!result) {
         return;
@@ -730,7 +739,26 @@ using namespace HMesh;
         }
     }
     
-   VertexID limbPole = [self populateNewLimb:allRibs];
+    VertexID limbPole = [self populateNewLimb:allRibs];
+    assert(is_pole(_manifold, limbPole));
+    
+    Walker wBase1 = _manifold.walker(limbPole);
+
+    for (; valency(_manifold, wBase1.vertex()) != 3; wBase1 = wBase1.next().opp().next()) {
+        NSLog(@"oppa");
+    }
+    wBase1 = wBase1.next(); //halfedge of the boundary ring
+    HalfEdgeID limbBoundaryHalfEdge = wBase1.halfedge();
+    
+    Walker stitch1 = _manifold.walker(boundaryHalfEdge);
+    Walker stitch2 = _manifold.walker(limbBoundaryHalfEdge);
+    while (!stitch2.full_circle()) {
+        _manifold.stitch_boundary_edges(stitch1.halfedge(), stitch2.halfedge());
+        stitch1 = stitch1.next().opp().next();
+        stitch2 = stitch2.next().opp().next();
+    }
+    
+    [self rebufferWithCleanup:YES edgeTrace:NO];
     
 }
 
@@ -1025,8 +1053,7 @@ using namespace HMesh;
     
     VertexID pole = [self closestVertexID_3D:[Utilities matrix4:self.modelMatrix multiplyVector3:poleVec]];
     assert(is_pole(_manifold, pole));
-    
-    [self rebufferWithCleanup:YES edgeTrace:NO];
+
 
     return pole;
 }

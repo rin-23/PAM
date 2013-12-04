@@ -750,22 +750,31 @@ using namespace HMesh;
     wBase1 = wBase1.next().opp(); //halfedge of the boundary ring
     HalfEdgeID limbBoundaryHalfEdge = wBase1.halfedge();
     
-    Manifold temp = _manifold;
-    Walker stitch1 = temp.walker(boundaryHalfEdge);
-    Walker stitch2 = temp.walker(limbBoundaryHalfEdge);
-    while (!stitch2.full_circle()) {
-        if (_manifold.stitch_boundary_edges(stitch1.halfedge(), stitch2.halfedge())) {
-            stitch1 = stitch1.next();
-            stitch2 = stitch2.next();
+
+    //Stich boundary edges
+    vector<HalfEdgeID> bEdges1;
+    vector<HalfEdgeID> bEdges2;
+    for (Walker stitch1 = _manifold.walker(boundaryHalfEdge);!stitch1.full_circle(); stitch1 = stitch1.next()) {
+        bEdges1.push_back(stitch1.halfedge());
+    }
+    bEdges1.pop_back();
+    
+    for ( Walker stitch2 = _manifold.walker(limbBoundaryHalfEdge); !stitch2.full_circle(); stitch2 = stitch2.prev()) {
+        bEdges2.push_back(stitch2.halfedge());
+    }
+    bEdges2.pop_back();
+    
+    assert(bEdges1.size() == bEdges2.size());
+     
+    for (int i = 0; i < bEdges1.size() ; i++) {
+        if (_manifold.stitch_boundary_edges(bEdges1[i], bEdges2[i])) {
             NSLog(@"stich");
         } else {
-            stitch1 = stitch1.next();
-            stitch2 = stitch2.next();
             NSLog(@"didnt stich");
         }
     }
     
-    [self rebufferWithCleanup:YES edgeTrace:NO];
+    [self rebufferWithCleanup:YES edgeTrace:YES];
     
 }
 

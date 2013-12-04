@@ -454,7 +454,7 @@ using namespace HMesh;
         *holeNorm = GLKVector3Make(n[0], n[1], n[2]);
         
         Walker w = _manifold.walker(*newPoleID);
-        w = w.next().opp();
+        w = w.next();
         *boundayHalfEdge = w.halfedge();
         
         NSLog(@"%i", valency(_manifold, w.vertex()));
@@ -747,15 +747,22 @@ using namespace HMesh;
     for (; valency(_manifold, wBase1.vertex()) != 3; wBase1 = wBase1.next().opp().next()) {
         NSLog(@"oppa");
     }
-    wBase1 = wBase1.next(); //halfedge of the boundary ring
+    wBase1 = wBase1.next().opp(); //halfedge of the boundary ring
     HalfEdgeID limbBoundaryHalfEdge = wBase1.halfedge();
     
-    Walker stitch1 = _manifold.walker(boundaryHalfEdge);
-    Walker stitch2 = _manifold.walker(limbBoundaryHalfEdge);
+    Manifold temp = _manifold;
+    Walker stitch1 = temp.walker(boundaryHalfEdge);
+    Walker stitch2 = temp.walker(limbBoundaryHalfEdge);
     while (!stitch2.full_circle()) {
-        _manifold.stitch_boundary_edges(stitch1.halfedge(), stitch2.halfedge());
-        stitch1 = stitch1.next().opp().next();
-        stitch2 = stitch2.next().opp().next();
+        if (_manifold.stitch_boundary_edges(stitch1.halfedge(), stitch2.halfedge())) {
+            stitch1 = stitch1.next();
+            stitch2 = stitch2.next();
+            NSLog(@"stich");
+        } else {
+            stitch1 = stitch1.next();
+            stitch2 = stitch2.next();
+            NSLog(@"didnt stich");
+        }
     }
     
     [self rebufferWithCleanup:YES edgeTrace:NO];

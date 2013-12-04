@@ -245,7 +245,8 @@ using namespace HMesh;
     }
     
     *newPoleID = polar_add_branch(_manifold, vs);
-    refine_branch(_manifold, *newPoleID);
+
+//    refine_branch(_manifold, *newPoleID);
     
     return YES;
 }

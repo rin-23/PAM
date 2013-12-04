@@ -193,7 +193,7 @@ forOneFingerTouchPoint:(std::vector<GLKVector2>)touchPointsWorld
 forTwoFingerTouchPoint:(std::vector<GLKVector2>)touchPointsWorld
         withNextCentroidStep:(float)step
 {
-    float accumLen = 0.0f;
+    double accumLen = 0.0f;
     //Add first centroid for pole
     GLKVector2 lastCentroid = GLKVector2Lerp(touchPointsWorld[0], touchPointsWorld[1], 0.5f);
     centroids.push_back(lastCentroid);
@@ -201,10 +201,11 @@ forTwoFingerTouchPoint:(std::vector<GLKVector2>)touchPointsWorld
     //Add all other centroids
     for (int i = 2; i < touchPointsWorld.size(); i +=2) {
         GLKVector2 centroid = GLKVector2Lerp(touchPointsWorld[i], touchPointsWorld[i+1], 0.5f);
-        float curLen = GLKVector2Distance(lastCentroid, centroid);
+        double curLen = GLKVector2Distance(lastCentroid, centroid);
         accumLen += curLen;
         
         if (accumLen > step) {
+           
             centroids.push_back(centroid);
             ribWidth.push_back(0.5*GLKVector2Length(GLKVector2Subtract(touchPointsWorld[i+1], touchPointsWorld[i])));
             accumLen = 0.0f;

@@ -729,9 +729,9 @@ using namespace HMesh;
             allRibs[i] = ribs;
         }
     }
-
-
-    [self populateNewLimb:allRibs];
+    
+   VertexID limbPole = [self populateNewLimb:allRibs];
+    
 }
 
 #pragma mark - TOUCHES: BRANCH CREATION TWO FINGERS
@@ -949,10 +949,12 @@ using namespace HMesh;
 
 #pragma mark - CREATE BRANCH FROM MESH
 
--(void)populateNewLimb:(std::vector<vector<GLKVector3>>)allRibs {
+-(VertexID)populateNewLimb:(std::vector<vector<GLKVector3>>)allRibs {
     vector<Vecf> vertices;
     vector<int> faces;
     vector<int> indices;
+    
+    GLKVector3 poleVec;
     
     //Add all verticies
     for (int i = 0; i < allRibs.size(); i++) {
@@ -968,6 +970,9 @@ using namespace HMesh;
             vector<GLKVector3> pole = allRibs[i+1];
             vector<GLKVector3> rib = allRibs[i];
             int poleIndex = [self limbIndexForCentroid:i+1 rib:0 totalCentroid:allRibs.size() totalRib:rib.size()];
+            Vec3f pV = vertices[poleIndex];
+            poleVec = GLKVector3Make(pV[0], pV[1], pV[2]);
+            
             for (int j = 0; j < rib.size(); j++) {
                 indices.push_back(poleIndex);
                 if (j == rib.size() - 1) {
@@ -1012,34 +1017,18 @@ using namespace HMesh;
         }
     }
     
-    
-//    _manifold.clear();
     _manifold.build(vertices.size(),
                     reinterpret_cast<float*>(&vertices[0]),
                     faces.size(),
                     &faces[0],
                     &indices[0]);
     
-//    _branchWidth = 1;
-//    modState = MODIFICATION_NONE;
-    
-    //Calculate Bounding Box
-//    Manifold::Vec pmin = Manifold::Vec();
-//    Manifold::Vec pmax = Manifold::Vec();
-//    HMesh::bbox(_manifold, pmin, pmax);
-    
-//    self.centerAtBoundingBox = YES;
-//    _boundingBox.minBound = GLKVector3Make(pmin[0], pmin[1], pmin[2]);
-//    _boundingBox.maxBound = GLKVector3Make(pmax[0], pmax[1], pmax[2]);
-//    _boundingBox.center = GLKVector3MultiplyScalar(GLKVector3Add(_boundingBox.minBound, _boundingBox.maxBound), 0.5f);
-//    
-//    GLKVector3 mid = GLKVector3MultiplyScalar(GLKVector3Subtract(_boundingBox.maxBound, _boundingBox.minBound), 0.5f);
-//    _boundingBox.radius = GLKVector3Length(mid);
-//    _boundingBox.width = fabsf(_boundingBox.maxBound.x - _boundingBox.minBound.x);
-//    _boundingBox.height = fabsf(_boundingBox.maxBound.y - _boundingBox.minBound.y);
-//    _boundingBox.depth = fabsf(_boundingBox.maxBound.z - _boundingBox.minBound.z);
+    VertexID pole = [self closestVertexID_3D:[Utilities matrix4:self.modelMatrix multiplyVector3:poleVec]];
+    assert(is_pole(_manifold, pole));
     
     [self rebufferWithCleanup:YES edgeTrace:NO];
+
+    return pole;
 }
 
 

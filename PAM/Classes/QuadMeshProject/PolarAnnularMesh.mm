@@ -206,7 +206,6 @@ using namespace HMesh;
 -(void)rebuffer{
     [self rebufferNoEdgetrace];
     _edgeInfo = trace_spine_edges(_manifold);
-
 }
 
 -(void)rebufferWithCleanup:(BOOL)shouldClean edgeTrace:(BOOL)shouldEdgeTrace {
@@ -651,10 +650,11 @@ using namespace HMesh;
     
     //Get skeleton aka joint points
     vector<GLKVector2> rawSkeleton;
-    float c_step = GLKVector3Length([Utilities matrix4:self.viewMatrix multiplyVector3:GLKVector3Make(kCENTROID_STEP, 0, 0)]);
+    float c_step = GLKVector3Length([Utilities matrix4:self.viewMatrix multiplyVector4:GLKVector4Make(kCENTROID_STEP, 0, 0, 0)]);
     [PAMUtilities centroids:rawSkeleton forOneFingerTouchPoint:touchPointsWorld withNextCentroidStep:c_step];
     if (rawSkeleton.size() < 4) {
         NSLog(@"[PolarAnnularMesh][WARNING] Not enough controids");
+        [self undo];
         return;
     }
     
@@ -744,35 +744,11 @@ using namespace HMesh;
     
     Walker wBase1 = _manifold.walker(limbPole);
 
-    for (; valency(_manifold, wBase1.vertex()) != 3; wBase1 = wBase1.next().opp().next()) {
-        NSLog(@"oppa");
-    }
+    for (; valency(_manifold, wBase1.vertex()) != 3; wBase1 = wBase1.next().opp().next());
     wBase1 = wBase1.next().opp(); //halfedge of the boundary ring
     HalfEdgeID limbBoundaryHalfEdge = wBase1.halfedge();
     
-
-    //Stich boundary edges
-    vector<HalfEdgeID> bEdges1;
-    vector<HalfEdgeID> bEdges2;
-    for (Walker stitch1 = _manifold.walker(boundaryHalfEdge);!stitch1.full_circle(); stitch1 = stitch1.next()) {
-        bEdges1.push_back(stitch1.halfedge());
-    }
-    bEdges1.pop_back();
-    
-    for ( Walker stitch2 = _manifold.walker(limbBoundaryHalfEdge); !stitch2.full_circle(); stitch2 = stitch2.prev()) {
-        bEdges2.push_back(stitch2.halfedge());
-    }
-    bEdges2.pop_back();
-    
-    assert(bEdges1.size() == bEdges2.size());
-     
-    for (int i = 0; i < bEdges1.size() ; i++) {
-        if (_manifold.stitch_boundary_edges(bEdges1[i], bEdges2[i])) {
-            NSLog(@"stich");
-        } else {
-            NSLog(@"didnt stich");
-        }
-    }
+    [self stitchBranch:boundaryHalfEdge toBody:limbBoundaryHalfEdge];
     
     [self rebufferWithCleanup:YES edgeTrace:YES];
     
@@ -795,9 +771,9 @@ using namespace HMesh;
 
 -(std::vector<std::vector<GLKVector3>>)endCreateBranchTwoFingers {
     
-    if (![self manifoldIsLoaded]) {
+//    if (![self manifoldIsLoaded]) {
         return [self endCreateNewBodyTwoFingers];
-    }
+//    }
     
     if (_touchPoints.size() < 8 || _touchPoints.size() % 2 != 0) {
         NSLog(@"[PolarAnnularMesh][WARNING] Garbage point data");
@@ -919,7 +895,7 @@ using namespace HMesh;
     vector<float> skeletonWidth;
 
     //Find scaled step
-    float c_step = GLKVector3Length([Utilities matrix4:self.modelViewMatrix multiplyVector3:GLKVector3Make(kCENTROID_STEP, 0, 0)]);
+    float c_step = GLKVector3Length([Utilities matrix4:self.modelViewMatrix multiplyVector4:GLKVector4Make(kCENTROID_STEP, 0, 0, 0)]);
     [PAMUtilities centroids:rawSkeleton ribWidth:skeletonWidth forTwoFingerTouchPoint:touchPointsWorld withNextCentroidStep:c_step];
     if (rawSkeleton.size() < 4) {
         NSLog(@"[PolarAnnularMesh][WARNING] Not enough controids");
@@ -933,13 +909,7 @@ using namespace HMesh;
     vector<GLKVector2> skeletonNormals;
     vector<GLKVector2> skeletonTangents;
     [PAMUtilities normals:skeletonNormals tangents:skeletonTangents forSkeleton:skeleton];
-
-//    //Get width for skeleton joints
-//    vector<float>skeletonWidth = [PAMUtilities ribWidthForSkeleton:skeleton
-//                                                           normals:skeletonNormals
-//                                                          tangents:skeletonTangents
-//                                                       touchPoints:touchPointsWorld];
-//    
+ 
     //Parse new skeleton and create ribs
     //Ingore first and last centroids since they are poles
     int numSpines = 30;
@@ -983,13 +953,58 @@ using namespace HMesh;
         skeletonNormalsModel.push_back(nModel);
     }
     
-//    allRibs.push_back(skeletonModel);
 //    allRibs.push_back(skeletonNormalsModel);
     
     [self populateManifold:allRibs];
+    allRibs.push_back(skeletonModel);
     
     return allRibs;
 }
+#pragma mark - BRANCH STICHING
+-(void)stitchBranch:(HalfEdgeID)branchHID toBody:(HalfEdgeID)bodyHID {
+
+    //Align edges
+    Walker align1 = _manifold.walker(branchHID);
+    VertexID vId1 = align1.vertex();
+    Vecf vPos1 = _manifold.posf(vId1);
+
+    HalfEdgeID closestHID;
+    float closestDist = FLT_MAX;
+    
+    for (Walker align2 = _manifold.walker(bodyHID); !align2.next().full_circle(); align2 = align2.next()) {
+        float cur_dist = (vPos1 - _manifold.posf(align2.vertex())).length();
+
+        if (cur_dist < closestDist) {
+            closestDist = cur_dist;
+            closestHID = align2.halfedge();
+        }
+    }
+    Walker temp = _manifold.walker(closestHID);
+    closestHID = temp.next().halfedge();
+    
+    //Stich boundary edges
+    vector<HalfEdgeID> bEdges1;
+    vector<HalfEdgeID> bEdges2;
+    for (Walker stitch1 = _manifold.walker(closestHID);!stitch1.full_circle(); stitch1 = stitch1.next())
+    {
+        bEdges1.push_back(stitch1.halfedge());
+    }
+    bEdges1.pop_back();
+    
+    for (Walker stitch2 = _manifold.walker(branchHID); !stitch2.full_circle(); stitch2 = stitch2.prev()) {
+        bEdges2.push_back(stitch2.halfedge());
+    }
+    bEdges2.pop_back();
+    
+    assert(bEdges1.size() == bEdges2.size());
+    
+    for (int i = 0; i < bEdges1.size() ; i++) {
+        BOOL didStich = _manifold.stitch_boundary_edges(bEdges1[i], bEdges2[i]);
+        assert(didStich);
+    }
+
+}
+
 
 #pragma mark - CREATE BRANCH FROM MESH
 
@@ -1069,7 +1084,6 @@ using namespace HMesh;
     
     VertexID pole = [self closestVertexID_3D:[Utilities matrix4:self.modelMatrix multiplyVector3:poleVec]];
     assert(is_pole(_manifold, pole));
-
 
     return pole;
 }

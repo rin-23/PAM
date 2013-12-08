@@ -230,7 +230,7 @@ using namespace HMesh;
         wireframeIndexData:(NSMutableData**)wireframeIndexData
 {
     Vec4uc color(200,200,200,255);
-    Vec4uc wColor(0, 0, 0, 255);
+    Vec4uc wColor(180, 180, 180, 255);
     
     for (VertexIDIterator vid = mani.vertices_begin(); vid != mani.vertices_end(); ++vid) {
         assert((*vid).index < mani.no_vertices());
@@ -745,13 +745,29 @@ using namespace HMesh;
     Walker wBase1 = _manifold.walker(limbPole);
 
     for (; valency(_manifold, wBase1.vertex()) != 3; wBase1 = wBase1.next().opp().next());
+    HalfEdgeID secondLastBoundary = wBase1.prev().halfedge();
+//    HalfEdgeID secondLastBoundary = wBase1.next().halfedge();
     wBase1 = wBase1.next().opp(); //halfedge of the boundary ring
     HalfEdgeID limbBoundaryHalfEdge = wBase1.halfedge();
-    
+
     [self stitchBranch:boundaryHalfEdge toBody:limbBoundaryHalfEdge];
     
-    [self rebufferWithCleanup:YES edgeTrace:YES];
+    //smooth
+    Walker smoothWalker = _manifold.walker(secondLastBoundary);
+    vector<VertexID> verteciesToSmooth;
+    for (;!smoothWalker.full_circle(); smoothWalker = smoothWalker.next().opp().next()) {
+        verteciesToSmooth.push_back(smoothWalker.next().vertex()); //boundary
+        verteciesToSmooth.push_back(smoothWalker.vertex()); //second last boundary
+        Walker ws = _manifold.walker(smoothWalker.next().halfedge());
+        for (int s = 0; s < self.branchWidth + 1; s++) {
+            ws = ws.next().opp().next();
+            verteciesToSmooth.push_back(ws.vertex());
+        }
+    }
+    _edgeInfo = trace_spine_edges(_manifold);
+    laplacian_smooth_vertex(_manifold, verteciesToSmooth, _edgeInfo, 5);
     
+    [self rebufferWithCleanup:YES edgeTrace:YES];
 }
 
 #pragma mark - TOUCHES: BRANCH CREATION TWO FINGERS

@@ -169,6 +169,18 @@ typedef enum {
     twoFingerTranslation.maximumNumberOfTouches = 2;
     [view addGestureRecognizer:twoFingerTranslation];
     
+    //3 finger pan
+    UIPanGestureRecognizer* threeFingerPanning = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleThreeFingePanGesture:)];
+    threeFingerPanning.minimumNumberOfTouches = 3;
+    threeFingerPanning.maximumNumberOfTouches = 3;
+    [view addGestureRecognizer:threeFingerPanning];
+    
+    //4 finger pan
+    UIPanGestureRecognizer* fourFingerPanning = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleFourFingePanGesture:)];
+    fourFingerPanning.minimumNumberOfTouches = 4;
+    fourFingerPanning.maximumNumberOfTouches = 4;
+    [view addGestureRecognizer:fourFingerPanning];
+    
     //Rotate along Z-axis
     UIRotationGestureRecognizer* rotationInPlaneOfScreen = [[UIRotationGestureRecognizer alloc] initWithTarget:self action:@selector(handleRotationGesture:)];
     [view addGestureRecognizer:rotationInPlaneOfScreen];
@@ -357,13 +369,13 @@ typedef enum {
 -(void)handleTwoFingerPanGesture:(UIGestureRecognizer*)sender {
     if (!_transformSwitch.isOn) {
         [_translationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity];
-    } else {
-   
+    } else {   
         if (sender.state == UIGestureRecognizerStateBegan) {
             _selectionLine = nil;
             _selectionLine2 = nil;
             _selectionLine3 = nil;
             if (sender.numberOfTouches != 2) return;
+            
             CGPoint touchPoint1 = [self scaleTouchPoint:[sender locationOfTouch:0 inView:(GLKView*)sender.view]
                                                  inView:(GLKView*)sender.view];
             CGPoint touchPoint2 = [self scaleTouchPoint:[sender locationOfTouch:1 inView:(GLKView*)sender.view]
@@ -386,7 +398,28 @@ typedef enum {
             NSMutableData* lineData2 = [[NSMutableData alloc] initWithBytes:&vertex2 length:sizeof(VertexRGBA)];
             _selectionLine2 = [[Line alloc] initWithVertexData:lineData2];
             
-            [_pMesh startCreateBranchFinger1:rayOrigin1 finger2:rayOrigin2];
+            //Check if we touched the middle point
+            CGPoint middlePoint = CGPointMake(floor((touchPoint1.x + touchPoint2.x)/2),
+                                              floor((touchPoint1.y + touchPoint2.y)/2));
+            NSMutableData* pixelData = [self renderToOffscreenDepthBuffer:@[_pMesh]];
+            float depth = [self depthForPoint:middlePoint depthBuffer:pixelData];
+            GLKVector3 modelCoord1;
+            GLKVector3 modelCoord2;
+            if (depth < 0) { //clicked on background
+                _state = TOUCHED_BACKGROUND;
+                [_pMesh startCreateBranchFinger1:rayOrigin1 finger2:rayOrigin2];
+            } else { //clicked on a model
+                _state = TOUCHED_MODEL;
+                _gaussianDepth = depth;
+                BOOL result1 = [self modelCoordinates:&modelCoord1 forTouchPoint:GLKVector3Make(touchPoint1.x, touchPoint1.y, _gaussianDepth)];
+                BOOL result2 = [self modelCoordinates:&modelCoord2 forTouchPoint:GLKVector3Make(touchPoint2.x, touchPoint2.y, _gaussianDepth)];
+                if (!(result1&&result2)) {
+                    NSLog(@"[WARNING] Couldn't determine touch area");
+                    return;
+                }
+                [_pMesh startCreateBranchFinger1:modelCoord1 finger2:modelCoord2];
+            }
+            
         } else if (sender.state == UIGestureRecognizerStateChanged) {
             if (sender.numberOfTouches!=2) {
                 return;
@@ -413,7 +446,9 @@ typedef enum {
             _selectionLine = nil;
             _selectionLine2 = nil;
 
-            std::vector<std::vector<GLKVector3>> allRibs = [_pMesh endCreateBranchTwoFingers];
+            std::vector<std::vector<GLKVector3>> allRibs = [_pMesh endCreateBranchTwoFingersWithTouchedModel:(_state == TOUCHED_MODEL)];
+            NSLog(@"FUCK");
+        }
             
 //            _ribsLines = [[NSMutableArray alloc] initWithCapacity:allRibs.size()];
 //            for (int i = 0; i <allRibs.size();i++) {
@@ -440,8 +475,16 @@ typedef enum {
             
 //            _bbox = _pMesh.boundingBox;
 //            _translationManager.scaleFactor = _bbox.radius;
-        }
+        
     }
+}
+
+-(void)handleThreeFingePanGesture:(UIGestureRecognizer*)sender {
+    [_rotationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity];
+}
+
+-(void)handleFourFingePanGesture:(UIGestureRecognizer*)sender {
+    [_translationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity];
 }
 
 -(void)handleRotationGesture:(UIGestureRecognizer*)sender {

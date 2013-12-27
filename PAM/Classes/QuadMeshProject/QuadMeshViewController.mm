@@ -19,6 +19,7 @@
 #import "UITwoFingerHoldGestureRecognizer.h"
 #import "Line.h"
 #include <vector>
+#import "SettingsManager.h"
 
 typedef enum {
     TOUCHED_NONE,
@@ -93,14 +94,14 @@ typedef enum {
     [self setupGL];
     [self addGestureRecognizersToView:self.view];
     
-    _branchWidthSlider.minimumValue = 1.0f;
-    _branchWidthSlider.maximumValue = 5.0f;
-    [_branchWidthSlider addTarget:self action:@selector(sliderChanged:) forControlEvents:UIControlEventValueChanged];
-    
-    [_transformSwitch addTarget:self action:@selector(transformSwitchChanged:) forControlEvents:UIControlEventValueChanged];
-    [_skeletonSwitch addTarget:self action:@selector(skeletonSwitchChanged:) forControlEvents:UIControlEventValueChanged];
-    
-    _ingnoredViews = @[_transformSwitch, _branchWidthSlider, _skeletonSwitch];
+//    _branchWidthSlider.minimumValue = 1.0f;
+//    _branchWidthSlider.maximumValue = 5.0f;
+//    [_branchWidthSlider addTarget:self action:@selector(sliderChanged:) forControlEvents:UIControlEventValueChanged];
+//    
+//    [_transformSwitch addTarget:self action:@selector(transformSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+//    [_skeletonSwitch addTarget:self action:@selector(skeletonSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+//    
+//    _ingnoredViews = @[_transformSwitch, _branchWidthSlider, _skeletonSwitch];
 }
 
 - (void)viewDidUnload {
@@ -159,6 +160,12 @@ typedef enum {
 
 -(void)addGestureRecognizersToView:(UIView*)view {
 
+    //3 finger tap
+    UITapGestureRecognizer* threeFingerTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleThreeFingeTapGesture:)];
+    threeFingerTap.numberOfTapsRequired = 1;
+    threeFingerTap.numberOfTouchesRequired = 3;
+    [view addGestureRecognizer:threeFingerTap];
+    
     //Pinch To Zoom. Scaling along X,Y,Z
     UIPinchGestureRecognizer* pinchToZoom = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(handlePinchGesture:)];
     [view addGestureRecognizer:pinchToZoom];
@@ -168,18 +175,6 @@ typedef enum {
     twoFingerTranslation.minimumNumberOfTouches = 2;
     twoFingerTranslation.maximumNumberOfTouches = 2;
     [view addGestureRecognizer:twoFingerTranslation];
-    
-    //3 finger pan
-    UIPanGestureRecognizer* threeFingerPanning = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleThreeFingePanGesture:)];
-    threeFingerPanning.minimumNumberOfTouches = 3;
-    threeFingerPanning.maximumNumberOfTouches = 3;
-    [view addGestureRecognizer:threeFingerPanning];
-    
-    //4 finger pan
-    UIPanGestureRecognizer* fourFingerPanning = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleFourFingePanGesture:)];
-    fourFingerPanning.minimumNumberOfTouches = 4;
-    fourFingerPanning.maximumNumberOfTouches = 4;
-    [view addGestureRecognizer:fourFingerPanning];
     
     //Rotate along Z-axis
     UIRotationGestureRecognizer* rotationInPlaneOfScreen = [[UIRotationGestureRecognizer alloc] initWithTarget:self action:@selector(handleRotationGesture:)];
@@ -230,12 +225,10 @@ typedef enum {
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch {
     CGPoint p = [touch locationInView:self.view];
 
-    for(UIView* view in _ingnoredViews) {
-        if (CGRectContainsPoint(view.frame, p)) {
-            return NO;
-        }
-    }
     
+//    if (CGRectContainsPoint(_containerView.frame, p)) {
+//        return NO;
+//    }
 
     if (gestureRecognizer == _twoFingerBending) {
         BOOL flag = [_twoFingerBending needsMoreTouch];
@@ -247,7 +240,7 @@ typedef enum {
 
 #pragma mark - Gesture recognizer selectors
 -(void)handlePinchGesture:(UIGestureRecognizer*)sender {
-    if (!_transformSwitch.isOn) {
+    if ([SettingsManager sharedInstance].transform) {
         [_zoomManager handlePinchGesture:sender];
     } else {
         return;
@@ -282,7 +275,7 @@ typedef enum {
 
 -(void)handleOneFingerPanGesture:(UIGestureRecognizer*)sender {
     
-    if (!_transformSwitch.isOn) {
+    if ([SettingsManager sharedInstance].transform) {
         [_rotationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity];
     } else {
         
@@ -367,7 +360,7 @@ typedef enum {
 }
 
 -(void)handleTwoFingerPanGesture:(UIGestureRecognizer*)sender {
-    if (!_transformSwitch.isOn) {
+    if ([SettingsManager sharedInstance].transform) {
         [_translationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity];
     } else {   
         if (sender.state == UIGestureRecognizerStateBegan) {
@@ -479,13 +472,13 @@ typedef enum {
     }
 }
 
--(void)handleThreeFingePanGesture:(UIGestureRecognizer*)sender {
-    [_rotationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity];
+-(void)handleThreeFingeTapGesture:(UIGestureRecognizer*)sender {
+    [SettingsManager sharedInstance].transform = ![SettingsManager sharedInstance].transform;
+//    [_transformSwitch setOn:!_transformSwitch.isOn animated:YES];
+//    [_translationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity];
+//    [_rotationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity];
 }
 
--(void)handleFourFingePanGesture:(UIGestureRecognizer*)sender {
-    [_translationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity];
-}
 
 -(void)handleRotationGesture:(UIGestureRecognizer*)sender {
     [_rotationManager handleRotationGesture:sender withViewMatrix:GLKMatrix4Identity];
@@ -570,7 +563,8 @@ typedef enum {
 -(void)handleFourFingerTapGesture:(UIGestureRecognizer*)sender {
     if (sender.state == UIGestureRecognizerStateEnded) {
         NSLog(@"Ended tap");
-        [_transformSwitch setOn:!_transformSwitch.isOn];
+//        [_transformSwitch setOn:!_transformSwitch.isOn];
+        [SettingsManager sharedInstance].transform = ![SettingsManager sharedInstance].transform;
     }
 }
 
@@ -673,7 +667,7 @@ typedef enum {
     [self setPaused:YES]; //pause rendering
     
     //Reset all transformations. Remove all previous screws and plates
-    [self resetClicked:nil];
+    [self resetTransformations];
     [self showLoadingIndicator];
     
     if (_pMesh == nil) {
@@ -695,7 +689,7 @@ typedef enum {
     [self setPaused:YES]; //pause rendering
     
     //Reset all transformations. Remove all previous screws and plates
-    [self resetClicked:nil];
+    [self resetTransformations];
     [self showLoadingIndicator];
     
     if (_pMesh == nil) {
@@ -849,21 +843,13 @@ typedef enum {
 
 #pragma mark - Navigation Bar Button Selector
 
-- (void)resetClicked:(id)sender {
-    [_rotationManager reset];
-    viewMatrix = GLKMatrix4Identity;
-    _translationManager.translationMatrix = GLKMatrix4Identity;
-    _zoomManager.scaleMatrix = GLKMatrix4Identity;
-//    [_branchPoints removeAllObjects];
-}
-
 -(void)sliderChanged:(id)sender{
 
-    float newStep = roundf(_branchWidthSlider.value);
+//    float newStep = roundf(_branchWidthSlider.value);
     
     // Convert "steps" back to the context of the sliders values.
-    _branchWidthSlider.value = newStep;
-    _pMesh.branchWidth = newStep;
+//    _branchWidthSlider.value = newStep;
+//    _pMesh.branchWidth = newStep;
 
 }
 
@@ -885,6 +871,32 @@ typedef enum {
         }
         [alertView dismissWithClickedButtonIndex:buttonIndex animated:YES];
     }
+}
+
+#pragma mark - SettingsViewControllerDelegate
+
+-(void)showSkeleton:(BOOL)showSkeleton {
+    //overwrite
+    [SettingsManager sharedInstance].showSkeleton = showSkeleton;
+}
+
+-(void)transformModeIsOn:(BOOL)isOn {
+    //overwrite
+    [SettingsManager sharedInstance].transform = isOn;
+}
+
+-(void)clearModel {
+    //overwrite
+    [_pMesh clear];
+}
+
+-(void)resetTransformations {
+    //overwrite
+    [_rotationManager reset];
+    viewMatrix = GLKMatrix4Identity;
+    _translationManager.translationMatrix = GLKMatrix4Identity;
+    _zoomManager.scaleMatrix = GLKMatrix4Identity;
+    //    [_branchPoints removeAllObjects];
 }
 
 @end

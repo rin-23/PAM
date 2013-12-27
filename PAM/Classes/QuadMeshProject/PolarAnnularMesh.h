@@ -38,6 +38,6 @@
 -(void)changeScalingRibsWithScaleFactor:(float)scale;
 -(void)endScalingRibsWithScaleFactor:(float)scale;
 
-
+-(void)clear;
 -(void)undo;
 @end

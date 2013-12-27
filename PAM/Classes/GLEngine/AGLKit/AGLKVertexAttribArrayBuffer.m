@@ -42,7 +42,7 @@
                     target:(GLenum)aTarget
 {
     NSParameterAssert(0 < aStride);
-    NSAssert((0 < count && NULL != dataPtr) ||
+    NSAssert((NULL != dataPtr) ||
              (0 == count && NULL == dataPtr),
              @"data must not be NULL or count > 0");
     

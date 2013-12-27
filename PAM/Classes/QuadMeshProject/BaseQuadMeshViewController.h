@@ -7,14 +7,14 @@
 //
 
 #import <GLKit/GLKit.h>
+#import "SettingsViewController.h"
 
-@interface BaseQuadMeshViewController : GLKViewController  {
+@interface BaseQuadMeshViewController : GLKViewController <SettingsViewControllerDelegate>  {
     UIActivityIndicatorView* _activity;
     GLsizei _glWidth;
     GLsizei _glHeight;
-    UISwitch* _transformSwitch;
-    UISlider* _branchWidthSlider;
-    UISwitch* _skeletonSwitch;
+
+    UIPopoverController* _settingsPopover;
 }
 
 -(void)showLoadingIndicator;

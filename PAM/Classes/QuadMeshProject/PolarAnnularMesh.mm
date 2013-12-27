@@ -309,6 +309,11 @@ using namespace HMesh;
     return _manifold.no_vertices() != 0;
 }
 
+-(void)clear {
+    _manifold.clear();
+    [self rebufferWithCleanup:NO edgeTrace:YES];
+}
+
 #pragma mark - FIND VERTEX/FACE NEAR TOUCH POINT
 
 -(VertexID)closestVertexID_2D:(GLKVector3)touchPoint {
@@ -936,7 +941,7 @@ using namespace HMesh;
     vector<float> skeletonWidth;
     
     //Find scaled step
-    float c_step = GLKVector3Length([Utilities matrix4:self.modelViewMatrix multiplyVector4:GLKVector4Make(kCENTROID_STEP, 0, 0, 0)]);
+    float c_step = GLKVector3Length([Utilities matrix4:self.viewMatrix multiplyVector4:GLKVector4Make(kCENTROID_STEP, 0, 0, 0)]);
     [PAMUtilities centroids:rawSkeleton ribWidth:skeletonWidth forTwoFingerTouchPoint:touchPointsWorld withNextCentroidStep:c_step];
     if (rawSkeleton.size() < 4) {
         NSLog(@"[PolarAnnularMesh][WARNING] Not enough controids");
@@ -969,12 +974,11 @@ using namespace HMesh;
         
         //dont preserve translation for norma and tangent
         float ribWidth = skeletonWidth[i];
-        GLKVector3 nModel = [Utilities invertVector4:GLKVector4Make(skeletonNormals[i].x, skeletonNormals[i].y, 0, 0)
+        GLKVector2 stretchedNorm = GLKVector2MultiplyScalar(skeletonNormals[i], ribWidth);
+        GLKVector3 nModel = [Utilities invertVector4:GLKVector4Make(stretchedNorm.x, stretchedNorm.y, 0, 0)
                                           withMatrix:self.modelViewMatrix];
-        nModel = GLKVector3MultiplyScalar(GLKVector3Normalize(nModel), ribWidth);
         GLKVector3 tModel = [Utilities invertVector4:GLKVector4Make(skeletonTangents[i].x, skeletonTangents[i].y, 0, 0)
                                           withMatrix:self.modelViewMatrix];
-        
         
         if (i == skeleton.size() - 1) {
             vector<GLKVector3> secondPole;
@@ -1050,7 +1054,6 @@ using namespace HMesh;
     }
     _edgeInfo = trace_spine_edges(_manifold);
     laplacian_smooth_vertex(_manifold, verteciesToSmooth, _edgeInfo, 5);
-
     
     [self rebufferWithCleanup:YES edgeTrace:NO];
 
@@ -1393,6 +1396,7 @@ using namespace HMesh;
     _boundingBox.height = fabsf(_boundingBox.maxBound.y - _boundingBox.minBound.y);
     _boundingBox.depth = fabsf(_boundingBox.maxBound.z - _boundingBox.minBound.z);
     
+
     [self rebufferWithCleanup:YES edgeTrace:YES];
 }
 

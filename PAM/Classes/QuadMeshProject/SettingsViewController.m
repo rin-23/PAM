@@ -1,0 +1,97 @@
+//
+//  SettingsViewController.m
+//  PAM
+//
+//  Created by Rinat Abdrashitov on 12/25/2013.
+//  Copyright (c) 2013 Rinat Abdrashitov. All rights reserved.
+//
+
+#import "SettingsViewController.h"
+#import "SettingsManager.h"
+
+@interface SettingsViewController ()
+
+@end
+
+@implementation SettingsViewController
+
+- (id)init
+{
+    self = [super init];
+    if (self) {
+        // Custom initialization
+    }
+    return self;
+}
+
+-(void)viewDidLoad
+{
+    [super viewDidLoad];
+	// Do any additional setup after loading the view.
+
+//    _branchWidthSlider = [[UISlider alloc] initWithFrame:CGRectMake(5, 25, 130, 10)];
+//    [self.view addSubview:_branchWidthSlider];
+    
+    int nextY = 10;
+    UILabel* skeletonLabel = [[UILabel alloc] initWithFrame:CGRectMake(15, nextY, 100, 30)];
+    [skeletonLabel setText:@"Skeleton"];
+    [self.view addSubview:skeletonLabel];
+    
+    _skeletonSwitch = [[UISwitch alloc] initWithFrame:CGRectMake(145, nextY, 30, 20)];
+    [_skeletonSwitch addTarget:self action:@selector(skeletonSwitchClicked:) forControlEvents:UIControlEventValueChanged];
+    [self.view addSubview:_skeletonSwitch];
+    
+    nextY = CGRectGetMaxY(skeletonLabel.frame);
+    UILabel* transformLabel = [[UILabel alloc] initWithFrame:CGRectMake(15, nextY + 10, 100, 30)];
+    [transformLabel setText:@"Transform"];
+    [self.view addSubview:transformLabel];
+    
+    _transformSwitch = [[UISwitch alloc] initWithFrame:CGRectMake(145, 50, 30, 20)];
+    [_transformSwitch addTarget:self action:@selector(transformSwitchClicked:) forControlEvents:UIControlEventValueChanged];
+    [self.view addSubview:_transformSwitch];
+    
+    nextY = CGRectGetMaxY(transformLabel.frame);
+    _clearModelBtn = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+    [_clearModelBtn setFrame:CGRectMake(15, nextY + 10, 100, 30)];
+    [_clearModelBtn setContentHorizontalAlignment:UIControlContentHorizontalAlignmentLeft];
+    [_clearModelBtn addTarget:self action:@selector(clearModelButton:) forControlEvents:UIControlEventTouchUpInside];
+    [_clearModelBtn setTitle:@"Clear Model" forState:UIControlStateNormal];
+    [self.view addSubview:_clearModelBtn];
+    
+    nextY = CGRectGetMaxY(_clearModelBtn.frame);
+    _resetBtn = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+    [_resetBtn setContentHorizontalAlignment:UIControlContentHorizontalAlignmentLeft];
+    [_resetBtn setTitle:@"Reset" forState:UIControlStateNormal];
+    [_resetBtn addTarget:self action:@selector(resetButton:) forControlEvents:UIControlEventTouchUpInside];
+    [_resetBtn setFrame:CGRectMake(15, nextY + 10, 100, 30)];
+    [self.view addSubview:_resetBtn];
+}
+
+-(void)viewWillAppear:(BOOL)animated {
+    [_transformSwitch setOn:[SettingsManager sharedInstance].transform];
+    [_skeletonSwitch setOn:[SettingsManager sharedInstance].showSkeleton];
+}
+
+-(void)didReceiveMemoryWarning
+{
+    [super didReceiveMemoryWarning];
+    // Dispose of any resources that can be recreated.
+}
+
+-(void)skeletonSwitchClicked:(UIControl*)sender {
+    [self.delegate showSkeleton:_skeletonSwitch.isOn];
+}
+
+-(void)transformSwitchClicked:(UIControl*)sender {
+    [self.delegate transformModeIsOn:_transformSwitch.isOn];
+}
+
+-(void)clearModelButton:(UIControl*)sender {
+    [self.delegate clearModel];
+}
+
+-(void)resetButton:(UIControl*)sender {
+    [self.delegate resetTransformations];
+}
+
+@end

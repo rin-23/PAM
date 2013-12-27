@@ -59,6 +59,8 @@
 		15646616182033920000B985 /* QuadPolygonMesh.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1564660B182033920000B985 /* QuadPolygonMesh.mm */; };
 		15646617182033920000B985 /* WireFrame.m in Sources */ = {isa = PBXBuildFile; fileRef = 1564660D182033920000B985 /* WireFrame.m */; };
 		158D8BB51841765C00FA8AFB /* sphere_mid_res.obj in Resources */ = {isa = PBXBuildFile; fileRef = 158D8BB41841765C00FA8AFB /* sphere_mid_res.obj */; };
+		15BB316E186ABC6D001EE9E9 /* SettingsViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 15BB316D186ABC6D001EE9E9 /* SettingsViewController.m */; };
+		15BB3172186ABF1B001EE9E9 /* SettingsManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 15BB3171186ABF1B001EE9E9 /* SettingsManager.m */; };
 		1A408F3918357A8D0044E48E /* sphere.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1A408F3818357A8D0044E48E /* sphere.obj */; };
 		1A408F3E18357BAB0044E48E /* quad_sphere.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1A408F3D18357BAB0044E48E /* quad_sphere.obj */; };
 		1A408F4018357CAA0044E48E /* quad_sphere_high_res.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1A408F3F18357CAA0044E48E /* quad_sphere_high_res.obj */; };
@@ -189,6 +191,10 @@
 		1564660C182033920000B985 /* WireFrame.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WireFrame.h; sourceTree = "<group>"; };
 		1564660D182033920000B985 /* WireFrame.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WireFrame.m; sourceTree = "<group>"; };
 		158D8BB41841765C00FA8AFB /* sphere_mid_res.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = sphere_mid_res.obj; sourceTree = "<group>"; };
+		15BB316C186ABC6D001EE9E9 /* SettingsViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SettingsViewController.h; sourceTree = "<group>"; };
+		15BB316D186ABC6D001EE9E9 /* SettingsViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SettingsViewController.m; sourceTree = "<group>"; };
+		15BB3170186ABF1B001EE9E9 /* SettingsManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SettingsManager.h; sourceTree = "<group>"; };
+		15BB3171186ABF1B001EE9E9 /* SettingsManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SettingsManager.m; sourceTree = "<group>"; };
 		1A408F3818357A8D0044E48E /* sphere.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = sphere.obj; sourceTree = "<group>"; };
 		1A408F3D18357BAB0044E48E /* quad_sphere.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = quad_sphere.obj; sourceTree = "<group>"; };
 		1A408F3F18357CAA0044E48E /* quad_sphere_high_res.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = quad_sphere_high_res.obj; sourceTree = "<group>"; };
@@ -413,12 +419,10 @@
 		156465FD182033920000B985 /* QuadMeshProject */ = {
 			isa = PBXGroup;
 			children = (
-				156465FE182033920000B985 /* BaseQuadMeshViewController.h */,
-				156465FF182033920000B985 /* BaseQuadMeshViewController.m */,
+				15BB316F186ABF03001EE9E9 /* Managers */,
+				15BB3168186ABC26001EE9E9 /* ViewControllers */,
 				15646600182033920000B985 /* MeshLoader.h */,
 				15646601182033920000B985 /* MeshLoader.mm */,
-				15646608182033920000B985 /* QuadMeshViewController.h */,
-				15646609182033920000B985 /* QuadMeshViewController.mm */,
 				1564660A182033920000B985 /* QuadPolygonMesh.h */,
 				1564660B182033920000B985 /* QuadPolygonMesh.mm */,
 				1564660C182033920000B985 /* WireFrame.h */,
@@ -447,6 +451,28 @@
 			);
 			name = ObjFiles;
 			path = Classes/QuadMeshProject/ObjFiles;
+			sourceTree = "<group>";
+		};
+		15BB3168186ABC26001EE9E9 /* ViewControllers */ = {
+			isa = PBXGroup;
+			children = (
+				156465FE182033920000B985 /* BaseQuadMeshViewController.h */,
+				156465FF182033920000B985 /* BaseQuadMeshViewController.m */,
+				15646608182033920000B985 /* QuadMeshViewController.h */,
+				15646609182033920000B985 /* QuadMeshViewController.mm */,
+				15BB316C186ABC6D001EE9E9 /* SettingsViewController.h */,
+				15BB316D186ABC6D001EE9E9 /* SettingsViewController.m */,
+			);
+			name = ViewControllers;
+			sourceTree = "<group>";
+		};
+		15BB316F186ABF03001EE9E9 /* Managers */ = {
+			isa = PBXGroup;
+			children = (
+				15BB3170186ABF1B001EE9E9 /* SettingsManager.h */,
+				15BB3171186ABF1B001EE9E9 /* SettingsManager.m */,
+			);
+			name = Managers;
 			sourceTree = "<group>";
 		};
 		1A9438AA1832F39F0081F188 /* Helpers */ = {
@@ -616,6 +642,7 @@
 				15646616182033920000B985 /* QuadPolygonMesh.mm in Sources */,
 				153B4E4118206CC200962DB2 /* EulerAngles.c in Sources */,
 				15646617182033920000B985 /* WireFrame.m in Sources */,
+				15BB316E186ABC6D001EE9E9 /* SettingsViewController.m in Sources */,
 				153B4E3D18206CC200962DB2 /* GyroRotationManager.m in Sources */,
 				153B4E3918206CC200962DB2 /* Mesh.m in Sources */,
 				153B4E3C18206CC200962DB2 /* ShaderProgram.m in Sources */,
@@ -629,6 +656,7 @@
 				156463FB1820266E0000B985 /* AppDelegate.m in Sources */,
 				153B4E3718206CC200962DB2 /* AGLKContext.m in Sources */,
 				153B4E4218206CC200962DB2 /* Utilities.m in Sources */,
+				15BB3172186ABF1B001EE9E9 /* SettingsManager.m in Sources */,
 				1551ED6E18348F7F00855993 /* Line.m in Sources */,
 				1553C23D183F00A100839072 /* PolarAnnularMesh.mm in Sources */,
 				1A976FC0184683EF0022AC3D /* PAMUtilities.mm in Sources */,

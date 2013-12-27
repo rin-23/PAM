@@ -9,6 +9,7 @@
 #import "BaseQuadMeshViewController.h"
 #import "AGLKContext.h"
 
+
 @interface BaseQuadMeshViewController ()
 
 @end
@@ -19,9 +20,6 @@
 {
     self = [super init];
     if (self) {
-        // Custom initialization
-        UIBarButtonItem* resetItem = [[UIBarButtonItem alloc] initWithTitle:@"Reset" style:UIBarButtonItemStylePlain target:self action:@selector(resetClicked:)];
-        [self.navigationItem setLeftBarButtonItems:@[resetItem]];
     }
     return self;
 }
@@ -30,12 +28,12 @@
 {
     [super viewDidLoad];
 	// Do any additional setup after loading the view.
+    self.navigationController.navigationBarHidden = YES;
 
-    GLKView* view = [[GLKView alloc] initWithFrame:CGRectMake(0, 20, self.view.frame.size.width, self.view.frame.size.height - 44)];
+    GLKView* view = [[GLKView alloc] initWithFrame:CGRectMake(0, 0, self.view.frame.size.width, self.view.frame.size.height)];
     view.multipleTouchEnabled = YES;
 //    view.contentScaleFactor = 1.0f;
     view.drawableDepthFormat = GLKViewDrawableDepthFormat16;
-    self.view = view;
     
     // Create an OpenGL ES 2.0 context and provide it to the view
     view.context = [[AGLKContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
@@ -47,14 +45,31 @@
     _activity.center =  CGPointMake(self.view.frame.size.width/2, self.view.frame.size.height/2);
     _activity.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin|UIViewAutoresizingFlexibleRightMargin|UIViewAutoresizingFlexibleTopMargin|UIViewAutoresizingFlexibleBottomMargin;
 
-    _transformSwitch = [[UISwitch alloc] initWithFrame:CGRectMake(5, 75, 30, 20)];
-    [view addSubview:_transformSwitch];
+    UIButton* settingsIcon = [UIButton buttonWithType:UIButtonTypeInfoDark];
+    [settingsIcon setFrame:CGRectMake(10, 10, 30, 30)];
+    [settingsIcon addTarget:self action:@selector(settingsButtonClicked:) forControlEvents:UIControlEventTouchUpInside];
+    [view addSubview:settingsIcon];
     
-    _branchWidthSlider = [[UISlider alloc] initWithFrame:CGRectMake(65, 85, 130, 10)];
-    [view addSubview:_branchWidthSlider];
+    SettingsViewController* contentViewContoller = [[SettingsViewController alloc] init];
+    contentViewContoller.delegate = self;
+    _settingsPopover = [[UIPopoverController alloc] initWithContentViewController:contentViewContoller];
+    
+    self.view = view;
+}
 
-    _skeletonSwitch = [[UISwitch alloc] initWithFrame:CGRectMake(200, 75, 30, 20)];    
-    [view addSubview:_skeletonSwitch];
+- (void)didReceiveMemoryWarning
+{
+    [super didReceiveMemoryWarning];
+    // Dispose of any resources that can be recreated.
+}
+
+
+-(void)settingsButtonClicked:(UIButton*)btn {
+    if (_settingsPopover.isPopoverVisible) {
+        [_settingsPopover dismissPopoverAnimated:YES];
+    } else {
+        [_settingsPopover presentPopoverFromRect:CGRectMake(10, 10, 30, 30) inView:self.view permittedArrowDirections:UIPopoverArrowDirectionAny animated:YES];
+    }
 }
 
 -(void)viewDidAppear:(BOOL)animated {
@@ -73,7 +88,6 @@
     [super viewWillDisappear:animated];
 }
 
-
 -(BOOL)canBecomeFirstResponder {
 	return YES;
 }
@@ -90,14 +104,25 @@
     [_activity stopAnimating];
 }
 
--(void)resetClicked:(id)sender {
+#pragma mark - SettingsViewControllerDelegate
+
+-(void)showSkeleton:(BOOL)showSkeleton {
     //overwrite
 }
 
-- (void)didReceiveMemoryWarning
-{
-    [super didReceiveMemoryWarning];
-    // Dispose of any resources that can be recreated.
+-(void)transformModeIsOn:(BOOL)isOn {
+    //overwrite
 }
+
+-(void)clearModel {
+    //overwrite
+}
+
+-(void)resetTransformations {
+    //overwrite
+}
+
+
+
 
 @end

@@ -6,17 +6,61 @@
       <BreakpointProxy
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
-            shouldBeEnabled = "Yes"
+            shouldBeEnabled = "No"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "PAM/Classes/QuadMeshProject/PolarAnnularMesh.mm"
-            timestampString = "406868755.430639"
+            timestampString = "410577868.988065"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "314"
-            endingLineNumber = "314"
-            landmarkName = "-createBranchAtVertex:width:vertexID:"
+            startingLineNumber = "486"
+            endingLineNumber = "486"
+            landmarkName = "-createBranchAtVertex:numOfSpines:vertexID:branchWidth:"
             landmarkType = "5">
+            <Locations>
+               <Location
+                  shouldBeEnabled = "No"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "-[PolarAnnularMesh createBranchAtVertex:numOfSpines:vertexID:branchWidth:]"
+                  moduleName = "PAM"
+                  urlString = "file:///Users/Rinat/Workspace/PAM/PAM/Classes/QuadMeshProject/PolarAnnularMesh.mm"
+                  timestampString = "410549133.782249"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "479"
+                  endingLineNumber = "479"
+                  offsetFromSymbolStart = "54">
+               </Location>
+               <Location
+                  shouldBeEnabled = "No"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "-[PolarAnnularMesh createBranchAtVertex:numOfSpines:vertexID:branchWidth:]"
+                  moduleName = "PAM"
+                  urlString = "file:///Users/Rinat/Workspace/PAM/PAM/Classes/QuadMeshProject/PolarAnnularMesh.mm"
+                  timestampString = "410549133.782496"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "479"
+                  endingLineNumber = "479"
+                  offsetFromSymbolStart = "1812">
+               </Location>
+               <Location
+                  shouldBeEnabled = "No"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "-[PolarAnnularMesh createBranchAtVertex:numOfSpines:vertexID:branchWidth:]"
+                  moduleName = "PAM"
+                  urlString = "file:///Users/Rinat/Workspace/PAM/PAM/Classes/QuadMeshProject/PolarAnnularMesh.mm"
+                  timestampString = "410549133.782663"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "479"
+                  endingLineNumber = "479"
+                  offsetFromSymbolStart = "1910">
+               </Location>
+            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
    </Breakpoints>

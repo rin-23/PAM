@@ -9,15 +9,15 @@
 #import <UIKit/UIKit.h>
 
 @protocol SettingsViewControllerDelegate <NSObject>
--(void)showSkeleton:(BOOL)showSkeleton;
+-(void)showSkeleton:(BOOL)show;
 -(void)transformModeIsOn:(BOOL)isOn;
 -(void)clearModel;
 -(void)resetTransformations;
+-(void)dismiss;
 @end
 
 @interface SettingsViewController : UIViewController {
     UISwitch* _transformSwitch;
-//    UISlider* _branchWidthSlider;
     UISwitch* _skeletonSwitch;
     UIButton* _clearModelBtn;
     UIButton* _resetBtn;

@@ -61,6 +61,7 @@
 		158D8BB51841765C00FA8AFB /* sphere_mid_res.obj in Resources */ = {isa = PBXBuildFile; fileRef = 158D8BB41841765C00FA8AFB /* sphere_mid_res.obj */; };
 		15BB316E186ABC6D001EE9E9 /* SettingsViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 15BB316D186ABC6D001EE9E9 /* SettingsViewController.m */; };
 		15BB3172186ABF1B001EE9E9 /* SettingsManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 15BB3171186ABF1B001EE9E9 /* SettingsManager.m */; };
+		15BB3176186E5AFC001EE9E9 /* PAMPanGestureRecognizer.m in Sources */ = {isa = PBXBuildFile; fileRef = 15BB3175186E5AFC001EE9E9 /* PAMPanGestureRecognizer.m */; };
 		1A408F3918357A8D0044E48E /* sphere.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1A408F3818357A8D0044E48E /* sphere.obj */; };
 		1A408F3E18357BAB0044E48E /* quad_sphere.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1A408F3D18357BAB0044E48E /* quad_sphere.obj */; };
 		1A408F4018357CAA0044E48E /* quad_sphere_high_res.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1A408F3F18357CAA0044E48E /* quad_sphere_high_res.obj */; };
@@ -195,6 +196,8 @@
 		15BB316D186ABC6D001EE9E9 /* SettingsViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SettingsViewController.m; sourceTree = "<group>"; };
 		15BB3170186ABF1B001EE9E9 /* SettingsManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SettingsManager.h; sourceTree = "<group>"; };
 		15BB3171186ABF1B001EE9E9 /* SettingsManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SettingsManager.m; sourceTree = "<group>"; };
+		15BB3174186E5AFC001EE9E9 /* PAMPanGestureRecognizer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = PAMPanGestureRecognizer.h; path = "Gesture Recongnizers/PAMPanGestureRecognizer.h"; sourceTree = "<group>"; };
+		15BB3175186E5AFC001EE9E9 /* PAMPanGestureRecognizer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = PAMPanGestureRecognizer.m; path = "Gesture Recongnizers/PAMPanGestureRecognizer.m"; sourceTree = "<group>"; };
 		1A408F3818357A8D0044E48E /* sphere.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = sphere.obj; sourceTree = "<group>"; };
 		1A408F3D18357BAB0044E48E /* quad_sphere.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = quad_sphere.obj; sourceTree = "<group>"; };
 		1A408F3F18357CAA0044E48E /* quad_sphere_high_res.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = quad_sphere_high_res.obj; sourceTree = "<group>"; };
@@ -419,6 +422,7 @@
 		156465FD182033920000B985 /* QuadMeshProject */ = {
 			isa = PBXGroup;
 			children = (
+				15BB3173186E5A32001EE9E9 /* Gesture Recognizers */,
 				15BB316F186ABF03001EE9E9 /* Managers */,
 				15BB3168186ABC26001EE9E9 /* ViewControllers */,
 				15646600182033920000B985 /* MeshLoader.h */,
@@ -473,6 +477,15 @@
 				15BB3171186ABF1B001EE9E9 /* SettingsManager.m */,
 			);
 			name = Managers;
+			sourceTree = "<group>";
+		};
+		15BB3173186E5A32001EE9E9 /* Gesture Recognizers */ = {
+			isa = PBXGroup;
+			children = (
+				15BB3174186E5AFC001EE9E9 /* PAMPanGestureRecognizer.h */,
+				15BB3175186E5AFC001EE9E9 /* PAMPanGestureRecognizer.m */,
+			);
+			name = "Gesture Recognizers";
 			sourceTree = "<group>";
 		};
 		1A9438AA1832F39F0081F188 /* Helpers */ = {
@@ -657,6 +670,7 @@
 				153B4E3718206CC200962DB2 /* AGLKContext.m in Sources */,
 				153B4E4218206CC200962DB2 /* Utilities.m in Sources */,
 				15BB3172186ABF1B001EE9E9 /* SettingsManager.m in Sources */,
+				15BB3176186E5AFC001EE9E9 /* PAMPanGestureRecognizer.m in Sources */,
 				1551ED6E18348F7F00855993 /* Line.m in Sources */,
 				1553C23D183F00A100839072 /* PolarAnnularMesh.mm in Sources */,
 				1A976FC0184683EF0022AC3D /* PAMUtilities.mm in Sources */,

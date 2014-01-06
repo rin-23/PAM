@@ -43,8 +43,8 @@ typedef CGLA::Vec3f Vecf;
 using namespace HMesh;
 
 @interface PolarAnnularMesh() {
-    
     HMesh::Manifold _manifold;
+    HMesh::Manifold _skeletonMani;
     HMesh::HalfEdgeAttributeVector<EdgeInfo> _edgeInfo;
     BoundingBox _boundingBox;
 
@@ -67,6 +67,8 @@ using namespace HMesh;
     HMesh::Manifold undoMani;
     
     CurrentModification modState;
+    
+
 }
 
 @property (nonatomic) AGLKVertexAttribArrayBuffer* normalDataBuffer;
@@ -74,6 +76,7 @@ using namespace HMesh;
 
 @property (nonatomic) AGLKVertexAttribArrayBuffer* wireframeColorDataBuffer;
 @property (nonatomic) AGLKVertexAttribArrayBuffer* wireframeIndexBuffer;
+
 @property (nonatomic, assign) int wireframeNumOfIndicies;
 
 @end
@@ -106,7 +109,7 @@ using namespace HMesh;
 
 -(void)setMeshFromObjFile:(NSString*)objFilePath {
 
-    _branchWidth = 1;
+//    _branchWidth = 1;
     modState = MODIFICATION_NONE;
     
     //Load manifold
@@ -129,9 +132,7 @@ using namespace HMesh;
     _boundingBox.height = fabsf(_boundingBox.maxBound.y - _boundingBox.minBound.y);
     _boundingBox.depth = fabsf(_boundingBox.maxBound.z - _boundingBox.minBound.z);
     
-    
-    
-    [self rebuffer];
+    [self rebufferWithCleanup:NO edgeTrace:NO];
 }
 
 
@@ -201,11 +202,6 @@ using namespace HMesh;
                                                                                     bytes:wireframeIndexData.bytes
                                                                                     usage:GL_STATIC_DRAW
                                                                                    target:GL_ELEMENT_ARRAY_BUFFER];
-}
-
--(void)rebuffer{
-    [self rebufferNoEdgetrace];
-    _edgeInfo = trace_spine_edges(_manifold);
 }
 
 -(void)rebufferWithCleanup:(BOOL)shouldClean edgeTrace:(BOOL)shouldEdgeTrace {
@@ -302,7 +298,17 @@ using namespace HMesh;
 
 -(void)undo {
     _manifold = undoMani;
-    [self rebuffer];
+    [self rebufferWithCleanup:NO edgeTrace:YES];
+}
+
+-(void)showSkeleton:(BOOL)show {
+    if (show) {
+        _skeletonMani = _manifold; //TODO check memmory managment here
+        skeleton_retract(_manifold, 1);
+    } else {
+        _manifold = _skeletonMani;
+    }
+    [self rebufferWithCleanup:NO edgeTrace:NO];
 }
 
 -(BOOL)manifoldIsLoaded {
@@ -481,7 +487,7 @@ using namespace HMesh;
         NSLog(@"[WARNING]Tried to create a branch at a pole");
         return NO;
     }
-    
+        
     //Find rib halfedge that points to a given vertex
     Walker walker = _manifold.walker(vID);
     if (_edgeInfo[walker.halfedge()].edge_type == SPINE) {
@@ -632,8 +638,9 @@ using namespace HMesh;
 #pragma mark - TOUCHES: BRANCH CREATION ONE FINGER
 
 -(void)startCreateBranch:(GLKVector3)touchPoint {
-    if (![self manifoldIsLoaded])
+    if (![self manifoldIsLoaded]) {
         return;
+    }
     
     _touchPoints.clear();
     _touchPoints.push_back(touchPoint);
@@ -690,8 +697,12 @@ using namespace HMesh;
 //    }
 //}
 
--(void)endCreateBranchBended:(GLKVector3)touchPoint touchedModel:(BOOL)touchedModel {
-    if(![self manifoldIsLoaded]) {
+-(void)endCreateBranchBended:(GLKVector3)touchPoint
+                touchedModel:(BOOL)touchedModel
+                   touchSize:(float)touchSize
+           averageTouchSpeed:(float)touchSpeed
+{
+    if (![self manifoldIsLoaded]) {
         return;
     }
     
@@ -719,8 +730,26 @@ using namespace HMesh;
     GLKVector3 holeNorm;
     HalfEdgeID boundaryHalfEdge;
     
+    int limbWidth = 1;
+
+//    if (touchSize > 9.0f) {
+//        limbWidth = 2;
+//    } else {
+//        limbWidth = 1;
+//    }
+
+    if (touchSpeed <= 500) {
+        limbWidth = 1;
+    } else if (touchSpeed > 500  && touchSpeed <= 1000) {
+        limbWidth = 2;
+    } else if (touchSpeed > 1000) {
+        limbWidth = 3;
+    }
+    
+    NSLog(@"Limb Width: %i", limbWidth);
+    
     BOOL result = [self createHoleAtVertex:touchedVID
-                                     numOfSpines:self.branchWidth
+                               numOfSpines:limbWidth
                                   vertexID:&newPoleID
                                branchWidth:&bWidth
                                 holeCenter:&holeCenter
@@ -732,8 +761,7 @@ using namespace HMesh;
     }
     
     //closest to the first centroid between two fingers vertex in 2D space
-    GLKVector3 touchedV_world = [Utilities matrix4:self.modelViewMatrix
-                                   multiplyVector3:holeCenter];
+    GLKVector3 touchedV_world = [Utilities matrix4:self.modelViewMatrix multiplyVector3:holeCenter];
     float zValueTouched = touchedV_world.z;
     
     //convert touch points to world space
@@ -750,7 +778,6 @@ using namespace HMesh;
     [PAMUtilities centroids:rawSkeleton forOneFingerTouchPoint:touchPointsWorld withNextCentroidStep:c_step];
     if (rawSkeleton.size() < 4) {
         NSLog(@"[PolarAnnularMesh][WARNING] Not enough controids");
-        [self undo];
         return;
     }
     
@@ -770,7 +797,7 @@ using namespace HMesh;
     
     //Parse new skeleton and create ribs
     //Ingore first and last centroids since they are poles
-    int numSpines = self.branchWidth * 4;
+    int numSpines = limbWidth * 4;
     vector<vector<GLKVector3>> allRibs(skeleton.size());
     vector<GLKVector3> skeletonModel;
     vector<GLKVector3> skeletonNormalsModel;
@@ -786,7 +813,6 @@ using namespace HMesh;
         nModel = GLKVector3MultiplyScalar(GLKVector3Normalize(nModel), ribWidth);
         GLKVector3 tModel = [Utilities invertVector4:GLKVector4Make(skeletonTangents[i].x, skeletonTangents[i].y, 0, 0)
                                           withMatrix:self.modelViewMatrix];
-        
         
         if (i == skeleton.size() - 1) {
             vector<GLKVector3> secondPole;
@@ -855,7 +881,7 @@ using namespace HMesh;
         verteciesToSmooth.push_back(smoothWalker.next().vertex()); //boundary
         verteciesToSmooth.push_back(smoothWalker.vertex()); //second last boundary
         Walker ws = _manifold.walker(smoothWalker.next().halfedge());
-        for (int s = 0; s < self.branchWidth + 1; s++) {
+        for (int s = 0; s < limbWidth + 1; s++) {
             ws = ws.next().opp().next();
             verteciesToSmooth.push_back(ws.vertex());
         }
@@ -1377,7 +1403,7 @@ using namespace HMesh;
                     &faces[0],
                     &indices[0]);
     
-    _branchWidth = 1;
+//    _branchWidth = 1;
     modState = MODIFICATION_NONE;
     
     //Calculate Bounding Box
@@ -1542,7 +1568,7 @@ using namespace HMesh;
     _edges_to_scale.clear();
     _all_vector_vid.clear();
     
-    [self rebuffer];
+    [self rebufferWithCleanup:NO edgeTrace:NO];
 }
  
 #pragma mark - SELECTION
@@ -1617,8 +1643,7 @@ using namespace HMesh;
     }
 }
 
--(void)draw {
-    
+-(void)draw {    
     [self updateMesh];
     
     glUseProgram(self.drawShaderProgram.program);

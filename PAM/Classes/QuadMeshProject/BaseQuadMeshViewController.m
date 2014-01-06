@@ -50,9 +50,23 @@
     [settingsIcon addTarget:self action:@selector(settingsButtonClicked:) forControlEvents:UIControlEventTouchUpInside];
     [view addSubview:settingsIcon];
     
+    
     SettingsViewController* contentViewContoller = [[SettingsViewController alloc] init];
     contentViewContoller.delegate = self;
-    _settingsPopover = [[UIPopoverController alloc] initWithContentViewController:contentViewContoller];
+    
+    if ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad) {
+        _settingsPopover = [[UIPopoverController alloc] initWithContentViewController:contentViewContoller];
+    } else {
+        _settingsController = contentViewContoller;
+    }
+    
+    _transformModeLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, 150, 30)];
+    _transformModeLabel.textColor = [UIColor blackColor];
+    _transformModeLabel.textAlignment = NSTextAlignmentCenter;
+    _transformModeLabel.center = CGPointMake(self.view.frame.size.width/2, _transformModeLabel.frame.size.height/2);
+    _transformModeLabel.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin|UIViewAutoresizingFlexibleRightMargin;
+    _transformModeLabel.alpha = 0.0f;
+    [view addSubview:_transformModeLabel];
     
     self.view = view;
 }
@@ -63,12 +77,23 @@
     // Dispose of any resources that can be recreated.
 }
 
+- (void)didRotateFromInterfaceOrientation:(UIInterfaceOrientation)fromInterfaceOrientation {
+    _glWidth = ((GLKView*)self.view).drawableWidth;
+    _glHeight = ((GLKView*)self.view).drawableHeight;
+}
 
 -(void)settingsButtonClicked:(UIButton*)btn {
-    if (_settingsPopover.isPopoverVisible) {
-        [_settingsPopover dismissPopoverAnimated:YES];
+    if ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad) {
+        if (_settingsPopover.isPopoverVisible) {
+            [_settingsPopover dismissPopoverAnimated:YES];
+        } else {
+            [_settingsPopover presentPopoverFromRect:CGRectMake(10, 10, 30, 30)
+                                              inView:self.view
+                            permittedArrowDirections:UIPopoverArrowDirectionAny animated:YES];
+        }
     } else {
-        [_settingsPopover presentPopoverFromRect:CGRectMake(10, 10, 30, 30) inView:self.view permittedArrowDirections:UIPopoverArrowDirectionAny animated:YES];
+        
+        [self presentViewController:_settingsController animated:YES completion:^{}];
     }
 }
 
@@ -104,25 +129,7 @@
     [_activity stopAnimating];
 }
 
-#pragma mark - SettingsViewControllerDelegate
-
--(void)showSkeleton:(BOOL)showSkeleton {
-    //overwrite
+-(void)dismiss {
+    [self dismissViewControllerAnimated:YES completion:nil];
 }
-
--(void)transformModeIsOn:(BOOL)isOn {
-    //overwrite
-}
-
--(void)clearModel {
-    //overwrite
-}
-
--(void)resetTransformations {
-    //overwrite
-}
-
-
-
-
 @end

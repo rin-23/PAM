@@ -14,7 +14,10 @@
     GLsizei _glWidth;
     GLsizei _glHeight;
 
+    UIViewController* _settingsController;
     UIPopoverController* _settingsPopover;
+    
+    UILabel* _transformModeLabel;
 }
 
 -(void)showLoadingIndicator;

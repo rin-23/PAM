@@ -10,7 +10,6 @@
 #import "RotationManager.h"
 #import "TranslationManager.h"
 #import "ZoomManager.h"
-//#import "QuadPolygonMesh.h"
 #import "PolarAnnularMesh.h"
 #import "AGLKContext.h"
 #import "Utilities.h"
@@ -20,6 +19,7 @@
 #import "Line.h"
 #include <vector>
 #import "SettingsManager.h"
+#import "PAMPanGestureRecognizer.h"
 
 typedef enum {
     TOUCHED_NONE,
@@ -32,8 +32,7 @@ typedef enum {
     GLKMatrix4 viewMatrix;
     GLKMatrix4 projectionMatrix;
     GLKMatrix4 modelViewProjectionMatrix;
-    
-//    QuadPolygonMesh* _pMesh;
+
     PolarAnnularMesh* _pMesh;
     BoundingBox _bbox;
     
@@ -41,21 +40,14 @@ typedef enum {
     GLuint _offScreenFrameBuffer;
     GLuint _offScreenColorBuffer;
     GLuint _offScreenDepthBuffer;
-    
-//    PlateStartPoint* _meshTouchPoint;
-//    
-//    BOOL isMovingPoint;
-//    
+
 //    NSMutableArray* _branchPoints;
-    
-    //Gestures
-    UITwoFingerHoldGestureRecognizer* _twoFingerBending;
-    UIPanGestureRecognizer* _oneFingerPanning;
     
     DrawingState _state;
     float _gaussianDepth;
-    
-    NSArray* _ingnoredViews;
+    float _touchSize;
+    float _speedSum;
+    int _touchCount;
     
     //Branch creation
     Line* _selectionLine;
@@ -76,7 +68,6 @@ typedef enum {
         _translationManager = [[TranslationManager alloc] init];
         _rotationManager = [[RotationManager alloc] init];
         _zoomManager = [[ZoomManager alloc] init];
-//        isMovingPoint = NO;
 //        _branchPoints = [[NSMutableArray alloc] init];
     }
     return self;
@@ -93,15 +84,6 @@ typedef enum {
     
     [self setupGL];
     [self addGestureRecognizersToView:self.view];
-    
-//    _branchWidthSlider.minimumValue = 1.0f;
-//    _branchWidthSlider.maximumValue = 5.0f;
-//    [_branchWidthSlider addTarget:self action:@selector(sliderChanged:) forControlEvents:UIControlEventValueChanged];
-//    
-//    [_transformSwitch addTarget:self action:@selector(transformSwitchChanged:) forControlEvents:UIControlEventValueChanged];
-//    [_skeletonSwitch addTarget:self action:@selector(skeletonSwitchChanged:) forControlEvents:UIControlEventValueChanged];
-//    
-//    _ingnoredViews = @[_transformSwitch, _branchWidthSlider, _skeletonSwitch];
 }
 
 - (void)viewDidUnload {
@@ -155,15 +137,13 @@ typedef enum {
 -(void)setupGL {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
-
 }
 
 -(void)addGestureRecognizersToView:(UIView*)view {
-
     //3 finger tap
-    UITapGestureRecognizer* threeFingerTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleThreeFingeTapGesture:)];
+    UITapGestureRecognizer* threeFingerTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTwoFingeTapGesture:)];
     threeFingerTap.numberOfTapsRequired = 1;
-    threeFingerTap.numberOfTouchesRequired = 3;
+    threeFingerTap.numberOfTouchesRequired = 2;
     [view addGestureRecognizer:threeFingerTap];
     
     //Pinch To Zoom. Scaling along X,Y,Z
@@ -181,11 +161,11 @@ typedef enum {
     [view addGestureRecognizer:rotationInPlaneOfScreen];
     
     //ArcBall Rotation
-    _oneFingerPanning = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleOneFingerPanGesture:)];
-    _oneFingerPanning.delegate = self;
-    _oneFingerPanning.maximumNumberOfTouches = 1;
-    [view addGestureRecognizer:_oneFingerPanning];
+    PAMPanGestureRecognizer* oneFingerPanning = [[PAMPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleOneFingerPanGesture:)];
+    oneFingerPanning.maximumNumberOfTouches = 1;
+    [view addGestureRecognizer:oneFingerPanning];
     
+    //Double Tap
     UITapGestureRecognizer* doubleTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleDoubleTapGesture:)];
     doubleTap.numberOfTouchesRequired = 1;
     doubleTap.numberOfTapsRequired = 2;
@@ -196,46 +176,10 @@ typedef enum {
 //    singleTap.numberOfTouchesRequired = 1;
 //    [singleTap requireGestureRecognizerToFail:doubleTap];
 //    [view addGestureRecognizer:singleTap];
-    
-    _twoFingerBending = [[UITwoFingerHoldGestureRecognizer alloc] initWithTarget:self action:@selector(handleTwoFingerTapGesture:)];
-    _twoFingerBending.delegate = self;
-//    _twoFingerBending.numberOfTouchesRequired = 2;
-//    _twoFingerBending.minimumPressDuration = 0.01;
-    _twoFingerBending.enabled = NO;
-//    [view addGestureRecognizer:_twoFingerBending];
 
 //    UITapGestureRecognizer* tapWithFourFingers = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleFourFingerTapGesture:)];
 //    tapWithTwoFingers.numberOfTouchesRequired = 4;
 //    [view addGestureRecognizer:tapWithFourFingers];
-}
-
-#pragma mark - UIGestureRecognizerDelegate
-- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
-{
-//    if (gestureRecognizer == _twoFingerBending && otherGestureRecognizer == _oneFingerPanning) {
-//        return YES;
-//    }
-//    if (gestureRecognizer == _oneFingerPanning && otherGestureRecognizer == _twoFingerBending) {
-//        return YES;
-//    }
-    return NO;
-}
-
-// called before touchesBegan:withEvent: is called on the gesture recognizer for a new touch. return NO to prevent the gesture recognizer from seeing this touch
-- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch {
-    CGPoint p = [touch locationInView:self.view];
-
-    
-//    if (CGRectContainsPoint(_containerView.frame, p)) {
-//        return NO;
-//    }
-
-    if (gestureRecognizer == _twoFingerBending) {
-        BOOL flag = [_twoFingerBending needsMoreTouch];
-        return flag;
-    }
-    
-    return YES;
 }
 
 #pragma mark - Gesture recognizer selectors
@@ -277,12 +221,27 @@ typedef enum {
     
     if ([SettingsManager sharedInstance].transform) {
         [_rotationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity];
+    } else if ([SettingsManager sharedInstance].showSkeleton) {
+        return;
     } else {
+        PAMPanGestureRecognizer* oneFingerPAMGesture = (PAMPanGestureRecognizer*)sender;
+
+        CGPoint V = [oneFingerPAMGesture velocityInView:self.view];
+        float S = sqrtf(powf(V.x, 2) + powf(V.y, 2));
+        float TS = [oneFingerPAMGesture touchSize];
+        NSLog(@"Touch Size:%0.3f Speed:%0.3f", TS, S);
         
         if (sender.state == UIGestureRecognizerStateBegan)
         {
-            CGPoint touchPoint = [self touchPointFromGesture:sender];
+            _touchSize = [oneFingerPAMGesture touchSize];
+//            CGPoint velocity = [oneFingerPAMGesture velocityInView:self.view];
+//            float cur_speed = sqrtf(powf(velocity.x, 2) + powf(velocity.y, 2));
+            _speedSum = 0;
+            _touchCount = 0;
+            
             _state = TOUCHED_NONE;
+            CGPoint touchPoint = [self touchPointFromGesture:sender];
+            
             //Add touch point to a line
             GLKVector3 rayOrigin, rayDirection;
             BOOL result = [self rayOrigin:&rayOrigin rayDirection:&rayDirection forTouchPoint:touchPoint];
@@ -290,6 +249,7 @@ typedef enum {
                 NSLog(@"[WARNING] Couldn't determine touch area");
                 return;
             }
+            
             rayOrigin = GLKVector3Add(rayOrigin, rayDirection);
             VertexRGBA vertex = {{rayOrigin.x, rayOrigin.y, rayOrigin.z}, {255,0,0,255}};
             NSMutableData* lineData = [[NSMutableData alloc] initWithBytes:&vertex length:sizeof(VertexRGBA)];
@@ -321,6 +281,11 @@ typedef enum {
         }
         else if (sender.state == UIGestureRecognizerStateChanged)
         {
+            CGPoint velocity = [oneFingerPAMGesture velocityInView:self.view];
+            float cur_speed = sqrtf(powf(velocity.x, 2) + powf(velocity.y, 2));
+            _speedSum += cur_speed;
+            _touchCount += 1;
+            
             //Add touch point to a line
             CGPoint touchPoint = [self touchPointFromGesture:sender];
             GLKVector3 rayOrigin, rayDirection;
@@ -338,20 +303,23 @@ typedef enum {
         {
             CGPoint touchPoint = [self touchPointFromGesture:sender];
             GLKVector3 modelCoord;
+            float averageSpeed = _speedSum/_touchCount;
+            NSLog(@"Average Speed: %f", averageSpeed);
+            
             if (_state == TOUCHED_MODEL) {
                 BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, _gaussianDepth)];
                 if (!result) {
                     NSLog(@"[WARNING] Couldn determine touch area");
                     return;
                 }
-                [_pMesh endCreateBranchBended:modelCoord touchedModel:YES];
+                [_pMesh endCreateBranchBended:modelCoord touchedModel:YES  touchSize:_touchSize averageTouchSpeed:averageSpeed];
             } else if (_state == TOUCHED_BACKGROUND){
                 BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, 0)];
                 if (!result) {
                     NSLog(@"[WARNING] Couldn't determine touch area");
                     return;
                 }
-                [_pMesh endCreateBranchBended:modelCoord touchedModel:NO];
+                [_pMesh endCreateBranchBended:modelCoord touchedModel:NO touchSize:_touchSize averageTouchSpeed:averageSpeed];
             }
             _state = TOUCHED_NONE;
             _selectionLine = nil;
@@ -362,12 +330,16 @@ typedef enum {
 -(void)handleTwoFingerPanGesture:(UIGestureRecognizer*)sender {
     if ([SettingsManager sharedInstance].transform) {
         [_translationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity];
-    } else {   
+    } else if ([SettingsManager sharedInstance].showSkeleton) {
+        return;
+    } else {
         if (sender.state == UIGestureRecognizerStateBegan) {
-            _selectionLine = nil;
+            _selectionLine  = nil;
             _selectionLine2 = nil;
             _selectionLine3 = nil;
-            if (sender.numberOfTouches != 2) return;
+            if (sender.numberOfTouches != 2) {
+                return;
+            }
             
             CGPoint touchPoint1 = [self scaleTouchPoint:[sender locationOfTouch:0 inView:(GLKView*)sender.view]
                                                  inView:(GLKView*)sender.view];
@@ -440,7 +412,6 @@ typedef enum {
             _selectionLine2 = nil;
 
             std::vector<std::vector<GLKVector3>> allRibs = [_pMesh endCreateBranchTwoFingersWithTouchedModel:(_state == TOUCHED_MODEL)];
-            NSLog(@"FUCK");
         }
             
 //            _ribsLines = [[NSMutableArray alloc] initWithCapacity:allRibs.size()];
@@ -472,11 +443,17 @@ typedef enum {
     }
 }
 
--(void)handleThreeFingeTapGesture:(UIGestureRecognizer*)sender {
+-(void)handleTwoFingeTapGesture:(UIGestureRecognizer*)sender {
     [SettingsManager sharedInstance].transform = ![SettingsManager sharedInstance].transform;
-//    [_transformSwitch setOn:!_transformSwitch.isOn animated:YES];
-//    [_translationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity];
-//    [_rotationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity];
+    _transformModeLabel.alpha = 1.0f;
+    if ([SettingsManager sharedInstance].transform) {
+        _transformModeLabel.text = @"Transform";
+    } else {
+        _transformModeLabel.text = @"Model";
+    }
+    [UIView animateWithDuration:1.0f animations:^{
+        _transformModeLabel.alpha = 0.0f;
+    }];
 }
 
 
@@ -485,6 +462,7 @@ typedef enum {
 }
 
 -(void)handleDoubleTapGesture:(UIGestureRecognizer*)sender {
+    return;
     if (sender.state == UIGestureRecognizerStateEnded) {
         CGPoint touchPoint = [self touchPointFromGesture:sender];
         GLKVector3 rayOrgin, rayDir;
@@ -495,87 +473,57 @@ typedef enum {
         }
         [_pMesh endSelectFaceWithRay:rayOrgin rayDirection:rayDir];
     }
-    
-    
-//    NSMutableData* pixelData = [self renderToOffscreenDepthBuffer:@[_pMesh]];
-//    CGPoint touchPoint = [self scaleTouchPoint:[sender locationInView:sender.view] inView:(GLKView*)sender.view];
-//    GLKVector3 startPoint;
-//    BOOL result = [self modelCoordinates:&startPoint forTouchPoint:touchPoint depthBuffer:pixelData];
-//    
-//    if (!result) {
-//        NSLog(@"[WARNING] Couldn determine touch area");
-//        return;
+}
+
+//-(void)handleTwoFingerTapGesture:(UIGestureRecognizer*)sender {
+//    if(sender.state == UIGestureRecognizerStateBegan) {
+//        NSLog(@"Two finger bending Started");
+//        CGPoint touchPoint1 = [self scaleTouchPoint:[sender locationOfTouch:0 inView:(GLKView*)sender.view]
+//                                             inView:(GLKView*)sender.view];
+//        CGPoint touchPoint2 = [self scaleTouchPoint:[sender locationOfTouch:1 inView:(GLKView*)sender.view]
+//                                             inView:(GLKView*)sender.view];
+//
+//        GLKVector3 rayOrgin, rayDir, touchPointViewCoord;
+//        BOOL result1 = [self rayOrigin:&rayOrgin rayDirection:&rayDir forTouchPoint:touchPoint1];
+//        BOOL result2 = [self modelCoordinates:&touchPointViewCoord forTouchPoint:GLKVector3Make(touchPoint2.x, touchPoint2.y, 0)];
+//        if (!result1 || !result2) {
+//            NSLog(@"[WARNING] Couldn't determine touch area");
+//            return;
+//        }
+////        [_pMesh bendBranchBeginWithFirstTouchRayOrigin:rayOrgin rayDirection:rayDir secondTouchPoint:touchPointViewCoord];        
+//    } else if (sender.state == UIGestureRecognizerStateChanged) {
+//        NSLog(@"Two finger bending Changed");
+//    } else if (sender.state == UIGestureRecognizerStateEnded) {
+//        NSLog(@"Two finger bending Ended ");
+//        CGPoint touchPoint2 = [self scaleTouchPoint:[sender locationOfTouch:1 inView:(GLKView*)sender.view]
+//                                             inView:(GLKView*)sender.view];
+//        GLKVector3 touchPointViewCoord;
+//        BOOL result = [self modelCoordinates:&touchPointViewCoord forTouchPoint:GLKVector3Make(touchPoint2.x, touchPoint2.y, 0)];
+//        if (!result) {
+//            NSLog(@"[WARNING] Couldn't determine touch area");
+//            return;
+//        }
+////        [_pMesh bendBranchEnd:touchPointViewCoord];
+//    } else if (sender.state == UIGestureRecognizerStateFailed) {
+//        NSLog(@"Two finger bending Failed ");
+//    } else {
+//        NSLog(@"Two finger bending Uknown State ");
 //    }
-   
-//    [_pMesh createBranchAtPointAndRefine:startPoint];
+//}
 
-    
-//    [_pMesh createNewRibAtPoint:startPoint];
-//    [_pMesh createNewSpineAtPoint:startPoint];
-//    GLKVector3* dataBytes = (GLKVector3*)data.bytes;
-//    
-//    for(int i = 0; i < data.length/sizeof(GLKVector3); i++) {
-//        PlateStartPoint* chosenPoint = [[PlateStartPoint alloc] initWithPoint:dataBytes[i] color:GLKVector3Make(0, 0, 255)];
-//        [_branchPoints addObject:chosenPoint];
+//-(void)handleFourFingerTapGesture:(UIGestureRecognizer*)sender {
+//    if (sender.state == UIGestureRecognizerStateEnded) {
+//        NSLog(@"Ended tap");
+////        [_transformSwitch setOn:!_transformSwitch.isOn];
+//        [SettingsManager sharedInstance].transform = ![SettingsManager sharedInstance].transform;
 //    }
-    
-//    GLKVector3 selectedVertex = [_pMesh closestVertexToMeshPoint:startPoint setAsCurrentID:NO];
-//    PlateStartPoint* chosenPoint = [[PlateStartPoint alloc] initWithPoint:selectedVertex color:GLKVector3Make(0, 0, 255)];
-//    [_branchPoints addObject:chosenPoint];
-}
-
--(void)handleTwoFingerTapGesture:(UIGestureRecognizer*)sender {
-    if(sender.state == UIGestureRecognizerStateBegan) {
-        NSLog(@"Two finger bending Started");
-        CGPoint touchPoint1 = [self scaleTouchPoint:[sender locationOfTouch:0 inView:(GLKView*)sender.view]
-                                             inView:(GLKView*)sender.view];
-        CGPoint touchPoint2 = [self scaleTouchPoint:[sender locationOfTouch:1 inView:(GLKView*)sender.view]
-                                             inView:(GLKView*)sender.view];
-
-        GLKVector3 rayOrgin, rayDir, touchPointViewCoord;
-        BOOL result1 = [self rayOrigin:&rayOrgin rayDirection:&rayDir forTouchPoint:touchPoint1];
-        BOOL result2 = [self modelCoordinates:&touchPointViewCoord forTouchPoint:GLKVector3Make(touchPoint2.x, touchPoint2.y, 0)];
-        if (!result1 || !result2) {
-            NSLog(@"[WARNING] Couldn't determine touch area");
-            return;
-        }
-//        [_pMesh bendBranchBeginWithFirstTouchRayOrigin:rayOrgin rayDirection:rayDir secondTouchPoint:touchPointViewCoord];        
-    } else if (sender.state == UIGestureRecognizerStateChanged) {
-        NSLog(@"Two finger bending Changed");
-    } else if (sender.state == UIGestureRecognizerStateEnded) {
-        NSLog(@"Two finger bending Ended ");
-        CGPoint touchPoint2 = [self scaleTouchPoint:[sender locationOfTouch:1 inView:(GLKView*)sender.view]
-                                             inView:(GLKView*)sender.view];
-        GLKVector3 touchPointViewCoord;
-        BOOL result = [self modelCoordinates:&touchPointViewCoord forTouchPoint:GLKVector3Make(touchPoint2.x, touchPoint2.y, 0)];
-        if (!result) {
-            NSLog(@"[WARNING] Couldn't determine touch area");
-            return;
-        }
-//        [_pMesh bendBranchEnd:touchPointViewCoord];
-    } else if (sender.state == UIGestureRecognizerStateFailed) {
-        NSLog(@"Two finger bending Failed ");
-    } else {
-        NSLog(@"Two finger bending Uknown State ");
-    }
-}
-
--(void)handleFourFingerTapGesture:(UIGestureRecognizer*)sender {
-    if (sender.state == UIGestureRecognizerStateEnded) {
-        NSLog(@"Ended tap");
-//        [_transformSwitch setOn:!_transformSwitch.isOn];
-        [SettingsManager sharedInstance].transform = ![SettingsManager sharedInstance].transform;
-    }
-}
+//}
 
 #pragma mark - Helpers
 
 //Respong to shake events in order to promit undo dialog
-- (void)motionEnded:(UIEventSubtype)motion withEvent:(UIEvent *)event
-{
-    if (motion == UIEventSubtypeMotionShake)
-    {
-        // your code
+- (void)motionEnded:(UIEventSubtype)motion withEvent:(UIEvent *)event {
+    if (motion == UIEventSubtypeMotionShake) {
         [[[UIAlertView alloc] initWithTitle:@"Undo?" message:nil delegate:self cancelButtonTitle:nil otherButtonTitles:@"Yes", @"No", nil] show];
     }
 }
@@ -650,10 +598,6 @@ typedef enum {
         [line draw];
     }
     
-//    _meshTouchPoint.viewMatrix = viewMatrix;
-//    _meshTouchPoint.projectionMatrix = projectionMatrix;
-//    [_meshTouchPoint draw];
-//    
 //    for (Mesh* bPoint in _branchPoints) {
 //        bPoint.viewMatrix = viewMatrix;
 //        bPoint.projectionMatrix = projectionMatrix;
@@ -841,28 +785,6 @@ typedef enum {
     return [self rayOrigin:rayOrigin rayDirection:rayDirection forTouchPoint:touchPoint];
 }
 
-#pragma mark - Navigation Bar Button Selector
-
--(void)sliderChanged:(id)sender{
-
-//    float newStep = roundf(_branchWidthSlider.value);
-    
-    // Convert "steps" back to the context of the sliders values.
-//    _branchWidthSlider.value = newStep;
-//    _pMesh.branchWidth = newStep;
-
-}
-
--(void)transformSwitchChanged:(id)sender {
-    UISwitch* s = (UISwitch*)sender;
-    _twoFingerBending.enabled = s.isOn;
-}
-
--(void)skeletonSwitchChanged:(id)sender {
-//    [_pMesh showSkeleton:_skeletonSwitch.isOn];
-}
-
-
 #pragma mark - UIAlertView Delegate 
 - (void)alertView:(UIAlertView *)alertView clickedButtonAtIndex:(NSInteger)buttonIndex {
     if ([alertView.title isEqualToString:@"Undo?"]) {
@@ -875,9 +797,10 @@ typedef enum {
 
 #pragma mark - SettingsViewControllerDelegate
 
--(void)showSkeleton:(BOOL)showSkeleton {
+-(void)showSkeleton:(BOOL)show {
     //overwrite
-    [SettingsManager sharedInstance].showSkeleton = showSkeleton;
+    [SettingsManager sharedInstance].showSkeleton = show;
+    [_pMesh showSkeleton:show];
 }
 
 -(void)transformModeIsOn:(BOOL)isOn {

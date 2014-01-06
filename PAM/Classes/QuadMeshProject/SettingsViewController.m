@@ -20,6 +20,7 @@
     self = [super init];
     if (self) {
         // Custom initialization
+
     }
     return self;
 }
@@ -28,9 +29,8 @@
 {
     [super viewDidLoad];
 	// Do any additional setup after loading the view.
-
-//    _branchWidthSlider = [[UISlider alloc] initWithFrame:CGRectMake(5, 25, 130, 10)];
-//    [self.view addSubview:_branchWidthSlider];
+    
+    self.view.backgroundColor = [UIColor whiteColor];
     
     int nextY = 10;
     UILabel* skeletonLabel = [[UILabel alloc] initWithFrame:CGRectMake(15, nextY, 100, 30)];
@@ -46,7 +46,7 @@
     [transformLabel setText:@"Transform"];
     [self.view addSubview:transformLabel];
     
-    _transformSwitch = [[UISwitch alloc] initWithFrame:CGRectMake(145, 50, 30, 20)];
+    _transformSwitch = [[UISwitch alloc] initWithFrame:CGRectMake(145, nextY + 10, 30, 20)];
     [_transformSwitch addTarget:self action:@selector(transformSwitchClicked:) forControlEvents:UIControlEventValueChanged];
     [self.view addSubview:_transformSwitch];
     
@@ -65,6 +65,17 @@
     [_resetBtn addTarget:self action:@selector(resetButton:) forControlEvents:UIControlEventTouchUpInside];
     [_resetBtn setFrame:CGRectMake(15, nextY + 10, 100, 30)];
     [self.view addSubview:_resetBtn];
+    
+    if ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPhone) {
+        UIButton* dismissButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+        [dismissButton setBackgroundColor:[UIColor lightGrayColor]];
+        [dismissButton setFrame:CGRectMake(20, self.view.frame.size.height - 60, self.view.frame.size.width - 40, 40)];
+        [dismissButton setAutoresizingMask:UIViewAutoresizingFlexibleTopMargin|UIViewAutoresizingFlexibleWidth];
+        [dismissButton addTarget:self action:@selector(dismissButtonClicked:) forControlEvents:UIControlEventTouchUpInside];
+        [dismissButton setTitle:@"OK" forState:UIControlStateNormal];
+        [dismissButton.titleLabel setFont:[UIFont systemFontOfSize:15.0f]];
+        [self.view addSubview:dismissButton];
+    }
 }
 
 -(void)viewWillAppear:(BOOL)animated {
@@ -92,6 +103,10 @@
 
 -(void)resetButton:(UIControl*)sender {
     [self.delegate resetTransformations];
+}
+
+-(void)dismissButtonClicked:(UIControl*)sender {
+    [self.delegate dismiss];
 }
 
 @end

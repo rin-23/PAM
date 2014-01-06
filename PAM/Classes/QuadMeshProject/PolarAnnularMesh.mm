@@ -633,7 +633,64 @@ using namespace HMesh;
     return YES;
 }
 
+#pragma mark - TOUCHES: SCULPTING A SMALL BUMP 
+-(void)createBumpAtPoint:(GLKVector3)touchPoint
+            touchedModel:(BOOL)touchedModel 
+              touchSpeed:(float)touchSpeed 
+               touchSize:(float)touchSize
+{
+    float brushSize;
 
+//    if (touchSize > 9.0f) {
+//        brushSize = 2;
+//    } else {
+//        brushSize = 1;
+//    }
+    
+    //make a small bump
+    if (touchSpeed <= 500) {
+        brushSize = 0.01;
+    } else if (touchSpeed > 500  && touchSpeed <= 1000) {
+        brushSize = 0.02;
+    } else if (touchSpeed > 1000) {
+        brushSize = 0.03;
+    }
+    
+    [self saveState];
+    
+    VertexID touchedVID;
+    GLKVector3 firstCentroid = _touchPoints[0];
+    if (touchedModel) {
+        //closest vertex in 3D space
+        touchedVID = [self closestVertexID_3D:firstCentroid];
+    } else {
+        //closest vertex in 2D space
+        touchedVID = [self closestVertexID_2D:firstCentroid];
+    }
+    
+    Vec c;
+    float r;
+    bsphere(_manifold, c, r);
+    Vec touchedPos = _manifold.pos(touchedVID);
+    Vec norm = HMesh::normal(_manifold, touchedVID);
+    Vec displace = 0.05*norm;
+    for (auto vid : _manifold.vertices())
+    {
+        double l = sqr_length(touchedPos - _manifold.pos(vid));
+        if (l < brushSize) {
+            _manifold.pos(vid) = _manifold.pos(vid) + displace * exp(-l/(brushSize*r*r));
+        }
+
+//        float l = (touchedPos - _manifold.pos(vid)).length();
+//        if (l < brushSize) {
+//            float x = l / brushSize;
+//            float weight  = pow(pow(x, 2) - 1, 2);
+//            _manifold.pos(vid) = _manifold.pos(vid) + displace * weight;
+//        }
+    }
+    
+    [self rebufferWithCleanup:NO edgeTrace:NO];
+}
 
 #pragma mark - TOUCHES: BRANCH CREATION ONE FINGER
 
@@ -707,7 +764,28 @@ using namespace HMesh;
     }
     
     if (_touchPoints.size() < 4) {
-        NSLog(@"[PolarAnnularMesh][WARNING] Garbage point data");
+        if (_touchPoints.size() > 1) {
+            [self createBumpAtPoint:_touchPoints[0] touchedModel:touchedModel touchSpeed:touchSpeed touchSize:touchSize];
+        } else {
+            NSLog(@"[PolarAnnularMesh][WARNING] Garbage point data");
+        }
+        return;
+    }
+    
+    //convert touch points to world space
+    vector<GLKVector2> touchPointsWorld(_touchPoints.size());
+    for (int i = 0; i < _touchPoints.size(); i++) {
+        GLKVector3 worldSpace3 = [Utilities matrix4:self.viewMatrix multiplyVector3:_touchPoints[i]];
+        touchPointsWorld[i] = GLKVector2Make(worldSpace3.x, worldSpace3.y);
+    }
+    
+    //Get skeleton aka joint points
+    vector<GLKVector2> rawSkeleton;
+    float c_step = GLKVector3Length([Utilities matrix4:self.viewMatrix multiplyVector4:GLKVector4Make(kCENTROID_STEP, 0, 0, 0)]);
+    [PAMUtilities centroids:rawSkeleton forOneFingerTouchPoint:touchPointsWorld withNextCentroidStep:c_step];
+    if (rawSkeleton.size() < 4) {
+        NSLog(@"[PolarAnnularMesh][WARNING] Not enough controids");
+        [self createBumpAtPoint:_touchPoints[0] touchedModel:touchedModel touchSpeed:touchSpeed touchSize:touchSize];
         return;
     }
     
@@ -763,23 +841,6 @@ using namespace HMesh;
     //closest to the first centroid between two fingers vertex in 2D space
     GLKVector3 touchedV_world = [Utilities matrix4:self.modelViewMatrix multiplyVector3:holeCenter];
     float zValueTouched = touchedV_world.z;
-    
-    //convert touch points to world space
-    vector<GLKVector2> touchPointsWorld(_touchPoints.size());
-    for (int i = 0; i < _touchPoints.size(); i++)
-    {
-        GLKVector3 worldSpace3 = [Utilities matrix4:self.viewMatrix multiplyVector3:_touchPoints[i]];
-        touchPointsWorld[i] = GLKVector2Make(worldSpace3.x, worldSpace3.y);
-    }
-    
-    //Get skeleton aka joint points
-    vector<GLKVector2> rawSkeleton;
-    float c_step = GLKVector3Length([Utilities matrix4:self.viewMatrix multiplyVector4:GLKVector4Make(kCENTROID_STEP, 0, 0, 0)]);
-    [PAMUtilities centroids:rawSkeleton forOneFingerTouchPoint:touchPointsWorld withNextCentroidStep:c_step];
-    if (rawSkeleton.size() < 4) {
-        NSLog(@"[PolarAnnularMesh][WARNING] Not enough controids");
-        return;
-    }
     
     //Smooth
     vector<GLKVector2> skeleton = [PAMUtilities laplacianSmoothing:rawSkeleton iterations:1];

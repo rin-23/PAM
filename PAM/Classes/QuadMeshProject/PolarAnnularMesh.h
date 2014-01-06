@@ -13,7 +13,7 @@
 
 -(void)setMeshFromObjFile:(NSString*)objFile;
 
-#pragma mark - TOUCHES: BRANCH CREATION ONE FINGER
+#pragma mark - TOUCHES: BRANCH/BUMPS CREATION ONE FINGER
 -(void)startCreateBranch:(GLKVector3)touchPoint;
 -(void)continueCreateBranch:(GLKVector3)touchPoint;
 -(void)endCreateBranchBended:(GLKVector3)touchPoint

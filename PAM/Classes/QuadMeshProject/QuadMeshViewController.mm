@@ -187,9 +187,9 @@ typedef enum {
     if ([SettingsManager sharedInstance].transform) {
         [_zoomManager handlePinchGesture:sender];
     } else {
-        return;
+//        return;
         UIPinchGestureRecognizer* pinch = (UIPinchGestureRecognizer*) sender;
-//        NSLog(@"Scale %f", pinch.scale);
+        NSLog(@"Scale %f", pinch.velocity);
         if (sender.state == UIGestureRecognizerStateBegan) {
             CGPoint touchPoint1 = [self scaleTouchPoint:[sender locationOfTouch:0 inView:(GLKView*)sender.view]
                                                  inView:(GLKView*)sender.view];
@@ -203,16 +203,12 @@ typedef enum {
                 NSLog(@"[WARNING] Couldn't determine touch area");
                 return;
             }
-            [_pMesh startScalingRibsWithRayOrigin1:rayOrigin1
-                                        rayOrigin2:rayOrigin2
-                                     rayDirection1:rayDir1 
-                                     rayDirection2:rayDir2
-                                             scale:pinch.scale];
             
+            [_pMesh startScalingSingleRibWithTouchPoint1:rayOrigin1 touchPoint2:rayOrigin2 scale:pinch.scale velocity:pinch.velocity];
         } else if (sender.state == UIGestureRecognizerStateChanged) {
-            [_pMesh changeScalingRibsWithScaleFactor:pinch.scale];
+            [_pMesh changeScalingSingleRibWithScaleFactor:pinch.scale];
         } else if (sender.state == UIGestureRecognizerStateEnded) {
-            [_pMesh endScalingRibsWithScaleFactor:pinch.scale];
+            [_pMesh endScalingSingleRibWithScaleFactor:pinch.scale];
         }
     }
 }

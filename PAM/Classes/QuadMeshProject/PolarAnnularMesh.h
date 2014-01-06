@@ -29,7 +29,15 @@
 #pragma mark - TOUCHES: FACE PICKING
 -(void)endSelectFaceWithRay:(GLKVector3)rayOrigin rayDirection:(GLKVector3)rayDir;
 
-#pragma mark - TOUHCES: SCALING
+#pragma mark - TOUCHES: SINGLE RING SCALING
+-(void)startScalingSingleRibWithTouchPoint1:(GLKVector3)touchPoint1
+                                touchPoint2:(GLKVector3)touchPoint2
+                                      scale:(float)scale
+                                   velocity:(float)velocity;
+-(void)changeScalingSingleRibWithScaleFactor:(float)scale;
+-(void)endScalingSingleRibWithScaleFactor:(float)scale;
+
+#pragma mark - TOUCHES: MULTIPLE RING SCALING
 -(void)startScalingRibsWithRayOrigin1:(GLKVector3)rayOrigin1
                            rayOrigin2:(GLKVector3)rayOrigin2
                         rayDirection1:(GLKVector3)rayDir1

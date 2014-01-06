@@ -634,11 +634,15 @@ using namespace HMesh;
 }
 
 #pragma mark - TOUCHES: SCULPTING A SMALL BUMP 
--(void)createBumpAtPoint:(GLKVector3)touchPoint
+-(void)createBumpAtPoint:(vector<GLKVector3>)tPoints
             touchedModel:(BOOL)touchedModel 
               touchSpeed:(float)touchSpeed 
                touchSize:(float)touchSize
 {
+    if (tPoints.size() < 2) {
+        return;
+    }
+    
     float brushSize;
 
 //    if (touchSize > 9.0f) {
@@ -659,13 +663,12 @@ using namespace HMesh;
     [self saveState];
     
     VertexID touchedVID;
-    GLKVector3 firstCentroid = _touchPoints[0];
     if (touchedModel) {
         //closest vertex in 3D space
-        touchedVID = [self closestVertexID_3D:firstCentroid];
+        touchedVID = [self closestVertexID_3D:tPoints[0]];
     } else {
         //closest vertex in 2D space
-        touchedVID = [self closestVertexID_2D:firstCentroid];
+        touchedVID = [self closestVertexID_2D:tPoints[0]];
     }
     
     Vec c;
@@ -674,6 +677,21 @@ using namespace HMesh;
     Vec touchedPos = _manifold.pos(touchedVID);
     Vec norm = HMesh::normal(_manifold, touchedVID);
     Vec displace = 0.05*norm;
+    
+    //Decide if its a bump or dent, based on direction of the normal and a stoke in 2D
+    GLKVector3 firstCentroidWorld = [Utilities matrix4:self.viewMatrix multiplyVector3:tPoints[0]];
+    GLKVector3 lastCentroidWorld = [Utilities matrix4:self.viewMatrix multiplyVector3:tPoints[tPoints.size() - 1]];
+    GLKVector3 strokeDirWorld = GLKVector3Subtract(lastCentroidWorld, firstCentroidWorld);
+    GLKVector2 strokeDirWorld2D = GLKVector2Make(strokeDirWorld.x, strokeDirWorld.y);
+    GLKVector3 normModel = GLKVector3Make(norm[0], norm[1], norm[2]);
+    GLKVector3 normWorld = [Utilities matrix4:self.modelViewMatrix multiplyVector3:normModel];
+    GLKVector2 normWorld2D = GLKVector2Make(normWorld.x, normWorld.y);
+
+    float dotP = GLKVector2DotProduct(normWorld2D, strokeDirWorld2D);
+    if (dotP < 0) {
+        displace = -1*displace;
+    }
+    
     for (auto vid : _manifold.vertices())
     {
         double l = sqr_length(touchedPos - _manifold.pos(vid));
@@ -764,8 +782,8 @@ using namespace HMesh;
     }
     
     if (_touchPoints.size() < 4) {
-        if (_touchPoints.size() > 1) {
-            [self createBumpAtPoint:_touchPoints[0] touchedModel:touchedModel touchSpeed:touchSpeed touchSize:touchSize];
+        if (_touchPoints.size() >= 2) {
+            [self createBumpAtPoint:_touchPoints touchedModel:touchedModel touchSpeed:touchSpeed touchSize:touchSize];
         } else {
             NSLog(@"[PolarAnnularMesh][WARNING] Garbage point data");
         }
@@ -785,7 +803,7 @@ using namespace HMesh;
     [PAMUtilities centroids:rawSkeleton forOneFingerTouchPoint:touchPointsWorld withNextCentroidStep:c_step];
     if (rawSkeleton.size() < 4) {
         NSLog(@"[PolarAnnularMesh][WARNING] Not enough controids");
-        [self createBumpAtPoint:_touchPoints[0] touchedModel:touchedModel touchSpeed:touchSpeed touchSize:touchSize];
+        [self createBumpAtPoint:_touchPoints touchedModel:touchedModel touchSpeed:touchSpeed touchSize:touchSize];
         return;
     }
     
@@ -976,6 +994,26 @@ using namespace HMesh;
         return vector<vector<GLKVector3>>();
     }
     
+    //convert touch points to world space
+    vector<GLKVector2> touchPointsWorld(_touchPoints.size());
+    for (int i = 0; i < _touchPoints.size(); i++)
+    {
+        GLKVector3 worldSpace3 = [Utilities matrix4:self.viewMatrix multiplyVector3:_touchPoints[i]];
+        touchPointsWorld[i] = GLKVector2Make(worldSpace3.x, worldSpace3.y);
+    }
+    
+    //Get skeleton aka joint points
+    vector<GLKVector2> rawSkeleton;
+    vector<float> skeletonWidth;
+    
+    //Find scaled step
+    float c_step = GLKVector3Length([Utilities matrix4:self.viewMatrix multiplyVector4:GLKVector4Make(kCENTROID_STEP, 0, 0, 0)]);
+    [PAMUtilities centroids:rawSkeleton ribWidth:skeletonWidth forTwoFingerTouchPoint:touchPointsWorld withNextCentroidStep:c_step];
+    if (rawSkeleton.size() < 4) {
+        NSLog(@"[PolarAnnularMesh][WARNING] Not enough controids");
+        return vector<vector<GLKVector3>>();
+    }
+    
     [self saveState];
     
     //closest to the first centroid between two fingers vertex in 2D space
@@ -1015,25 +1053,7 @@ using namespace HMesh;
                                    multiplyVector3:holeCenter];
     float zValueTouched = touchedV_world.z;
     
-    //convert touch points to world space
-    vector<GLKVector2> touchPointsWorld(_touchPoints.size());
-    for (int i = 0; i < _touchPoints.size(); i++)
-    {
-        GLKVector3 worldSpace3 = [Utilities matrix4:self.viewMatrix multiplyVector3:_touchPoints[i]];
-        touchPointsWorld[i] = GLKVector2Make(worldSpace3.x, worldSpace3.y);
-    }
 
-    //Get skeleton aka joint points
-    vector<GLKVector2> rawSkeleton;
-    vector<float> skeletonWidth;
-    
-    //Find scaled step
-    float c_step = GLKVector3Length([Utilities matrix4:self.viewMatrix multiplyVector4:GLKVector4Make(kCENTROID_STEP, 0, 0, 0)]);
-    [PAMUtilities centroids:rawSkeleton ribWidth:skeletonWidth forTwoFingerTouchPoint:touchPointsWorld withNextCentroidStep:c_step];
-    if (rawSkeleton.size() < 4) {
-        NSLog(@"[PolarAnnularMesh][WARNING] Not enough controids");
-        return vector<vector<GLKVector3>>();
-    }
     
     //Smooth
     vector<GLKVector2> skeleton = [PAMUtilities laplacianSmoothing:rawSkeleton iterations:3];
@@ -1509,7 +1529,111 @@ using namespace HMesh;
     }
 }
 
-#pragma mark - TOUCHES: SCALING
+#pragma mark - TOUCHES: SINGLE RING SCALING
+//middlePoint - centroid between tow fingers of a pinch gesture
+-(void)startScalingSingleRibWithTouchPoint1:(GLKVector3)touchPoint1 touchPoint2:(GLKVector3)touchPoint2 scale:(float)scale velocity:(float)velocity {
+    if (![self manifoldIsLoaded]) {
+        return;
+    }
+    
+    GLKVector3 middlePoint = GLKVector3Lerp(touchPoint1, touchPoint2, 0.5f);
+    VertexID vID = [self closestVertexID_2D:touchPoint1];
+    if (is_pole(_manifold, vID)) {
+        return;
+    }
+
+    Walker ribWalker = _manifold.walker(vID);
+    if (_edgeInfo[ribWalker.halfedge()].edge_type != RIB) {
+        ribWalker = ribWalker.opp().next();
+    }
+    assert(_edgeInfo[ribWalker.halfedge()].edge_type == RIB);
+    
+      [self saveState];
+    
+    _edges_to_scale.clear();
+    _all_vector_vid.clear();
+
+    Walker oneWay = _manifold.walker(ribWalker.next().halfedge());
+    Walker otherWay = _manifold.walker(ribWalker.opp().next().halfedge());
+
+    vector<VertexID> vector_vid;
+    if (!is_pole(_manifold, oneWay.vertex())) {
+        _edges_to_scale.push_back(oneWay.next().halfedge());
+        vector_vid = verticies_along_the_rib(_manifold, oneWay.next().halfedge(), _edgeInfo);
+        _all_vector_vid.insert(_all_vector_vid.end(), vector_vid.begin(), vector_vid.end());
+    }
+
+    _edges_to_scale.push_back(ribWalker.halfedge());
+    vector_vid = verticies_along_the_rib(_manifold, ribWalker.halfedge(), _edgeInfo);
+    _all_vector_vid.insert(_all_vector_vid.end(), vector_vid.begin(), vector_vid.end());
+
+    if (!is_pole(_manifold, otherWay.vertex())) {
+        _edges_to_scale.push_back(otherWay.next().halfedge());
+        vector_vid = verticies_along_the_rib(_manifold, otherWay.next().halfedge(), _edgeInfo);
+        _all_vector_vid.insert(_all_vector_vid.end(), vector_vid.begin(), vector_vid.end());
+    }
+
+    
+  
+    _current_scale_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
+    
+    _scaleFactor = scale;
+    
+    //Calculate centroids and gaussian weights
+    _centroids = centroid_for_ribs(_manifold, _edges_to_scale, _edgeInfo);
+    Vec3f base;
+    if (_centroids.size() % 2 == 0) {
+        Vec3f b1 = _centroids[_centroids.size()/2 -1];
+        Vec3f b2 = _centroids[_centroids.size()/2];
+        base = 0.5*(b1 + b2);
+    } else {
+        base = _centroids[_centroids.size()/2];
+    }
+    
+    _scale_weight_vector.clear();
+    if (_centroids.size() == 1) {
+        _scale_weight_vector.push_back(1.0f);
+    } else {
+        float r = (base - _centroids[0]).length();
+        for(int i = 0; i < _centroids.size(); i++)
+        {
+            CGLA::Vec3f c = _centroids[i];
+            float l = sqr_length(base - c);
+            _scale_weight_vector.push_back(exp(-l/(2*r*r)));
+        }
+    }
+    
+    modState = MODIFICATION_SCALING;
+}
+
+-(void)changeScalingSingleRibWithScaleFactor:(float)scale {
+    if (![self manifoldIsLoaded])
+        return;
+    
+    _scaleFactor = scale;
+}
+
+-(void)endScalingSingleRibWithScaleFactor:(float)scale {
+    
+    if (![self manifoldIsLoaded])
+        return;
+    
+    for (int i = 0; i < _edges_to_scale.size(); i++) {
+        change_rib_radius(_manifold, _edges_to_scale[i], _centroids[i], _edgeInfo, 1 + (_scaleFactor - 1)*_scale_weight_vector[i]); //update _manifold
+    }
+    
+    modState = MODIFICATION_NONE;
+    
+    _edges_to_scale.clear();
+    _all_vector_vid.clear();
+    
+    [self rebufferWithCleanup:NO edgeTrace:NO];
+}
+
+
+
+
+#pragma mark - TOUCHES: MULTIPLE RING SCALING
 -(void)startScalingRibsWithRayOrigin1:(GLKVector3)rayOrigin1
                            rayOrigin2:(GLKVector3)rayOrigin2
                         rayDirection1:(GLKVector3)rayDir1

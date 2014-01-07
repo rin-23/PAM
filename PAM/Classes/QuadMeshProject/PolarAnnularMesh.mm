@@ -21,6 +21,7 @@
 #include "Mat4x4d.h"
 #include <map>
 #include <set>
+#include <queue>
 #import "Vec4uc.h"
 #import <OpenGLES/ES2/gl.h>
 #import <OpenGLES/ES2/glext.h>
@@ -59,6 +60,7 @@ using namespace HMesh;
     
     //Bending
     HalfEdgeID _pinHalfEdgeID;
+    HalfEdgeID _pivotHalfEdgeID;
         
     //Selection
     vector<HMesh::HalfEdgeID> _edges_to_scale;
@@ -1259,30 +1261,143 @@ using namespace HMesh;
 }
 
 #pragma mark - TOUCHES: BENDING THE BRANCH
--(void)createPinAtTouchPoint:(GLKVector3)rayOrigin rayDir:(GLKVector3)rayDir {
-    BOOL didHitModel;
-    FaceID fid = [self closestFaceForRayOrigin:rayOrigin direction:rayDir didHitModel:&didHitModel];
-    if (didHitModel) {
-        Walker walker = _manifold.walker(fid);
-        if (_edgeInfo[walker.halfedge()].edge_type != RIB) {
-            walker = walker.next();
-        }
-        assert(_edgeInfo[walker.halfedge()].edge_type == RIB);
-        
-        _pinHalfEdgeID = walker.halfedge();
-        
-        vector<VertexID> verticies;
-        for (Walker ringWalker = _manifold.walker(walker.halfedge());
-             !ringWalker.full_circle();
-             ringWalker = ringWalker.next().opp().next())
-        {
-            verticies.push_back(ringWalker.vertex());
-        }
-        [self changeVerticiesColor:verticies toSelected:YES];
+-(void)createPinPoint:(GLKVector3)touchPoint
+{
+    VertexID vID = [self closestVertexID_3D:touchPoint];
+
+    Walker walker = _manifold.walker(vID).opp();
+    while (_edgeInfo[walker.halfedge()].edge_type != RIB) {
+        walker = walker.next();
     }
+
+    assert(_edgeInfo[walker.halfedge()].edge_type == RIB);
+    
+    _pinHalfEdgeID = walker.halfedge();
+    
+    vector<VertexID> verticies;
+    for (Walker ringWalker = _manifold.walker(walker.halfedge());
+         !ringWalker.full_circle();
+         ringWalker = ringWalker.next().opp().next())
+    {
+        verticies.push_back(ringWalker.vertex());
+    }
+    [self changeVerticiesColor:verticies toSelected:YES];
 }
 
+-(void)createPivotPoint:(GLKVector3)touchPoint
+{
+    VertexID vID = [self closestVertexID_3D:touchPoint];
+    
+    Walker walker = _manifold.walker(vID).opp();
+    while (_edgeInfo[walker.halfedge()].edge_type != RIB) {
+        walker = walker.next();
+    }
+    assert(_edgeInfo[walker.halfedge()].edge_type == RIB);
+    
+    _pivotHalfEdgeID = walker.halfedge();
+    
+    vector<VertexID> verticies;
+    for (Walker ringWalker = _manifold.walker(walker.halfedge());
+         !ringWalker.full_circle();
+         ringWalker = ringWalker.next().opp().next())
+    {
+        verticies.push_back(ringWalker.vertex());
+    }
+    [self changeVerticiesColor:verticies toSelected:YES];
+    
+    [self skeleton];
+    
+}
 
+-(void)skeleton {
+    number_rib_edges(_manifold, _edgeInfo);
+    Walker pivotDir = [self pivotDirection];
+
+    int pin_loop_id = _edgeInfo[_pinHalfEdgeID].id;
+    int pivot_loop_id = _edgeInfo[_pivotHalfEdgeID].id;
+    
+    map<VertexID, int> vertexToRing;
+    map<int, float> ringToDeformValue;
+    
+    
+    assert(_edgeInfo[pivotDir.halfedge()].is_spine());
+    
+    //Go through transition area
+    int loopID = _edgeInfo[pivotDir.next().halfedge()].id;
+    while (loopID != pivot_loop_id) {
+        vector<VertexID> verticies = verticies_along_the_rib(_manifold, pivotDir.next().halfedge(), _edgeInfo);
+        for (VertexID vID: verticies) {
+            vertexToRing[vID] = _edgeInfo[pivotDir.next().halfedge()].id;
+        }
+        pivotDir = pivotDir.next().opp().next();
+        loopID = _edgeInfo[pivotDir.next().halfedge()].id;
+    }
+    
+    //Go through rotational area
+    HalfEdgeAttributeVector<EdgeInfo> sEdgeInfo(_manifold.allocated_halfedges());
+    queue<HalfEdgeID> hq;
+    Walker bWalker = _manifold.walker(pivotDir.next().halfedge());
+    set<HalfEdgeID> boundaryEdges;
+    for (;!bWalker.full_circle(); bWalker = bWalker.next().opp().next()) {
+        boundaryEdges.count(<#const key_type &__k#>)
+    }
+    
+    while(!hq.empty())
+    {
+        HalfEdgeID h = hq.front();
+        Walker w = _manifold.walker(h);
+        hq.pop();
+        bool is_spine = _edgeInfo[h].edge_type == SPINE;
+        for (;!w.full_circle(); w=w.circulate_vertex_ccw(),is_spine = !is_spine)
+            if(edge_info[w.halfedge()].edge_type == UNKNOWN)
+            {
+                EdgeInfo ei = is_spine ? EdgeInfo(SPINE,0) : EdgeInfo(RIB,0);
+                
+                edge_info[w.halfedge()] = ei;
+                edge_info[w.opp().halfedge()] = ei;
+                hq.push(w.opp().halfedge());
+            }
+        
+    }
+    
+
+}
+
+-(Walker)pivotDirection
+{
+    int pin_loop_id = _edgeInfo[_pinHalfEdgeID].id;
+    int pivot_loop_id = _edgeInfo[_pivotHalfEdgeID].id;
+    
+    //find which way is the pivot
+    Walker w1 = _manifold.walker(_pinHalfEdgeID).next();
+    Walker w2 = w1.opp().next().opp().next();
+
+    Walker sW = w1;
+    Walker sW1 = w1;
+    Walker sW2 = w2;
+    
+    while (true) {
+        HalfEdgeID hID = w1.next().halfedge();
+        HalfEdgeID hID2 = w2.next().halfedge();
+        
+        if (_edgeInfo[hID].id == pivot_loop_id) {
+            sW = sW1;
+            break;
+        } else if (_edgeInfo[hID2].id == pivot_loop_id) {
+            sW = sW2;
+            break;
+        }
+        
+        if (!halfedge_lies_on_junction(_manifold, _edgeInfo, hID)) {
+            w1 = w1.next().opp().next();
+        }
+        
+        if (!halfedge_lies_on_junction(_manifold, _edgeInfo, hID2)) {
+            w2 = w2.next().opp().next();
+        }
+    }
+    return sW;
+}
 
 #pragma mark - BRANCH STICHING
 -(void)stitchBranch:(HalfEdgeID)branchHID toBody:(HalfEdgeID)bodyHID {
@@ -1561,7 +1676,11 @@ using namespace HMesh;
 
 #pragma mark - TOUCHES: SINGLE RING SCALING
 //middlePoint - centroid between tow fingers of a pinch gesture
--(void)startScalingSingleRibWithTouchPoint1:(GLKVector3)touchPoint1 touchPoint2:(GLKVector3)touchPoint2 scale:(float)scale velocity:(float)velocity {
+-(void)startScalingSingleRibWithTouchPoint1:(GLKVector3)touchPoint1
+                                touchPoint2:(GLKVector3)touchPoint2
+                                      scale:(float)scale
+                                   velocity:(float)velocity
+{
     if (![self manifoldIsLoaded]) {
         return;
     }

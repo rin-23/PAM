@@ -47,7 +47,8 @@
 -(void)endScalingRibsWithScaleFactor:(float)scale;
 
 #pragma mark - TOUCHES: BENDING THE BRANCH
--(void)createPinAtTouchPoint:(GLKVector3)rayOrigin rayDir:(GLKVector3)rayDir;
+-(void)createPinPoint:(GLKVector3)touchPoint;
+-(void)createPivotPoint:(GLKVector3)touchPoint;
 
 #pragma mark - UTILITIES
 -(void)clear;

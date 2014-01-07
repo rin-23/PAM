@@ -166,14 +166,16 @@ typedef enum {
     [view addGestureRecognizer:oneFingerPanning];
     
     //Double Tap
-//    UITapGestureRecognizer* doubleTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleDoubleTapGesture:)];
-//    doubleTap.numberOfTouchesRequired = 1;
-//    doubleTap.numberOfTapsRequired = 2;
-//    [view addGestureRecognizer:doubleTap];
+    UITapGestureRecognizer* doubleTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleDoubleTapGesture:)];
+    doubleTap.numberOfTouchesRequired = 1;
+    doubleTap.numberOfTapsRequired = 2;
+    [view addGestureRecognizer:doubleTap];
     
-    UITapGestureRecognizer* oneFingerTouch = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleSingleTapGesture:)];
-    oneFingerPanning.delegate = self;
-    [view addGestureRecognizer:oneFingerTouch];
+    UITapGestureRecognizer* singleTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleSingleTapGesture:)];
+    singleTap.numberOfTouchesRequired = 1;
+    singleTap.numberOfTapsRequired = 1;
+    [singleTap requireGestureRecognizerToFail:doubleTap];
+    [view addGestureRecognizer:singleTap];
 
 //    UITapGestureRecognizer* tapWithFourFingers = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleFourFingerTapGesture:)];
 //    tapWithTwoFingers.numberOfTouchesRequired = 4;
@@ -189,19 +191,30 @@ typedef enum {
 -(void)handleSingleTapGesture:(UIGestureRecognizer*)sender {
 
     CGPoint touchPoint = [self touchPointFromGesture:sender];
-    GLKVector3 rayOrg, rayDir;
-    BOOL result = [self rayOrigin:&rayOrg rayDirection:&rayDir forTouchPoint:touchPoint];
+    GLKVector3 modelCoord;
+    NSMutableData* pixelData = [self renderToOffscreenDepthBuffer:@[_pMesh]];
+     BOOL result  = [self modelCoordinates:&modelCoord forTouchPoint:touchPoint depthBuffer:pixelData];
+
+    if (!result) {
+        NSLog(@"[WARNING] Couldn't determine touch area");
+        return;
+    }
     
-//    NSMutableData* pixelData = [self renderToOffscreenDepthBuffer:@[_pMesh]];
-//    GLKVector3 modelCoord;
-//    BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:touchPoint depthBuffer:pixelData];
+    [_pMesh createPinPoint:modelCoord];
+}
+
+-(void)handleDoubleTapGesture:(UIGestureRecognizer*)sender {
+    CGPoint touchPoint = [self touchPointFromGesture:sender];
+    GLKVector3 modelCoord;
+    NSMutableData* pixelData = [self renderToOffscreenDepthBuffer:@[_pMesh]];
+    BOOL result  = [self modelCoordinates:&modelCoord forTouchPoint:touchPoint depthBuffer:pixelData];
     
     if (!result) {
         NSLog(@"[WARNING] Couldn't determine touch area");
         return;
     }
     
-    [_pMesh createPinAtTouchPoint:rayOrg rayDir:rayDir];
+    [_pMesh createPivotPoint:modelCoord];
 }
 
 -(void)handlePinchGesture:(UIGestureRecognizer*)sender {
@@ -478,19 +491,7 @@ typedef enum {
     [_rotationManager handleRotationGesture:sender withViewMatrix:GLKMatrix4Identity];
 }
 
--(void)handleDoubleTapGesture:(UIGestureRecognizer*)sender {
-    return;
-    if (sender.state == UIGestureRecognizerStateEnded) {
-        CGPoint touchPoint = [self touchPointFromGesture:sender];
-        GLKVector3 rayOrgin, rayDir;
-        BOOL result = [self rayOrigin:&rayOrgin rayDirection:&rayDir forTouchPoint:touchPoint];
-        if (!result) {
-            NSLog(@"[WARNING] Couldn determine touch area");
-            return;
-        }
-        [_pMesh endSelectFaceWithRay:rayOrgin rayDirection:rayDir];
-    }
-}
+
 
 //-(void)handleTwoFingerTapGesture:(UIGestureRecognizer*)sender {
 //    if(sender.state == UIGestureRecognizerStateBegan) {

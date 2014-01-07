@@ -1310,38 +1310,48 @@ using namespace HMesh;
 }
 
 -(void)skeleton {
-    number_rib_edges(_manifold, _edgeInfo);
-    Walker pivotDir = [self pivotDirection];
-
+    number_rib_edges(_manifold, _edgeInfo); // number rings
+    Walker pivotDir = [self pivotDirection]; //spine towards the pivot
+    EdgeType etype = _edgeInfo[pivotDir.halfedge()].edge_type;
+    assert(etype == SPINE);
+    
     int pin_loop_id = _edgeInfo[_pinHalfEdgeID].id;
     int pivot_loop_id = _edgeInfo[_pivotHalfEdgeID].id;
     
-    map<VertexID, int> vertexToRing;
+    map<VertexID, int> vertexToLoop;
     map<int, float> ringToDeformValue;
     
-    
-    assert(_edgeInfo[pivotDir.halfedge()].is_spine());
-    
-    //Go through transition area
-    int loopID = _edgeInfo[pivotDir.next().halfedge()].id;
+    //Go through transition area. Stop when pointing to the loop containing pivot.
+    //Assigh loopID for every vertex along the way
+    HalfEdgeID loopRib = pivotDir.next().halfedge();
+    int loopID = _edgeInfo[loopRib].id;
     while (loopID != pivot_loop_id) {
-        vector<VertexID> verticies = verticies_along_the_rib(_manifold, pivotDir.next().halfedge(), _edgeInfo);
+        vector<VertexID> verticies = verticies_along_the_rib(_manifold, loopRib, _edgeInfo);
         for (VertexID vID: verticies) {
-            vertexToRing[vID] = _edgeInfo[pivotDir.next().halfedge()].id;
+            vertexToLoop[vID] = loopID;
         }
         pivotDir = pivotDir.next().opp().next();
         loopID = _edgeInfo[pivotDir.next().halfedge()].id;
+        loopRib = pivotDir.next().halfedge();
     }
     
-    //Go through rotational area
+    //Flood rotational area
     HalfEdgeAttributeVector<EdgeInfo> sEdgeInfo(_manifold.allocated_halfedges());
+    Walker bWalker = _manifold.walker(pivotDir.next().halfedge()); //Walk along pivot boundary loop
+//    set<HalfEdgeID> boundaryEdges; //avoid    
     queue<HalfEdgeID> hq;
-    Walker bWalker = _manifold.walker(pivotDir.next().halfedge());
-    set<HalfEdgeID> boundaryEdges;
     for (;!bWalker.full_circle(); bWalker = bWalker.next().opp().next()) {
-        boundaryEdges.count(<#const key_type &__k#>)
+        HalfEdgeID hID = bWalker.next().halfedge();
+        HalfEdgeID opp_hID = bWalker.next().opp().halfedge();
+//        boundaryEdges.insert(hID);
+//        boundaryEdges.insert(opp_hID);
+        
+        sEdgeInfo[hID] = EdgeInfo(SPINE, 0);
+        sEdgeInfo[opp_hID] = EdgeInfo(SPINE, 0);
+        hq.push(opp_hID);
     }
     
+    set<VertexID> floodVerticiesSet;
     while(!hq.empty())
     {
         HalfEdgeID h = hq.front();
@@ -1349,16 +1359,21 @@ using namespace HMesh;
         hq.pop();
         bool is_spine = _edgeInfo[h].edge_type == SPINE;
         for (;!w.full_circle(); w=w.circulate_vertex_ccw(),is_spine = !is_spine)
-            if(edge_info[w.halfedge()].edge_type == UNKNOWN)
+            if(sEdgeInfo[w.halfedge()].edge_type == UNKNOWN)
             {
                 EdgeInfo ei = is_spine ? EdgeInfo(SPINE,0) : EdgeInfo(RIB,0);
                 
-                edge_info[w.halfedge()] = ei;
-                edge_info[w.opp().halfedge()] = ei;
+                floodVerticiesSet.insert(w.vertex());
+                floodVerticiesSet.insert(w.opp().vertex());
+                
+                sEdgeInfo[w.halfedge()] = ei;
+                sEdgeInfo[w.opp().halfedge()] = ei;
                 hq.push(w.opp().halfedge());
             }
-        
     }
+    
+    vector<VertexID> floodVerticiesVector(floodVerticiesSet.begin(), floodVerticiesSet.end());
+    [self changeVerticiesColor:floodVerticiesVector toSelected:YES];
     
 
 }
@@ -1371,6 +1386,12 @@ using namespace HMesh;
     //find which way is the pivot
     Walker w1 = _manifold.walker(_pinHalfEdgeID).next();
     Walker w2 = w1.opp().next().opp().next();
+
+    EdgeType etype = _edgeInfo[w1.halfedge()].edge_type;
+    assert(etype == SPINE);
+    
+    EdgeType etype2 = _edgeInfo[w2.halfedge()].edge_type;
+    assert(etype2 == SPINE);
 
     Walker sW = w1;
     Walker sW1 = w1;
@@ -1396,7 +1417,26 @@ using namespace HMesh;
             w2 = w2.next().opp().next();
         }
     }
+    
+    EdgeType etype3 = _edgeInfo[sW.halfedge()].edge_type;
+    assert(etype3 == SPINE);
+    
     return sW;
+}
+
+-(void)showRibJunctions
+{
+    number_rib_edges(_manifold, _edgeInfo);
+    vector<VertexID> verticies;
+    for(HalfEdgeID hid : _manifold.halfedges())
+    {
+        if(_edgeInfo[hid].edge_type == RIB_JUNCTION) {
+            Walker w = _manifold.walker(hid);
+            verticies.push_back(w.vertex());
+        }
+    }
+    [self changeWireFrameColor:verticies toSelected:YES];
+
 }
 
 #pragma mark - BRANCH STICHING
@@ -1907,6 +1947,26 @@ using namespace HMesh;
 }
  
 #pragma mark - SELECTION
+
+-(void)changeWireFrameColor:(vector<HMesh::VertexID>)vertecies toSelected:(BOOL)isSelected {
+    
+    Vec4uc selectColor;
+    if (isSelected) {
+        selectColor = Vec4uc(240, 0, 0, 255);
+    } else {
+        selectColor = Vec4uc(0,0,0,255);
+    }
+    
+    [self.wireframeColorDataBuffer bind];
+    unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
+    for (VertexID vid: vertecies) {
+        int index = vid.index;
+        memcpy(temp + index*COLOR_SIZE, selectColor.get(), COLOR_SIZE);
+    }
+    glUnmapBufferOES(GL_ARRAY_BUFFER);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
 -(void)changeVerticiesColor:(vector<HMesh::VertexID>) vertecies toSelected:(BOOL)isSelected {
     
     Vec4uc selectColor;
@@ -1925,6 +1985,8 @@ using namespace HMesh;
     glUnmapBufferOES(GL_ARRAY_BUFFER);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
+
+
 
 -(void)changeFacesColorToSelected:(vector<HMesh::FaceID>)fids toSelected:(BOOL)isSelected {
     vector<VertexID> vIDs;

@@ -9,6 +9,7 @@
 #import <UIKit/UIKit.h>
 
 @protocol SettingsViewControllerDelegate <NSObject>
+-(void)showRibJunctions;
 -(void)showSkeleton:(BOOL)show;
 -(void)transformModeIsOn:(BOOL)isOn;
 -(void)clearModel;
@@ -21,6 +22,7 @@
     UISwitch* _skeletonSwitch;
     UIButton* _clearModelBtn;
     UIButton* _resetBtn;
+    UIButton* _showRibJunctionsBtn;
 }
 
 @property (nonatomic, weak) id<SettingsViewControllerDelegate> delegate;

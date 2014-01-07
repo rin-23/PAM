@@ -66,6 +66,16 @@
     [_resetBtn setFrame:CGRectMake(15, nextY + 10, 100, 30)];
     [self.view addSubview:_resetBtn];
     
+    
+    nextY = CGRectGetMaxY(_resetBtn.frame);
+    _showRibJunctionsBtn = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+    [_showRibJunctionsBtn setContentHorizontalAlignment:UIControlContentHorizontalAlignmentLeft];
+    [_showRibJunctionsBtn setTitle:@"Show Rib Junctions" forState:UIControlStateNormal];
+    [_showRibJunctionsBtn addTarget:self action:@selector(showRibJunctions:) forControlEvents:UIControlEventTouchUpInside];
+    [_showRibJunctionsBtn setFrame:CGRectMake(15, nextY + 10, 100, 30)];
+    [self.view addSubview:_showRibJunctionsBtn];
+    
+    
     if ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPhone) {
         UIButton* dismissButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
         [dismissButton setBackgroundColor:[UIColor lightGrayColor]];
@@ -105,8 +115,13 @@
     [self.delegate resetTransformations];
 }
 
+-(void)showRibJunctions:(UIControl*)sender {
+    [self.delegate showRibJunctions];
+}
+
 -(void)dismissButtonClicked:(UIControl*)sender {
     [self.delegate dismiss];
 }
+
 
 @end

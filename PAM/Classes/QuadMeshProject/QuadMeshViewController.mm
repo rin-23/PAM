@@ -813,7 +813,13 @@ typedef enum {
     }
 }
 
+
+
 #pragma mark - SettingsViewControllerDelegate
+
+-(void)showRibJunctions {
+    [_pMesh showRibJunctions];
+}
 
 -(void)showSkeleton:(BOOL)show {
     //overwrite

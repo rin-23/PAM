@@ -54,5 +54,6 @@
 -(void)clear;
 -(void)undo;
 -(void)showSkeleton:(BOOL)show;
+-(void)showRibJunctions;
 
 @end

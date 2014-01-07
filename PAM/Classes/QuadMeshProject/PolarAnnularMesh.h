@@ -46,6 +46,9 @@
 -(void)changeScalingRibsWithScaleFactor:(float)scale;
 -(void)endScalingRibsWithScaleFactor:(float)scale;
 
+#pragma mark - TOUCHES: BENDING THE BRANCH
+-(void)createPinAtTouchPoint:(GLKVector3)rayOrigin rayDir:(GLKVector3)rayDir;
+
 #pragma mark - UTILITIES
 -(void)clear;
 -(void)undo;

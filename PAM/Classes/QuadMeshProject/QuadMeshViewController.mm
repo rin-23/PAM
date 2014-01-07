@@ -166,23 +166,44 @@ typedef enum {
     [view addGestureRecognizer:oneFingerPanning];
     
     //Double Tap
-    UITapGestureRecognizer* doubleTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleDoubleTapGesture:)];
-    doubleTap.numberOfTouchesRequired = 1;
-    doubleTap.numberOfTapsRequired = 2;
-    [view addGestureRecognizer:doubleTap];
+//    UITapGestureRecognizer* doubleTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleDoubleTapGesture:)];
+//    doubleTap.numberOfTouchesRequired = 1;
+//    doubleTap.numberOfTapsRequired = 2;
+//    [view addGestureRecognizer:doubleTap];
     
-//    UITapGestureRecognizer* singleTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleSingleTapGesture:)];
-//    singleTap.numberOfTapsRequired = 1;
-//    singleTap.numberOfTouchesRequired = 1;
-//    [singleTap requireGestureRecognizerToFail:doubleTap];
-//    [view addGestureRecognizer:singleTap];
+    UITapGestureRecognizer* oneFingerTouch = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleSingleTapGesture:)];
+    oneFingerPanning.delegate = self;
+    [view addGestureRecognizer:oneFingerTouch];
 
 //    UITapGestureRecognizer* tapWithFourFingers = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleFourFingerTapGesture:)];
 //    tapWithTwoFingers.numberOfTouchesRequired = 4;
 //    [view addGestureRecognizer:tapWithFourFingers];
 }
 
+//#pragma mark - UIGestureRecognizerDelegate 
+//-(BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
+//    
+//}
+
 #pragma mark - Gesture recognizer selectors
+-(void)handleSingleTapGesture:(UIGestureRecognizer*)sender {
+
+    CGPoint touchPoint = [self touchPointFromGesture:sender];
+    GLKVector3 rayOrg, rayDir;
+    BOOL result = [self rayOrigin:&rayOrg rayDirection:&rayDir forTouchPoint:touchPoint];
+    
+//    NSMutableData* pixelData = [self renderToOffscreenDepthBuffer:@[_pMesh]];
+//    GLKVector3 modelCoord;
+//    BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:touchPoint depthBuffer:pixelData];
+    
+    if (!result) {
+        NSLog(@"[WARNING] Couldn't determine touch area");
+        return;
+    }
+    
+    [_pMesh createPinAtTouchPoint:rayOrg rayDir:rayDir];
+}
+
 -(void)handlePinchGesture:(UIGestureRecognizer*)sender {
     if ([SettingsManager sharedInstance].transform) {
         [_zoomManager handlePinchGesture:sender];
@@ -222,10 +243,10 @@ typedef enum {
     } else {
         PAMPanGestureRecognizer* oneFingerPAMGesture = (PAMPanGestureRecognizer*)sender;
 
-        CGPoint V = [oneFingerPAMGesture velocityInView:self.view];
-        float S = sqrtf(powf(V.x, 2) + powf(V.y, 2));
-        float TS = [oneFingerPAMGesture touchSize];
-        NSLog(@"Touch Size:%0.3f Speed:%0.3f", TS, S);
+//        CGPoint V = [oneFingerPAMGesture velocityInView:self.view];
+//        float S = sqrtf(powf(V.x, 2) + powf(V.y, 2));
+//        float TS = [oneFingerPAMGesture touchSize];
+//        NSLog(@"Touch Size:%0.3f Speed:%0.3f", TS, S);
         
         if (sender.state == UIGestureRecognizerStateBegan)
         {

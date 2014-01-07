@@ -10,7 +10,7 @@
 
 @class RotationManager, ZoomManager, TranslationManager;
 
-@interface QuadMeshViewController : BaseQuadMeshViewController <UIAlertViewDelegate>
+@interface QuadMeshViewController : BaseQuadMeshViewController <UIAlertViewDelegate, UIGestureRecognizerDelegate>
 
 @property (nonatomic) RotationManager* rotationManager;
 @property (nonatomic) ZoomManager* zoomManager;

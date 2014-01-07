@@ -56,6 +56,9 @@ using namespace HMesh;
     float _scaleFactor;
     vector<float> _scale_weight_vector;
     HMesh::VertexAttributeVector<Vecf> _current_scale_position;
+    
+    //Bending
+    HalfEdgeID _pinHalfEdgeID;
         
     //Selection
     vector<HMesh::HalfEdgeID> _edges_to_scale;
@@ -1254,6 +1257,33 @@ using namespace HMesh;
     
     return allRibs;
 }
+
+#pragma mark - TOUCHES: BENDING THE BRANCH
+-(void)createPinAtTouchPoint:(GLKVector3)rayOrigin rayDir:(GLKVector3)rayDir {
+    BOOL didHitModel;
+    FaceID fid = [self closestFaceForRayOrigin:rayOrigin direction:rayDir didHitModel:&didHitModel];
+    if (didHitModel) {
+        Walker walker = _manifold.walker(fid);
+        if (_edgeInfo[walker.halfedge()].edge_type != RIB) {
+            walker = walker.next();
+        }
+        assert(_edgeInfo[walker.halfedge()].edge_type == RIB);
+        
+        _pinHalfEdgeID = walker.halfedge();
+        
+        vector<VertexID> verticies;
+        for (Walker ringWalker = _manifold.walker(walker.halfedge());
+             !ringWalker.full_circle();
+             ringWalker = ringWalker.next().opp().next())
+        {
+            verticies.push_back(ringWalker.vertex());
+        }
+        [self changeVerticiesColor:verticies toSelected:YES];
+    }
+}
+
+
+
 #pragma mark - BRANCH STICHING
 -(void)stitchBranch:(HalfEdgeID)branchHID toBody:(HalfEdgeID)bodyHID {
 
@@ -1525,7 +1555,7 @@ using namespace HMesh;
     BOOL didHitModel;
     FaceID fid = [self closestFaceForRayOrigin:rayOrigin direction:rayDir didHitModel:&didHitModel];
     if (didHitModel) {
-        [self changeFaceColorToSelected:fid toSelected:YES];
+//        [self changeFaceColorToSelected:fid toSelected:YES];
     }
 }
 
@@ -1546,9 +1576,10 @@ using namespace HMesh;
     if (_edgeInfo[ribWalker.halfedge()].edge_type != RIB) {
         ribWalker = ribWalker.opp().next();
     }
+
     assert(_edgeInfo[ribWalker.halfedge()].edge_type == RIB);
     
-      [self saveState];
+    [self saveState];
     
     _edges_to_scale.clear();
     _all_vector_vid.clear();
@@ -1725,7 +1756,7 @@ using namespace HMesh;
 
     
     modState = MODIFICATION_SCALING;
-    [self changeFacesColor:_all_vector_vid toSelected:YES];
+    [self changeVerticiesColor:_all_vector_vid toSelected:YES];
     
     NSLog(@"Finished calling begin scalling funtion");
 }
@@ -1746,7 +1777,7 @@ using namespace HMesh;
         change_rib_radius(_manifold, _edges_to_scale[i], _centroids[i], _edgeInfo, 1 + (_scaleFactor - 1)*_scale_weight_vector[i]); //update _manifold
     }
 
-    [self changeFacesColor:_all_vector_vid toSelected:NO];
+    [self changeVerticiesColor:_all_vector_vid toSelected:NO];
     
     modState = MODIFICATION_NONE;
 
@@ -1757,7 +1788,7 @@ using namespace HMesh;
 }
  
 #pragma mark - SELECTION
--(void)changeFacesColor:(vector<HMesh::VertexID>) vertecies toSelected:(BOOL)isSelected {
+-(void)changeVerticiesColor:(vector<HMesh::VertexID>) vertecies toSelected:(BOOL)isSelected {
     
     Vec4uc selectColor;
     if (isSelected) {
@@ -1766,7 +1797,7 @@ using namespace HMesh;
         selectColor = Vec4uc(0,0,0,255);
     }
     
-    [self.wireframeColorDataBuffer bind];
+    [self.colorDataBuffer bind];
     unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
     for (VertexID vid: vertecies) {
         int index = vid.index;
@@ -1776,31 +1807,56 @@ using namespace HMesh;
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-
--(void)changeFaceColorToSelected:(FaceID)fid  toSelected:(BOOL)isSelected {
-
-    vector<int> indicies;
-    for(Walker w = _manifold.walker(fid); !w.full_circle(); w = w.circulate_face_cw()) {
-        VertexID vid = w.vertex();
-        int index = vid.index;
-        indicies.push_back(index);
+-(void)changeFacesColorToSelected:(vector<HMesh::FaceID>)fids toSelected:(BOOL)isSelected {
+    vector<VertexID> vIDs;
+    for (FaceID fid: fids) {
+        for(Walker w = _manifold.walker(fid); !w.full_circle(); w = w.circulate_face_cw()) {
+            VertexID vid = w.vertex();
+            vIDs.push_back(vid);
+        }
     }
-    
+
     Vec4uc selectColor;
     if (isSelected) {
-        selectColor =  Vec4uc(240, 0, 0, 255);
+        selectColor = Vec4uc(240, 0, 0, 255);
     } else {
-        selectColor = Vec4uc(200,200,200,255);
+        selectColor = Vec4uc(0,0,0,255);
     }
     
-    [self.wireframeColorDataBuffer bind];
+    [self.colorDataBuffer bind];
     unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
-    for (int index: indicies) {
+    for (VertexID vid: vIDs) {
+        int index = vid.index;
         memcpy(temp + index*COLOR_SIZE, selectColor.get(), COLOR_SIZE);
     }
     glUnmapBufferOES(GL_ARRAY_BUFFER);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
+
+//-(void)changeFaceColorToSelected:(FaceID)fid toSelected:(BOOL)isSelected {
+//
+//    vector<int> indicies;
+//    for(Walker w = _manifold.walker(fid); !w.full_circle(); w = w.circulate_face_cw()) {
+//        VertexID vid = w.vertex();
+//        int index = vid.index;
+//        indicies.push_back(index);
+//    }
+//    
+//    Vec4uc selectColor;
+//    if (isSelected) {
+//        selectColor =  Vec4uc(240, 0, 0, 255);
+//    } else {
+//        selectColor = Vec4uc(200,200,200,255);
+//    }
+//    
+//    [self.wireframeColorDataBuffer bind];
+//    unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
+//    for (int index: indicies) {
+//        memcpy(temp + index*COLOR_SIZE, selectColor.get(), COLOR_SIZE);
+//    }
+//    glUnmapBufferOES(GL_ARRAY_BUFFER);
+//    glBindBuffer(GL_ARRAY_BUFFER, 0);
+//}
 
 #pragma mark - DRAWING
 -(void)updateMesh {

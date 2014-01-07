@@ -35,7 +35,8 @@ static int INDEX_SIZE  = sizeof(unsigned int);
 
 typedef enum {
     MODIFICATION_NONE,
-    MODIFICATION_SCALING
+    MODIFICATION_SCALING,
+    MODIFICATION_ROTATION
 } CurrentModification;
 
 typedef CGLA::Vec3d Vec;
@@ -973,7 +974,7 @@ using namespace HMesh;
     _edgeInfo = trace_spine_edges(_manifold);
     laplacian_smooth_vertex(_manifold, verteciesToSmooth, _edgeInfo, 5);
     
-    [self rebufferWithCleanup:YES edgeTrace:NO];
+    [self rebufferWithCleanup:YES edgeTrace:YES];
 }
 
 #pragma mark - TOUCHES: BRANCH CREATION TWO FINGERS
@@ -1167,7 +1168,7 @@ using namespace HMesh;
     _edgeInfo = trace_spine_edges(_manifold);
     laplacian_smooth_vertex(_manifold, verteciesToSmooth, _edgeInfo, 5);
     
-    [self rebufferWithCleanup:YES edgeTrace:NO];
+    [self rebufferWithCleanup:YES edgeTrace:YES];
 
     return vector<vector<GLKVector3>>();
 }
@@ -1306,6 +1307,22 @@ using namespace HMesh;
     [self changeVerticiesColor:verticies toSelected:YES];
     
     [self skeleton];
+}
+
+#pragma mark - TOUCHES: BENDING THE BRANCH
+-(void)startBendingWithTouhcPoint:(GLKVector3)touchPoint angle:(float)angle {
+    if (![self manifoldIsLoaded]) {
+        return;
+    }
+    
+    
+}
+
+-(void)continueBendingWithWithAngle:(float)angle {
+    
+}
+
+-(void)endBendingWithAngle:(float)angle {
     
 }
 
@@ -1319,6 +1336,7 @@ using namespace HMesh;
     int pivot_loop_id = _edgeInfo[_pivotHalfEdgeID].id;
     
     map<VertexID, int> vertexToLoop;
+    vector<int> loopsToDeform;
     map<int, float> ringToDeformValue;
     
     //Go through transition area. Stop when pointing to the loop containing pivot.
@@ -1326,6 +1344,7 @@ using namespace HMesh;
     HalfEdgeID loopRib = pivotDir.next().halfedge();
     int loopID = _edgeInfo[loopRib].id;
     while (loopID != pivot_loop_id) {
+        loopsToDeform.push_back(loopID);
         vector<VertexID> verticies = verticies_along_the_rib(_manifold, loopRib, _edgeInfo);
         for (VertexID vID: verticies) {
             vertexToLoop[vID] = loopID;
@@ -1335,11 +1354,19 @@ using namespace HMesh;
         loopRib = pivotDir.next().halfedge();
     }
     
+    //Assign deformation angle to the loops
+    for (int i = 0; i < loopsToDeform.size(); i++) {
+        int lID = loopsToDeform[i];
+        float weight = (float)i/loopsToDeform.size();
+        ringToDeformValue[lID] = weight;
+    }
+    
     //Flood rotational area
     HalfEdgeAttributeVector<EdgeInfo> sEdgeInfo(_manifold.allocated_halfedges());
     Walker bWalker = _manifold.walker(pivotDir.next().halfedge()); //Walk along pivot boundary loop
 //    set<HalfEdgeID> boundaryEdges; //avoid    
     queue<HalfEdgeID> hq;
+    
     for (;!bWalker.full_circle(); bWalker = bWalker.next().opp().next()) {
         HalfEdgeID hID = bWalker.next().halfedge();
         HalfEdgeID opp_hID = bWalker.next().opp().halfedge();
@@ -1348,8 +1375,14 @@ using namespace HMesh;
         
         sEdgeInfo[hID] = EdgeInfo(SPINE, 0);
         sEdgeInfo[opp_hID] = EdgeInfo(SPINE, 0);
-        hq.push(opp_hID);
+        hq.push(hID);
     }
+    
+    //Get centroid for rotation
+    vector<HalfEdgeID> centroidHID;
+    centroidHID.push_back(pivotDir.next().halfedge());
+    vector<CGLA::Vec3f> centroidVec = centroid_for_ribs(_manifold, centroidHID, _edgeInfo);
+    Vec3f centr = centroidVec[0];
     
     set<VertexID> floodVerticiesSet;
     while(!hq.empty())
@@ -1358,7 +1391,7 @@ using namespace HMesh;
         Walker w = _manifold.walker(h);
         hq.pop();
         bool is_spine = _edgeInfo[h].edge_type == SPINE;
-        for (;!w.full_circle(); w=w.circulate_vertex_ccw(),is_spine = !is_spine)
+        for (;!w.full_circle(); w=w.circulate_vertex_ccw(),is_spine = !is_spine) {
             if(sEdgeInfo[w.halfedge()].edge_type == UNKNOWN)
             {
                 EdgeInfo ei = is_spine ? EdgeInfo(SPINE,0) : EdgeInfo(RIB,0);
@@ -1370,29 +1403,42 @@ using namespace HMesh;
                 sEdgeInfo[w.opp().halfedge()] = ei;
                 hq.push(w.opp().halfedge());
             }
+        }
     }
     
     vector<VertexID> floodVerticiesVector(floodVerticiesSet.begin(), floodVerticiesSet.end());
     [self changeVerticiesColor:floodVerticiesVector toSelected:YES];
-    
 
+    bool isInvertable;
+    float rotZ =  GLKMathDegreesToRadians(45);
+    GLKVector3 zAxis = GLKMatrix4MultiplyVector3(GLKMatrix4Invert(self.viewMatrix, &isInvertable),
+                                                 GLKVector3Make(0, 0, -1));
+    
+    GLKMatrix4 toOrigin = GLKMatrix4MakeTranslation(-centr[0], -centr[1], -centr[2]);
+    GLKMatrix4 rotMatrix = GLKMatrix4MakeRotation(rotZ, zAxis.x, zAxis.y, zAxis.z);
+    GLKMatrix4 fromOrigin = GLKMatrix4MakeTranslation(centr[0], centr[1], centr[2]);
+    
+    GLKMatrix4 tMatrix = GLKMatrix4Multiply(GLKMatrix4Multiply(fromOrigin, rotMatrix), toOrigin);
+    
+    for (VertexID vID: floodVerticiesVector) {
+        Vec pos = _manifold.pos(vID);
+        GLKVector3 posGLK = GLKVector3Make(pos[0], pos[1], pos[2]);
+        GLKVector3 newPosGLK = [Utilities matrix4:tMatrix multiplyVector3:posGLK];
+        Vec newPos = Vec(newPosGLK.x, newPosGLK.y, newPosGLK.z);
+        _manifold.pos(vID) = newPos;
+    }
+    
+    [self rebufferWithCleanup:NO edgeTrace:NO];    
 }
 
 -(Walker)pivotDirection
 {
-    int pin_loop_id = _edgeInfo[_pinHalfEdgeID].id;
+//    int pin_loop_id = _edgeInfo[_pinHalfEdgeID].id;
     int pivot_loop_id = _edgeInfo[_pivotHalfEdgeID].id;
     
     //find which way is the pivot
     Walker w1 = _manifold.walker(_pinHalfEdgeID).next();
     Walker w2 = w1.opp().next().opp().next();
-
-    EdgeType etype = _edgeInfo[w1.halfedge()].edge_type;
-    assert(etype == SPINE);
-    
-    EdgeType etype2 = _edgeInfo[w2.halfedge()].edge_type;
-    assert(etype2 == SPINE);
-
     Walker sW = w1;
     Walker sW1 = w1;
     Walker sW2 = w2;
@@ -1409,17 +1455,14 @@ using namespace HMesh;
             break;
         }
         
-        if (!halfedge_lies_on_junction(_manifold, _edgeInfo, hID)) {
+        if (_edgeInfo[hID].edge_type != RIB_JUNCTION) {
             w1 = w1.next().opp().next();
         }
         
-        if (!halfedge_lies_on_junction(_manifold, _edgeInfo, hID2)) {
+        if (_edgeInfo[hID2].edge_type != RIB_JUNCTION) {
             w2 = w2.next().opp().next();
         }
     }
-    
-    EdgeType etype3 = _edgeInfo[sW.halfedge()].edge_type;
-    assert(etype3 == SPINE);
     
     return sW;
 }
@@ -1430,7 +1473,7 @@ using namespace HMesh;
     vector<VertexID> verticies;
     for(HalfEdgeID hid : _manifold.halfedges())
     {
-        if(_edgeInfo[hid].edge_type == RIB_JUNCTION) {
+        if (_edgeInfo[hid].edge_type == RIB_JUNCTION) {
             Walker w = _manifold.walker(hid);
             verticies.push_back(w.vertex());
         }
@@ -1822,7 +1865,6 @@ using namespace HMesh;
 
 
 
-
 #pragma mark - TOUCHES: MULTIPLE RING SCALING
 -(void)startScalingRibsWithRayOrigin1:(GLKVector3)rayOrigin1
                            rayOrigin2:(GLKVector3)rayOrigin2
@@ -2062,6 +2104,8 @@ using namespace HMesh;
         }
         glUnmapBufferOES(GL_ARRAY_BUFFER);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
+    } else if (modState == MODIFICATION_ROTATION) {
+        
     }
 }
 

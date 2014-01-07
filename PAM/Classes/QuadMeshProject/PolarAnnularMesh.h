@@ -50,6 +50,10 @@
 -(void)createPinPoint:(GLKVector3)touchPoint;
 -(void)createPivotPoint:(GLKVector3)touchPoint;
 
+-(void)startBendingWithTouhcPoint:(GLKVector3)touchPoint angle:(float)angle;
+-(void)continueBendingWithWithAngle:(float)angle;
+-(void)endBendingWithAngle:(float)angle;
+
 #pragma mark - UTILITIES
 -(void)clear;
 -(void)undo;

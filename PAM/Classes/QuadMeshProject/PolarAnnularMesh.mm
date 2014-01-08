@@ -59,10 +59,17 @@ using namespace HMesh;
     vector<float> _scale_weight_vector;
     HMesh::VertexAttributeVector<Vecf> _current_scale_position;
     
-    //Bending
+    //Rotation
     HalfEdgeID _pinHalfEdgeID;
     HalfEdgeID _pivotHalfEdgeID;
-        
+    float _rotAngle;
+    HMesh::VertexAttributeVector<Vecf> _current_rot_position;
+    GLKVector3 _centerOfRotation;
+    map<VertexID, int> _vertexToLoop;
+    vector<int> _loopsToDeform;
+    map<int, float> _ringToDeformValue;
+    Walker _deformDir;
+    
     //Selection
     vector<HMesh::HalfEdgeID> _edges_to_scale;
     vector<HMesh::VertexID> _all_vector_vid;
@@ -315,6 +322,21 @@ using namespace HMesh;
         _manifold = _skeletonMani;
     }
     [self rebufferWithCleanup:NO edgeTrace:NO];
+}
+
+-(void)showRibJunctions
+{
+    number_rib_edges(_manifold, _edgeInfo);
+    vector<VertexID> verticies;
+    for(HalfEdgeID hid : _manifold.halfedges())
+    {
+        if (_edgeInfo[hid].edge_type == RIB_JUNCTION) {
+            Walker w = _manifold.walker(hid);
+            verticies.push_back(w.vertex());
+        }
+    }
+    [self changeWireFrameColor:verticies toSelected:YES];
+    
 }
 
 -(BOOL)manifoldIsLoaded {
@@ -1306,33 +1328,21 @@ using namespace HMesh;
     }
     [self changeVerticiesColor:verticies toSelected:YES];
     
-    [self skeleton];
 }
 
-#pragma mark - TOUCHES: BENDING THE BRANCH
 -(void)startBendingWithTouhcPoint:(GLKVector3)touchPoint angle:(float)angle {
     if (![self manifoldIsLoaded]) {
         return;
     }
     
+    [self createPivotPoint:touchPoint];
     
-}
-
--(void)continueBendingWithWithAngle:(float)angle {
-    
-}
-
--(void)endBendingWithAngle:(float)angle {
-    
-}
-
--(void)skeleton {
     number_rib_edges(_manifold, _edgeInfo); // number rings
     Walker pivotDir = [self pivotDirection]; //spine towards the pivot
-    EdgeType etype = _edgeInfo[pivotDir.halfedge()].edge_type;
-    assert(etype == SPINE);
+    _deformDir = pivotDir;
+    assert(_edgeInfo[pivotDir.halfedge()].is_spine());
     
-    int pin_loop_id = _edgeInfo[_pinHalfEdgeID].id;
+//    int pin_loop_id = _edgeInfo[_pinHalfEdgeID].id;
     int pivot_loop_id = _edgeInfo[_pivotHalfEdgeID].id;
     
     map<VertexID, int> vertexToLoop;
@@ -1350,39 +1360,46 @@ using namespace HMesh;
             vertexToLoop[vID] = loopID;
         }
         pivotDir = pivotDir.next().opp().next();
-        loopID = _edgeInfo[pivotDir.next().halfedge()].id;
         loopRib = pivotDir.next().halfedge();
+        loopID = _edgeInfo[loopRib].id;
+    }
+
+    //Get centroid for future rotation
+    Vec3f centr = centroid_for_rib(_manifold, pivotDir.next().halfedge(), _edgeInfo);
+    _centerOfRotation = GLKVector3Make(centr[0], centr[1], centr[2]);
+    
+    //Assign weight deformation for angle to the loops
+    for (int i = 0; i < loopsToDeform.size(); i++) {
+
+        int lID = loopsToDeform[i];
+        
+        //linear interpolation
+//        float weight = (float)i/loopsToDeform.size();
+//        ringToDeformValue[lID] = weight;
+        
+        //gaussian
+        float r = loopsToDeform.size();
+        float l = i*i;
+        float weight = exp(-l/(2*r*r));
+        ringToDeformValue[lID] = 1-weight;
     }
     
-    //Assign deformation angle to the loops
-    for (int i = 0; i < loopsToDeform.size(); i++) {
-        int lID = loopsToDeform[i];
-        float weight = (float)i/loopsToDeform.size();
-        ringToDeformValue[lID] = weight;
-    }
+    _vertexToLoop = vertexToLoop;
+    _loopsToDeform = loopsToDeform;
+    _ringToDeformValue = ringToDeformValue;
     
     //Flood rotational area
     HalfEdgeAttributeVector<EdgeInfo> sEdgeInfo(_manifold.allocated_halfedges());
     Walker bWalker = _manifold.walker(pivotDir.next().halfedge()); //Walk along pivot boundary loop
-//    set<HalfEdgeID> boundaryEdges; //avoid    
     queue<HalfEdgeID> hq;
     
     for (;!bWalker.full_circle(); bWalker = bWalker.next().opp().next()) {
         HalfEdgeID hID = bWalker.next().halfedge();
         HalfEdgeID opp_hID = bWalker.next().opp().halfedge();
-//        boundaryEdges.insert(hID);
-//        boundaryEdges.insert(opp_hID);
-        
         sEdgeInfo[hID] = EdgeInfo(SPINE, 0);
         sEdgeInfo[opp_hID] = EdgeInfo(SPINE, 0);
         hq.push(hID);
     }
-    
-    //Get centroid for rotation
-    vector<HalfEdgeID> centroidHID;
-    centroidHID.push_back(pivotDir.next().halfedge());
-    vector<CGLA::Vec3f> centroidVec = centroid_for_ribs(_manifold, centroidHID, _edgeInfo);
-    Vec3f centr = centroidVec[0];
     
     set<VertexID> floodVerticiesSet;
     while(!hq.empty())
@@ -1407,20 +1424,32 @@ using namespace HMesh;
     }
     
     vector<VertexID> floodVerticiesVector(floodVerticiesSet.begin(), floodVerticiesSet.end());
+    _all_vector_vid = floodVerticiesVector;
     [self changeVerticiesColor:floodVerticiesVector toSelected:YES];
+    
+    _rotAngle = angle;
+    modState = MODIFICATION_ROTATION;
+    _current_rot_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
+}
 
-    bool isInvertable;
-    float rotZ =  GLKMathDegreesToRadians(45);
-    GLKVector3 zAxis = GLKMatrix4MultiplyVector3(GLKMatrix4Invert(self.viewMatrix, &isInvertable),
-                                                 GLKVector3Make(0, 0, -1));
+-(void)continueBendingWithWithAngle:(float)angle {
+    if (![self manifoldIsLoaded])
+        return;
     
-    GLKMatrix4 toOrigin = GLKMatrix4MakeTranslation(-centr[0], -centr[1], -centr[2]);
-    GLKMatrix4 rotMatrix = GLKMatrix4MakeRotation(rotZ, zAxis.x, zAxis.y, zAxis.z);
-    GLKMatrix4 fromOrigin = GLKMatrix4MakeTranslation(centr[0], centr[1], centr[2]);
+    _rotAngle = angle;
+}
+
+-(void)endBendingWithAngle:(float)angle {
+    if (![self manifoldIsLoaded])
+        return;
     
+    GLKVector3 zAxis = GLKMatrix4MultiplyVector3(GLKMatrix4Invert(self.viewMatrix, NULL), GLKVector3Make(0, 0, -1));
+    GLKMatrix4 toOrigin = GLKMatrix4MakeTranslation(-_centerOfRotation.x, -_centerOfRotation.y, -_centerOfRotation.z);
+    GLKMatrix4 rotMatrix = GLKMatrix4MakeRotation(angle, zAxis.x, zAxis.y, zAxis.z);
+    GLKMatrix4 fromOrigin = GLKMatrix4MakeTranslation(_centerOfRotation.x, _centerOfRotation.y, _centerOfRotation.z);
     GLKMatrix4 tMatrix = GLKMatrix4Multiply(GLKMatrix4Multiply(fromOrigin, rotMatrix), toOrigin);
     
-    for (VertexID vID: floodVerticiesVector) {
+    for (VertexID vID: _all_vector_vid) {
         Vec pos = _manifold.pos(vID);
         GLKVector3 posGLK = GLKVector3Make(pos[0], pos[1], pos[2]);
         GLKVector3 newPosGLK = [Utilities matrix4:tMatrix multiplyVector3:posGLK];
@@ -1428,7 +1457,32 @@ using namespace HMesh;
         _manifold.pos(vID) = newPos;
     }
     
-    [self rebufferWithCleanup:NO edgeTrace:NO];    
+    //deformable area
+    map<int,GLKMatrix4> rotMatricies;
+    for (auto lid: _loopsToDeform) {
+        float weight = _ringToDeformValue[lid];
+        float angle = weight * _rotAngle;
+        GLKMatrix4 rotMatrix = GLKMatrix4MakeRotation(angle, zAxis.x, zAxis.y, zAxis.z);
+        GLKMatrix4 tMatrix = GLKMatrix4Multiply(GLKMatrix4Multiply(fromOrigin, rotMatrix), toOrigin);
+        rotMatricies[lid]=tMatrix;
+    }
+    
+    for (auto it = _vertexToLoop.begin(); it!=_vertexToLoop.end(); ++it) {
+        VertexID vid = it->first;
+        int lid = it->second;
+        GLKMatrix4 tMatrix = rotMatricies[lid];
+        
+        Vec pos = _manifold.pos(vid);
+        GLKVector3 posGLK = GLKVector3Make(pos[0], pos[1], pos[2]);
+        GLKVector3 newPosGLK = [Utilities matrix4:tMatrix multiplyVector3:posGLK];
+        Vec newPos = Vec(newPosGLK.x, newPosGLK.y, newPosGLK.z);
+        _manifold.pos(vid) = newPos;
+    }
+
+    modState = MODIFICATION_NONE;
+    _all_vector_vid.clear();
+    
+    [self rebufferWithCleanup:NO edgeTrace:NO];
 }
 
 -(Walker)pivotDirection
@@ -1467,20 +1521,90 @@ using namespace HMesh;
     return sW;
 }
 
--(void)showRibJunctions
-{
-    number_rib_edges(_manifold, _edgeInfo);
-    vector<VertexID> verticies;
-    for(HalfEdgeID hid : _manifold.halfedges())
+
+-(void)rotateRingsFrom:(Walker)pivotDir toRingID:(int)pivot_loop_id  {
+    //Get all centroids
+    vector<GLKVector3> centroids;
+    vector<GLKVector3> leadVectors;
+    vector<vector<float>> all_angles;
+    vector<vector<float>> all_distances;
+    
+    HalfEdgeID loopRib = pivotDir.next().halfedge();
+    int loopID = _edgeInfo[loopRib].id;
+    while (loopID != pivot_loop_id) {
+        Vec3f c = centroid_for_rib(_manifold, loopRib, _edgeInfo);
+        centroids.push_back(GLKVector3Make(c[0], c[1], c[2]));
+        vector<VertexID> verticies = verticies_along_the_rib(_manifold, loopRib, _edgeInfo);
+        vector<float> loopAngles;
+        vector<float> loopDistances;
+        GLKVector3 leadVector;
+        for (int i = 0; i < verticies.size(); i++) {
+            VertexID vID = verticies[i];
+            Vecf pos = _manifold.posf(vID);
+            Vecf v = pos - c;
+            if (i == 0) {
+                leadVector = GLKVector3Make(v[0], v[1], v[2]);
+                leadVectors.push_back(leadVector);
+            }
+            float angle = [Utilities signedAngleBetweenReferenceVector3:GLKVector3Make(v[0], v[1], v[2])
+                                                              andVector:leadVector];
+            float distance = v.length();
+            loopAngles.push_back(angle);
+            loopDistances.push_back(distance);
+        }
+        
+        all_angles.push_back(loopAngles);
+        all_distances.push_back(loopDistances);
+
+        pivotDir = pivotDir.next().opp().next();
+        loopRib = pivotDir.next().halfedge();
+        loopID = _edgeInfo[loopRib].id;
+    }
+    
+    //Convert centroids to world
+    vector<GLKVector2> centroidsWorld;
+    for (auto center: centroids)
     {
-        if (_edgeInfo[hid].edge_type == RIB_JUNCTION) {
-            Walker w = _manifold.walker(hid);
-            verticies.push_back(w.vertex());
+        GLKVector3 worldSpace3 = [Utilities matrix4:self.modelViewMatrix multiplyVector3:center];
+        centroidsWorld.push_back(GLKVector2Make(worldSpace3.x, worldSpace3.y));
+    }
+    
+    //Get norm vectors for skeleton joints
+    vector<GLKVector2> skeletonNormals;
+    vector<GLKVector2> skeletonTangents;
+    [PAMUtilities normals:skeletonNormals tangents:skeletonTangents forSkeleton:centroidsWorld];
+    
+    //Parse new skeleton and create ribs
+    //Ingore first and last centroids since they are poles
+    for (int i = 0; i < centroidsWorld.size(); i++) {
+        GLKVector3 sModel = [Utilities invertVector3:GLKVector3Make(centroidsWorld[i].x, centroidsWorld[i].y, 0)
+                                          withMatrix:self.modelViewMatrix];
+        
+        
+        
+        //iterate through every vertex
+        for (int j = 0; j < all_angles[0].size(); j++) {
+            //dont preserve translation for norma and tangent
+            float ribWidth = all_distances[i][j];
+            GLKVector2 stretchedNorm = GLKVector2MultiplyScalar(skeletonNormals[i], ribWidth);
+            GLKVector3 nModel = [Utilities invertVector4:GLKVector4Make(stretchedNorm.x, stretchedNorm.y, 0, 0)
+                                              withMatrix:self.modelViewMatrix];
+            GLKVector3 tModel = [Utilities invertVector4:GLKVector4Make(skeletonTangents[i].x, skeletonTangents[i].y, 0, 0)
+                                              withMatrix:self.modelViewMatrix];
+            
+      
+//            vector<GLKVector3> ribs(numSpines);
+//            float rot_step = 360.0f/numSpines;
+//            for (int j = 0; j < numSpines; j++) {
+            float angle = all_angles[i][j];
+            GLKQuaternion quat = GLKQuaternionMakeWithAngleAndVector3Axis(GLKMathDegreesToRadians(angle), GLKVector3Normalize(tModel));
+            GLKVector3 newNorm = GLKQuaternionRotateVector3(quat, nModel);
+            GLKVector3 newRibPoint = GLKVector3Add(newNorm, sModel);
         }
     }
-    [self changeWireFrameColor:verticies toSelected:YES];
-
 }
+
+
 
 #pragma mark - BRANCH STICHING
 -(void)stitchBranch:(HalfEdgeID)branchHID toBody:(HalfEdgeID)bodyHID {
@@ -1768,7 +1892,7 @@ using namespace HMesh;
         return;
     }
     
-    GLKVector3 middlePoint = GLKVector3Lerp(touchPoint1, touchPoint2, 0.5f);
+//    GLKVector3 middlePoint = GLKVector3Lerp(touchPoint1, touchPoint2, 0.5f);
     VertexID vID = [self closestVertexID_2D:touchPoint1];
     if (is_pole(_manifold, vID)) {
         return;
@@ -1807,7 +1931,6 @@ using namespace HMesh;
     }
 
     
-  
     _current_scale_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
     
     _scaleFactor = scale;
@@ -2083,8 +2206,7 @@ using namespace HMesh;
 
 #pragma mark - DRAWING
 -(void)updateMesh {
-    if (modState == MODIFICATION_SCALING) {
-        
+    if (modState == MODIFICATION_SCALING) {        
         for (int i = 0; i < _edges_to_scale.size(); i ++) {
             scaled_pos_for_rib(_manifold,
                                _edges_to_scale[i],
@@ -2105,9 +2227,61 @@ using namespace HMesh;
         glUnmapBufferOES(GL_ARRAY_BUFFER);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     } else if (modState == MODIFICATION_ROTATION) {
+        GLKVector3 zAxis = GLKMatrix4MultiplyVector3(GLKMatrix4Invert(self.viewMatrix, NULL), GLKVector3Make(0, 0, -1));
+        GLKMatrix4 toOrigin = GLKMatrix4MakeTranslation(-_centerOfRotation.x, -_centerOfRotation.y, -_centerOfRotation.z);
+        GLKMatrix4 rotMatrix = GLKMatrix4MakeRotation(_rotAngle, zAxis.x, zAxis.y, zAxis.z);
+        GLKMatrix4 fromOrigin = GLKMatrix4MakeTranslation(_centerOfRotation.x, _centerOfRotation.y, _centerOfRotation.z);
+        GLKMatrix4 tMatrix = GLKMatrix4Multiply(GLKMatrix4Multiply(fromOrigin, rotMatrix), toOrigin);
+
+        for (VertexID vID: _all_vector_vid) {
+            Vec pos = _manifold.pos(vID);
+            GLKVector3 posGLK = GLKVector3Make(pos[0], pos[1], pos[2]);
+            GLKVector3 newPosGLK = [Utilities matrix4:tMatrix multiplyVector3:posGLK];
+            Vecf newPos = Vecf(newPosGLK.x, newPosGLK.y, newPosGLK.z);
+            _current_rot_position[vID] = newPos;
+        }
         
+//        map<VertexID, int> _vertexToLoop;
+//        vector<int> _loopsToDeform;
+//        map<int, float> _ringToDeformValue;
+        
+        [self.vertexDataBuffer bind];
+        unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
+        for (VertexID vid: _all_vector_vid) {
+            Vecf pos = _current_rot_position[vid];
+            int index = vid.index;
+            memcpy(temp + index*VERTEX_SIZE, pos.get(), VERTEX_SIZE);
+        }
+        
+        //deformable area
+        map<int,GLKMatrix4> rotMatricies;
+        for (auto lid: _loopsToDeform) {
+            float weight = _ringToDeformValue[lid];
+            float angle = weight * _rotAngle;
+            GLKMatrix4 rotMatrix = GLKMatrix4MakeRotation(angle, zAxis.x, zAxis.y, zAxis.z);
+            GLKMatrix4 tMatrix = GLKMatrix4Multiply(GLKMatrix4Multiply(fromOrigin, rotMatrix), toOrigin);
+            rotMatricies[lid]=tMatrix;
+        }
+        
+        for (auto it = _vertexToLoop.begin(); it!=_vertexToLoop.end(); ++it) {
+            VertexID vid = it->first;
+            int lid = it->second;
+            GLKMatrix4 tMatrix = rotMatricies[lid];
+            
+            Vec pos = _manifold.pos(vid);
+            GLKVector3 posGLK = GLKVector3Make(pos[0], pos[1], pos[2]);
+            GLKVector3 newPosGLK = [Utilities matrix4:tMatrix multiplyVector3:posGLK];
+            Vecf newPos = Vecf(newPosGLK.x, newPosGLK.y, newPosGLK.z);
+            
+            int index = vid.index;
+            memcpy(temp + index*VERTEX_SIZE, newPos.get(), VERTEX_SIZE);
+        }
+        
+        glUnmapBufferOES(GL_ARRAY_BUFFER);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 }
+
 
 -(void)draw {    
     [self updateMesh];

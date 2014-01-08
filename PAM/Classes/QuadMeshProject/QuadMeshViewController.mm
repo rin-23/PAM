@@ -488,7 +488,30 @@ typedef enum {
 
 
 -(void)handleRotationGesture:(UIGestureRecognizer*)sender {
-    [_rotationManager handleRotationGesture:sender withViewMatrix:GLKMatrix4Identity];
+    
+    if ([SettingsManager sharedInstance].transform) {
+        [_rotationManager handleRotationGesture:sender withViewMatrix:GLKMatrix4Identity];
+    } else if ([SettingsManager sharedInstance].showSkeleton) {
+        return;
+    } else {
+        UIRotationGestureRecognizer* rotGesture =( UIRotationGestureRecognizer*) sender;
+        if (sender.state == UIGestureRecognizerStateBegan) {
+            CGPoint touchPoint = [self touchPointFromGesture:sender];
+            GLKVector3 modelCoord;
+            NSMutableData* pixelData = [self renderToOffscreenDepthBuffer:@[_pMesh]];
+            BOOL result  = [self modelCoordinates:&modelCoord forTouchPoint:touchPoint depthBuffer:pixelData];
+            
+            if (!result) {
+                NSLog(@"[WARNING] Couldn't determine touch area");
+                return;
+            }
+            [_pMesh startBendingWithTouhcPoint:modelCoord angle:rotGesture.rotation];
+        } else if (sender.state == UIGestureRecognizerStateChanged) {
+            [_pMesh continueBendingWithWithAngle:rotGesture.rotation];
+        } else if (sender.state == UIGestureRecognizerStateEnded) {
+            [_pMesh endBendingWithAngle:rotGesture.rotation];
+        }
+    }
 }
 
 

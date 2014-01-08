@@ -46,13 +46,25 @@
 -(void)changeScalingRibsWithScaleFactor:(float)scale;
 -(void)endScalingRibsWithScaleFactor:(float)scale;
 
-#pragma mark - TOUCHES: BENDING THE BRANCH
+#pragma mark - Common bending methods
 -(void)createPinPoint:(GLKVector3)touchPoint;
 -(void)createPivotPoint:(GLKVector3)touchPoint;
 
+#pragma mark - ROTATING THE BRANCH TREE
 -(void)startBendingWithTouhcPoint:(GLKVector3)touchPoint angle:(float)angle;
 -(void)continueBendingWithWithAngle:(float)angle;
 -(void)endBendingWithAngle:(float)angle;
+
+#pragma mark - SCALING THE BRANCH TREE
+-(void)startScalingBranchTreeWithTouchPoint:(GLKVector3)touchPoint scale:(float)scale;
+-(void)continueScalingBranchTreeWithScale:(float)scale;
+-(void)endScalingBranchTreeWithScale:(float)scale;
+
+#pragma mark - TRANSLATION OF THE BRANCH TREE
+-(void)startTranslatingBranchTreeWithTouchPoint:(GLKVector3)touchPoint
+                                    translation:(GLKVector3)translation;
+-(void)continueTranslatingBranchTree:(GLKVector3)translation;
+-(void)endTranslatingBranchTree:(GLKVector3)translation;
 
 #pragma mark - UTILITIES
 -(void)clear;

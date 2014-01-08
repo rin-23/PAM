@@ -368,10 +368,19 @@ double triangleAngleWithSides(double a, double b, double c) {
     float angle = atan2(sina, cosa);
     float sign = GLKVector3DotProduct(norm, GLKVector3CrossProduct(refVector, vector));
 
-    if (sign<0) {
+    if (sign < 0) {
         angle = -angle;
     }
     
+    return angle;
+}
+
++(float)angleBetweenVector:(GLKVector3)v1 andVector:(GLKVector3)v2
+{
+    GLKVector3 v1Norm = GLKVector3Normalize(v1);
+    GLKVector3 v2Norm = GLKVector3Normalize(v2);
+    float dotP = GLKVector3DotProduct(v1Norm, v2Norm);
+    float angle = acosf(dotP);
     return angle;
 }
 @end

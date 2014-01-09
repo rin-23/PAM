@@ -746,6 +746,42 @@ using namespace HMesh;
     [self rebufferWithCleanup:NO edgeTrace:NO];
 }
 
+#pragma mark - UTILITIES BRANCH CREATION
+
+-(int)branchWidthForTouchSpeed:(float)touchSpeed touchPoint:(VertexID)vID{
+    
+    float angle = 0;
+    if (touchSpeed <= 500) {
+        angle = GLKMathDegreesToRadians(30);
+    } else if (touchSpeed > 500  && touchSpeed <= 1100) {
+        angle = GLKMathDegreesToRadians(70);
+    } else if (touchSpeed > 1100) {
+        angle = GLKMathDegreesToRadians(110);
+    }
+    
+    Walker walker = _manifold.walker(vID);
+    if (_edgeInfo[walker.halfedge()].is_spine()) {
+        walker = walker.opp().next();
+    }
+    assert(_edgeInfo[walker.halfedge()].is_rib());
+    
+    Vecf centr = centroid_for_rib(_manifold, walker.halfedge(), _edgeInfo);
+    Vecf v1 = _manifold.posf(vID) - centr;
+    GLKVector3 v1glk = GLKVector3Make(v1[0], v1[1], v1[2]);
+    
+    float cur_angle = 0;
+    int width = 0;
+    while (cur_angle <= angle/2) {
+        Vecf v2 = _manifold.posf(walker.vertex()) - centr;
+        GLKVector3 v2glk = GLKVector3Make(v2[0], v2[1], v2[2]);
+        cur_angle = [Utilities angleBetweenVector:v1glk andVector:v2glk];
+        width += 1;
+        walker = walker.next().opp().next();
+    }
+    
+    return width;
+}
+
 #pragma mark - BRANCH CREATION ONE FINGER
 
 -(void)startCreateBranch:(GLKVector3)touchPoint {
@@ -863,20 +899,20 @@ using namespace HMesh;
     HalfEdgeID boundaryHalfEdge;
     
     int limbWidth = 1;
-
 //    if (touchSize > 9.0f) {
 //        limbWidth = 2;
 //    } else {
 //        limbWidth = 1;
 //    }
-
-    if (touchSpeed <= 500) {
-        limbWidth = 1;
-    } else if (touchSpeed > 500  && touchSpeed <= 1000) {
-        limbWidth = 2;
-    } else if (touchSpeed > 1000) {
-        limbWidth = 3;
-    }
+//    if (touchSpeed <= 500) {
+//        limbWidth = 1;
+//    } else if (touchSpeed > 500  && touchSpeed <= 1000) {
+//        limbWidth = 2;
+//    } else if (touchSpeed > 1000) {
+//        limbWidth = 3;
+//    }
+    
+    limbWidth = [self branchWidthForTouchSpeed:touchSpeed touchPoint:touchedVID];
     
     NSLog(@"Limb Width: %i", limbWidth);
     

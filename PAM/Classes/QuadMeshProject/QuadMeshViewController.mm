@@ -222,6 +222,10 @@ typedef enum {
 }
 
 -(void)handlePinchGesture:(UIGestureRecognizer*)sender {
+    if (![_pMesh manifoldIsLoaded]) {
+        return;
+    }
+    
     if ([SettingsManager sharedInstance].transform) {
         [_zoomManager handlePinchGesture:sender];
     } else {

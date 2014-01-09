@@ -71,5 +71,5 @@
 -(void)undo;
 -(void)showSkeleton:(BOOL)show;
 -(void)showRibJunctions;
-
+-(BOOL)manifoldIsLoaded;
 @end

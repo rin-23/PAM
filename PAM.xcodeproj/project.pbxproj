@@ -67,7 +67,6 @@
 		1A408F4018357CAA0044E48E /* quad_sphere_high_res.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1A408F3F18357CAA0044E48E /* quad_sphere_high_res.obj */; };
 		1A9438AD1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m in Sources */ = {isa = PBXBuildFile; fileRef = 1A9438AC1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m */; };
 		1A976FC0184683EF0022AC3D /* PAMUtilities.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1A976FBF184683EF0022AC3D /* PAMUtilities.mm */; };
-		1AABFCE2187DE1D10016EC81 /* PAMLongPressGestureRecongnizer.m in Sources */ = {isa = PBXBuildFile; fileRef = 1AABFCE1187DE1D10016EC81 /* PAMLongPressGestureRecongnizer.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -206,8 +205,6 @@
 		1A9438AC1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = UITwoFingerHoldGestureRecognizer.m; path = Classes/QuadMeshProject/UITwoFingerHoldGestureRecognizer.m; sourceTree = "<group>"; };
 		1A976FBE184683EF0022AC3D /* PAMUtilities.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PAMUtilities.h; sourceTree = "<group>"; };
 		1A976FBF184683EF0022AC3D /* PAMUtilities.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = PAMUtilities.mm; sourceTree = "<group>"; };
-		1AABFCE0187DE1D10016EC81 /* PAMLongPressGestureRecongnizer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = PAMLongPressGestureRecongnizer.h; path = "Gesture Recongnizers/PAMLongPressGestureRecongnizer.h"; sourceTree = "<group>"; };
-		1AABFCE1187DE1D10016EC81 /* PAMLongPressGestureRecongnizer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = PAMLongPressGestureRecongnizer.m; path = "Gesture Recongnizers/PAMLongPressGestureRecongnizer.m"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -487,8 +484,6 @@
 			children = (
 				15BB3174186E5AFC001EE9E9 /* PAMPanGestureRecognizer.h */,
 				15BB3175186E5AFC001EE9E9 /* PAMPanGestureRecognizer.m */,
-				1AABFCE0187DE1D10016EC81 /* PAMLongPressGestureRecongnizer.h */,
-				1AABFCE1187DE1D10016EC81 /* PAMLongPressGestureRecongnizer.m */,
 			);
 			name = "Gesture Recognizers";
 			sourceTree = "<group>";
@@ -679,7 +674,6 @@
 				1551ED6E18348F7F00855993 /* Line.m in Sources */,
 				1553C23D183F00A100839072 /* PolarAnnularMesh.mm in Sources */,
 				1A976FC0184683EF0022AC3D /* PAMUtilities.mm in Sources */,
-				1AABFCE2187DE1D10016EC81 /* PAMLongPressGestureRecongnizer.m in Sources */,
 				1564660F182033920000B985 /* MeshLoader.mm in Sources */,
 				156463F71820266E0000B985 /* main.m in Sources */,
 				15646615182033920000B985 /* QuadMeshViewController.mm in Sources */,

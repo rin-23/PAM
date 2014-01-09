@@ -156,7 +156,6 @@ using namespace HMesh;
 }
 
 
-
 -(void)rebufferNoEdgetrace {
    
     //Load data
@@ -688,11 +687,11 @@ using namespace HMesh;
     
     //make a small bump
     if (touchSpeed <= 500) {
-        brushSize = 0.01;
+        brushSize = 0.07;
     } else if (touchSpeed > 500  && touchSpeed <= 1000) {
-        brushSize = 0.02;
+        brushSize = 0.08;
     } else if (touchSpeed > 1000) {
-        brushSize = 0.03;
+        brushSize = 0.1;
     }
     
     [self saveState];
@@ -706,9 +705,9 @@ using namespace HMesh;
         touchedVID = [self closestVertexID_2D:tPoints[0]];
     }
     
-    Vec c;
-    float r;
-    bsphere(_manifold, c, r);
+//    Vec c;
+//    float r;
+//    bsphere(_manifold, c, r);
     Vec touchedPos = _manifold.pos(touchedVID);
     Vec norm = HMesh::normal(_manifold, touchedVID);
     Vec displace = 0.05*norm;
@@ -729,9 +728,11 @@ using namespace HMesh;
     
     for (auto vid : _manifold.vertices())
     {
-        double l = sqr_length(touchedPos - _manifold.pos(vid));
-        if (l < brushSize) {
-            _manifold.pos(vid) = _manifold.pos(vid) + displace * exp(-l/(brushSize*r*r));
+        double l = (touchedPos - _manifold.pos(vid)).length();
+        float x = l/brushSize;
+        if (x <= 1) {
+            float weight = pow(pow(x,2)-1, 2);
+            _manifold.pos(vid) = _manifold.pos(vid) + displace * weight;
         }
 
 //        float l = (touchedPos - _manifold.pos(vid)).length();
@@ -836,7 +837,7 @@ using namespace HMesh;
     vector<GLKVector2> rawSkeleton;
     float c_step = GLKVector3Length([Utilities matrix4:self.viewMatrix multiplyVector4:GLKVector4Make(kCENTROID_STEP, 0, 0, 0)]);
     [PAMUtilities centroids:rawSkeleton forOneFingerTouchPoint:touchPointsWorld withNextCentroidStep:c_step];
-    if (rawSkeleton.size() < 4) {
+    if (rawSkeleton.size() < 5) {
         NSLog(@"[PolarAnnularMesh][WARNING] Not enough controids");
         [self createBumpAtPoint:_touchPoints touchedModel:touchedModel touchSpeed:touchSpeed touchSize:touchSize];
         return;
@@ -1290,6 +1291,270 @@ using namespace HMesh;
     return allRibs;
 }
 
+#pragma mark - BRANCH STICHING
+-(void)stitchBranch:(HalfEdgeID)branchHID toBody:(HalfEdgeID)bodyHID {
+    
+    //Align edges
+    Walker align1 = _manifold.walker(branchHID);
+    VertexID vId1 = align1.vertex();
+    Vecf vPos1 = _manifold.posf(vId1);
+    
+    HalfEdgeID closestHID;
+    float closestDist = FLT_MAX;
+    
+    for (Walker align2 = _manifold.walker(bodyHID); !align2.next().full_circle(); align2 = align2.next()) {
+        float cur_dist = (vPos1 - _manifold.posf(align2.vertex())).length();
+        
+        if (cur_dist < closestDist) {
+            closestDist = cur_dist;
+            closestHID = align2.halfedge();
+        }
+    }
+    Walker temp = _manifold.walker(closestHID);
+    closestHID = temp.next().halfedge();
+    
+    //Stich boundary edges
+    vector<HalfEdgeID> bEdges1;
+    vector<HalfEdgeID> bEdges2;
+    for (Walker stitch1 = _manifold.walker(closestHID);!stitch1.full_circle(); stitch1 = stitch1.next())
+    {
+        bEdges1.push_back(stitch1.halfedge());
+    }
+    bEdges1.pop_back();
+    
+    for (Walker stitch2 = _manifold.walker(branchHID); !stitch2.full_circle(); stitch2 = stitch2.prev()) {
+        bEdges2.push_back(stitch2.halfedge());
+    }
+    bEdges2.pop_back();
+    
+    assert(bEdges1.size() == bEdges2.size());
+    
+    for (int i = 0; i < bEdges1.size() ; i++) {
+        BOOL didStich = _manifold.stitch_boundary_edges(bEdges1[i], bEdges2[i]);
+        assert(didStich);
+    }
+    
+}
+
+
+#pragma mark - CREATE BRANCH FROM MESH
+
+-(VertexID)populateNewLimb:(std::vector<vector<GLKVector3>>)allRibs {
+    vector<Vecf> vertices;
+    vector<int> faces;
+    vector<int> indices;
+    
+    GLKVector3 poleVec;
+    
+    //Add all verticies
+    for (int i = 0; i < allRibs.size(); i++) {
+        vector<GLKVector3> rib = allRibs[i];
+        for (int j = 0; j < rib.size(); j++) {
+            GLKVector3 v = rib[j];
+            vertices.push_back(Vecf(v.x, v.y, v.z));
+        }
+    }
+    
+    for (int i = 0; i < allRibs.size() - 1; i++) {
+        if (i == allRibs.size() - 2) { //pole 2
+            vector<GLKVector3> pole = allRibs[i+1];
+            vector<GLKVector3> rib = allRibs[i];
+            int poleIndex = [self limbIndexForCentroid:i+1 rib:0 totalCentroid:allRibs.size() totalRib:rib.size()];
+            Vec3f pV = vertices[poleIndex];
+            poleVec = GLKVector3Make(pV[0], pV[1], pV[2]);
+            
+            for (int j = 0; j < rib.size(); j++) {
+                indices.push_back(poleIndex);
+                if (j == rib.size() - 1) {
+                    int index1 = [self limbIndexForCentroid:i rib:j totalCentroid:allRibs.size() totalRib:rib.size()];
+                    int index2 = [self limbIndexForCentroid:i rib:0 totalCentroid:allRibs.size() totalRib:rib.size()];
+                    indices.push_back(index1);
+                    indices.push_back(index2);
+                } else {
+                    int index1 = [self limbIndexForCentroid:i rib:j totalCentroid:allRibs.size() totalRib:rib.size()];
+                    int index2 = [self limbIndexForCentroid:i rib:j+1 totalCentroid:allRibs.size() totalRib:rib.size()];
+                    indices.push_back(index1);
+                    indices.push_back(index2);
+                }
+                faces.push_back(3);
+            }
+        } else {
+            vector<GLKVector3> rib1 = allRibs[i];
+            vector<GLKVector3> rib2 = allRibs[i+1];
+            
+            for (int j = 0; j < rib1.size(); j++) {
+                if (j == rib1.size() - 1) {
+                    int index1 = [self limbIndexForCentroid:i rib:j totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    int index2 = [self limbIndexForCentroid:i rib:0 totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    int index3 = [self limbIndexForCentroid:i+1 rib:0 totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    int index4 = [self limbIndexForCentroid:i+1 rib:j totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    indices.push_back(index1);
+                    indices.push_back(index2);
+                    indices.push_back(index3);
+                    indices.push_back(index4);
+                } else {
+                    int index1 = [self limbIndexForCentroid:i rib:j totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    int index2 = [self limbIndexForCentroid:i rib:j+1 totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    int index3 = [self limbIndexForCentroid:i+1 rib:j+1 totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    int index4 = [self limbIndexForCentroid:i+1 rib:j totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    indices.push_back(index1);
+                    indices.push_back(index2);
+                    indices.push_back(index3);
+                    indices.push_back(index4);
+                }
+                faces.push_back(4);
+            }
+        }
+    }
+    
+    _manifold.build(vertices.size(),
+                    reinterpret_cast<float*>(&vertices[0]),
+                    faces.size(),
+                    &faces[0],
+                    &indices[0]);
+    
+    VertexID pole = [self closestVertexID_3D:[Utilities matrix4:self.modelMatrix multiplyVector3:poleVec]];
+    assert(is_pole(_manifold, pole));
+    
+    return pole;
+}
+
+
+-(int)limbIndexForCentroid:(int)centeroid rib:(int)rib totalCentroid:(int)totalCentroid totalRib:(int)totalRib
+{
+    if (centeroid == totalCentroid - 1) {
+        return (totalCentroid - 1)*totalRib + 1 - 1;
+    } else {
+        return centeroid*totalRib + rib;
+    }
+}
+
+
+-(void)populateManifold:(std::vector<vector<GLKVector3>>)allRibs {
+    vector<Vecf> vertices;
+    vector<int> faces;
+    vector<int> indices;
+    
+    //Add all verticies
+    for (int i = 0; i < allRibs.size(); i++) {
+        vector<GLKVector3> rib = allRibs[i];
+        for (int j = 0; j < rib.size(); j++) {
+            GLKVector3 v = rib[j];
+            vertices.push_back(Vecf(v.x, v.y, v.z));
+        }
+    }
+    
+    for (int i = 0; i < allRibs.size() - 1; i++) {
+        
+        if (i == 0) { //pole 1
+            vector<GLKVector3> pole = allRibs[i];
+            vector<GLKVector3> rib = allRibs[i+1];
+            int poleIndex = 0;
+            for (int j = 0; j < rib.size(); j++) {
+                indices.push_back(poleIndex);
+                if (j == rib.size() - 1) {
+                    int index1 = [self indexForCentroid:1 rib:j totalCentroid:allRibs.size() totalRib:rib.size()];
+                    int index2 = [self indexForCentroid:1 rib:0 totalCentroid:allRibs.size() totalRib:rib.size()];
+                    indices.push_back(index2);
+                    indices.push_back(index1);
+                } else {
+                    int index1 = [self indexForCentroid:1 rib:j totalCentroid:allRibs.size() totalRib:rib.size()];
+                    int index2 = [self indexForCentroid:1 rib:j+1 totalCentroid:allRibs.size() totalRib:rib.size()];
+                    indices.push_back(index2);
+                    indices.push_back(index1);
+                }
+                faces.push_back(3);
+            }
+        } else if (i == allRibs.size() - 2) { //pole 2
+            vector<GLKVector3> pole = allRibs[i+1];
+            vector<GLKVector3> rib = allRibs[i];
+            int poleIndex = [self indexForCentroid:i+1 rib:0 totalCentroid:allRibs.size() totalRib:rib.size()];
+            for (int j = 0; j < rib.size(); j++) {
+                indices.push_back(poleIndex);
+                if (j == rib.size() - 1) {
+                    int index1 = [self indexForCentroid:i rib:j totalCentroid:allRibs.size() totalRib:rib.size()];
+                    int index2 = [self indexForCentroid:i rib:0 totalCentroid:allRibs.size() totalRib:rib.size()];
+                    indices.push_back(index1);
+                    indices.push_back(index2);
+                } else {
+                    int index1 = [self indexForCentroid:i rib:j totalCentroid:allRibs.size() totalRib:rib.size()];
+                    int index2 = [self indexForCentroid:i rib:j+1 totalCentroid:allRibs.size() totalRib:rib.size()];
+                    indices.push_back(index1);
+                    indices.push_back(index2);
+                }
+                faces.push_back(3);
+            }
+        } else {
+            vector<GLKVector3> rib1 = allRibs[i];
+            vector<GLKVector3> rib2 = allRibs[i+1];
+            
+            for (int j = 0; j < rib1.size(); j++) {
+                if (j == rib1.size() - 1) {
+                    int index1 = [self indexForCentroid:i rib:j totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    int index2 = [self indexForCentroid:i rib:0 totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    int index3 = [self indexForCentroid:i+1 rib:0 totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    int index4 = [self indexForCentroid:i+1 rib:j totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    indices.push_back(index1);
+                    indices.push_back(index2);
+                    indices.push_back(index3);
+                    indices.push_back(index4);
+                } else {
+                    int index1 = [self indexForCentroid:i rib:j totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    int index2 = [self indexForCentroid:i rib:j+1 totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    int index3 = [self indexForCentroid:i+1 rib:j+1 totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    int index4 = [self indexForCentroid:i+1 rib:j totalCentroid:allRibs.size() totalRib:rib1.size()];
+                    indices.push_back(index1);
+                    indices.push_back(index2);
+                    indices.push_back(index3);
+                    indices.push_back(index4);
+                }
+                faces.push_back(4);
+            }
+        }
+    }
+    
+    _manifold.clear();
+    _manifold.build(vertices.size(),
+                    reinterpret_cast<float*>(&vertices[0]),
+                    faces.size(),
+                    &faces[0],
+                    &indices[0]);
+    
+    //    _branchWidth = 1;
+    modState = MODIFICATION_NONE;
+    
+    //Calculate Bounding Box
+    Manifold::Vec pmin = Manifold::Vec();
+    Manifold::Vec pmax = Manifold::Vec();
+    HMesh::bbox(_manifold, pmin, pmax);
+    
+    self.centerAtBoundingBox = YES;
+    _boundingBox.minBound = GLKVector3Make(pmin[0], pmin[1], pmin[2]);
+    _boundingBox.maxBound = GLKVector3Make(pmax[0], pmax[1], pmax[2]);
+    _boundingBox.center = GLKVector3MultiplyScalar(GLKVector3Add(_boundingBox.minBound, _boundingBox.maxBound), 0.5f);
+    
+    GLKVector3 mid = GLKVector3MultiplyScalar(GLKVector3Subtract(_boundingBox.maxBound, _boundingBox.minBound), 0.5f);
+    _boundingBox.radius = GLKVector3Length(mid);
+    _boundingBox.width = fabsf(_boundingBox.maxBound.x - _boundingBox.minBound.x);
+    _boundingBox.height = fabsf(_boundingBox.maxBound.y - _boundingBox.minBound.y);
+    _boundingBox.depth = fabsf(_boundingBox.maxBound.z - _boundingBox.minBound.z);
+    
+    polar_subdivide(_manifold, 1);
+    [self rebufferWithCleanup:YES edgeTrace:YES];
+}
+
+-(int)indexForCentroid:(int)centeroid rib:(int)rib totalCentroid:(int)totalCentroid totalRib:(int)totalRib
+{
+    if (centeroid == 0) {
+        return 0;
+    } else if (centeroid == totalCentroid - 1) {
+        return (totalCentroid - 2)*totalRib + 2 - 1;
+    } else {
+        return 1 + (centeroid - 1)*totalRib + rib;
+    }
+}
+
+
 #pragma mark - UTILITIES: COMMON BENDING FUCNTIONS
 -(void)createPinPoint:(GLKVector3)touchPoint
 {
@@ -1414,10 +1679,17 @@ using namespace HMesh;
         //        ringToDeformValue[lID] = weight;
         
         //gaussian
+//        float r = loopsToDeform.size();
+//        float l = i*i;
+//        float weight = exp(-l/(0.5*r*r));
+//        ringToDeformValue[lID] = 1-weight;
+        
+        //karan's
         float r = loopsToDeform.size();
-        float l = i*i;
-        float weight = exp(-l/(0.5*r*r));
+        float x = i/r;
+        float weight = pow(pow(x, 2)-1, 2);
         ringToDeformValue[lID] = 1-weight;
+
     }
     
     _vertexToLoop = vertexToLoop;
@@ -1790,269 +2062,6 @@ using namespace HMesh;
     }
 }
 
-#pragma mark - BRANCH STICHING
--(void)stitchBranch:(HalfEdgeID)branchHID toBody:(HalfEdgeID)bodyHID {
-
-    //Align edges
-    Walker align1 = _manifold.walker(branchHID);
-    VertexID vId1 = align1.vertex();
-    Vecf vPos1 = _manifold.posf(vId1);
-
-    HalfEdgeID closestHID;
-    float closestDist = FLT_MAX;
-    
-    for (Walker align2 = _manifold.walker(bodyHID); !align2.next().full_circle(); align2 = align2.next()) {
-        float cur_dist = (vPos1 - _manifold.posf(align2.vertex())).length();
-
-        if (cur_dist < closestDist) {
-            closestDist = cur_dist;
-            closestHID = align2.halfedge();
-        }
-    }
-    Walker temp = _manifold.walker(closestHID);
-    closestHID = temp.next().halfedge();
-    
-    //Stich boundary edges
-    vector<HalfEdgeID> bEdges1;
-    vector<HalfEdgeID> bEdges2;
-    for (Walker stitch1 = _manifold.walker(closestHID);!stitch1.full_circle(); stitch1 = stitch1.next())
-    {
-        bEdges1.push_back(stitch1.halfedge());
-    }
-    bEdges1.pop_back();
-    
-    for (Walker stitch2 = _manifold.walker(branchHID); !stitch2.full_circle(); stitch2 = stitch2.prev()) {
-        bEdges2.push_back(stitch2.halfedge());
-    }
-    bEdges2.pop_back();
-    
-    assert(bEdges1.size() == bEdges2.size());
-    
-    for (int i = 0; i < bEdges1.size() ; i++) {
-        BOOL didStich = _manifold.stitch_boundary_edges(bEdges1[i], bEdges2[i]);
-        assert(didStich);
-    }
-
-}
-
-
-#pragma mark - CREATE BRANCH FROM MESH
-
--(VertexID)populateNewLimb:(std::vector<vector<GLKVector3>>)allRibs {
-    vector<Vecf> vertices;
-    vector<int> faces;
-    vector<int> indices;
-    
-    GLKVector3 poleVec;
-    
-    //Add all verticies
-    for (int i = 0; i < allRibs.size(); i++) {
-        vector<GLKVector3> rib = allRibs[i];
-        for (int j = 0; j < rib.size(); j++) {
-            GLKVector3 v = rib[j];
-            vertices.push_back(Vecf(v.x, v.y, v.z));
-        }
-    }
-    
-    for (int i = 0; i < allRibs.size() - 1; i++) {
-        if (i == allRibs.size() - 2) { //pole 2
-            vector<GLKVector3> pole = allRibs[i+1];
-            vector<GLKVector3> rib = allRibs[i];
-            int poleIndex = [self limbIndexForCentroid:i+1 rib:0 totalCentroid:allRibs.size() totalRib:rib.size()];
-            Vec3f pV = vertices[poleIndex];
-            poleVec = GLKVector3Make(pV[0], pV[1], pV[2]);
-            
-            for (int j = 0; j < rib.size(); j++) {
-                indices.push_back(poleIndex);
-                if (j == rib.size() - 1) {
-                    int index1 = [self limbIndexForCentroid:i rib:j totalCentroid:allRibs.size() totalRib:rib.size()];
-                    int index2 = [self limbIndexForCentroid:i rib:0 totalCentroid:allRibs.size() totalRib:rib.size()];
-                    indices.push_back(index1);
-                    indices.push_back(index2);
-                } else {
-                    int index1 = [self limbIndexForCentroid:i rib:j totalCentroid:allRibs.size() totalRib:rib.size()];
-                    int index2 = [self limbIndexForCentroid:i rib:j+1 totalCentroid:allRibs.size() totalRib:rib.size()];
-                    indices.push_back(index1);
-                    indices.push_back(index2);
-                }
-                faces.push_back(3);
-            }
-        } else {
-            vector<GLKVector3> rib1 = allRibs[i];
-            vector<GLKVector3> rib2 = allRibs[i+1];
-            
-            for (int j = 0; j < rib1.size(); j++) {
-                if (j == rib1.size() - 1) {
-                    int index1 = [self limbIndexForCentroid:i rib:j totalCentroid:allRibs.size() totalRib:rib1.size()];
-                    int index2 = [self limbIndexForCentroid:i rib:0 totalCentroid:allRibs.size() totalRib:rib1.size()];
-                    int index3 = [self limbIndexForCentroid:i+1 rib:0 totalCentroid:allRibs.size() totalRib:rib1.size()];
-                    int index4 = [self limbIndexForCentroid:i+1 rib:j totalCentroid:allRibs.size() totalRib:rib1.size()];
-                    indices.push_back(index1);
-                    indices.push_back(index2);
-                    indices.push_back(index3);
-                    indices.push_back(index4);
-                } else {
-                    int index1 = [self limbIndexForCentroid:i rib:j totalCentroid:allRibs.size() totalRib:rib1.size()];
-                    int index2 = [self limbIndexForCentroid:i rib:j+1 totalCentroid:allRibs.size() totalRib:rib1.size()];
-                    int index3 = [self limbIndexForCentroid:i+1 rib:j+1 totalCentroid:allRibs.size() totalRib:rib1.size()];
-                    int index4 = [self limbIndexForCentroid:i+1 rib:j totalCentroid:allRibs.size() totalRib:rib1.size()];
-                    indices.push_back(index1);
-                    indices.push_back(index2);
-                    indices.push_back(index3);
-                    indices.push_back(index4);
-                }
-                faces.push_back(4);
-            }
-        }
-    }
-    
-    _manifold.build(vertices.size(),
-                    reinterpret_cast<float*>(&vertices[0]),
-                    faces.size(),
-                    &faces[0],
-                    &indices[0]);
-    
-    VertexID pole = [self closestVertexID_3D:[Utilities matrix4:self.modelMatrix multiplyVector3:poleVec]];
-    assert(is_pole(_manifold, pole));
-
-    return pole;
-}
-
-
--(int)limbIndexForCentroid:(int)centeroid rib:(int)rib totalCentroid:(int)totalCentroid totalRib:(int)totalRib
-{
-    if (centeroid == totalCentroid - 1) {
-        return (totalCentroid - 1)*totalRib + 1 - 1;
-    } else {
-        return centeroid*totalRib + rib;
-    }
-}
-
-
--(void)populateManifold:(std::vector<vector<GLKVector3>>)allRibs {
-    vector<Vecf> vertices;
-    vector<int> faces;
-    vector<int> indices;
-    
-    //Add all verticies
-    for (int i = 0; i < allRibs.size(); i++) {
-        vector<GLKVector3> rib = allRibs[i];
-        for (int j = 0; j < rib.size(); j++) {
-            GLKVector3 v = rib[j];
-            vertices.push_back(Vecf(v.x, v.y, v.z));
-        }
-    }
-    
-    for (int i = 0; i < allRibs.size() - 1; i++) {
-
-        if (i == 0) { //pole 1
-            vector<GLKVector3> pole = allRibs[i];
-            vector<GLKVector3> rib = allRibs[i+1];
-            int poleIndex = 0;
-            for (int j = 0; j < rib.size(); j++) {
-                indices.push_back(poleIndex);
-                if (j == rib.size() - 1) {
-                    int index1 = [self indexForCentroid:1 rib:j totalCentroid:allRibs.size() totalRib:rib.size()];
-                    int index2 = [self indexForCentroid:1 rib:0 totalCentroid:allRibs.size() totalRib:rib.size()];
-                    indices.push_back(index2);
-                    indices.push_back(index1);
-                } else {
-                    int index1 = [self indexForCentroid:1 rib:j totalCentroid:allRibs.size() totalRib:rib.size()];
-                    int index2 = [self indexForCentroid:1 rib:j+1 totalCentroid:allRibs.size() totalRib:rib.size()];
-                    indices.push_back(index2);
-                    indices.push_back(index1);
-                }
-                faces.push_back(3);
-            }
-        } else if (i == allRibs.size() - 2) { //pole 2
-            vector<GLKVector3> pole = allRibs[i+1];
-            vector<GLKVector3> rib = allRibs[i];
-            int poleIndex = [self indexForCentroid:i+1 rib:0 totalCentroid:allRibs.size() totalRib:rib.size()];
-            for (int j = 0; j < rib.size(); j++) {
-                indices.push_back(poleIndex);
-                if (j == rib.size() - 1) {
-                    int index1 = [self indexForCentroid:i rib:j totalCentroid:allRibs.size() totalRib:rib.size()];
-                    int index2 = [self indexForCentroid:i rib:0 totalCentroid:allRibs.size() totalRib:rib.size()];
-                    indices.push_back(index1);
-                    indices.push_back(index2);
-                } else {
-                    int index1 = [self indexForCentroid:i rib:j totalCentroid:allRibs.size() totalRib:rib.size()];
-                    int index2 = [self indexForCentroid:i rib:j+1 totalCentroid:allRibs.size() totalRib:rib.size()];
-                    indices.push_back(index1);
-                    indices.push_back(index2);
-                }
-                faces.push_back(3);
-            }
-        } else {
-            vector<GLKVector3> rib1 = allRibs[i];
-            vector<GLKVector3> rib2 = allRibs[i+1];
-            
-            for (int j = 0; j < rib1.size(); j++) {
-                if (j == rib1.size() - 1) {
-                    int index1 = [self indexForCentroid:i rib:j totalCentroid:allRibs.size() totalRib:rib1.size()];
-                    int index2 = [self indexForCentroid:i rib:0 totalCentroid:allRibs.size() totalRib:rib1.size()];
-                    int index3 = [self indexForCentroid:i+1 rib:0 totalCentroid:allRibs.size() totalRib:rib1.size()];
-                    int index4 = [self indexForCentroid:i+1 rib:j totalCentroid:allRibs.size() totalRib:rib1.size()];
-                    indices.push_back(index1);
-                    indices.push_back(index2);
-                    indices.push_back(index3);
-                    indices.push_back(index4);
-                } else {
-                    int index1 = [self indexForCentroid:i rib:j totalCentroid:allRibs.size() totalRib:rib1.size()];
-                    int index2 = [self indexForCentroid:i rib:j+1 totalCentroid:allRibs.size() totalRib:rib1.size()];
-                    int index3 = [self indexForCentroid:i+1 rib:j+1 totalCentroid:allRibs.size() totalRib:rib1.size()];
-                    int index4 = [self indexForCentroid:i+1 rib:j totalCentroid:allRibs.size() totalRib:rib1.size()];
-                    indices.push_back(index1);
-                    indices.push_back(index2);
-                    indices.push_back(index3);
-                    indices.push_back(index4);
-                }
-                faces.push_back(4);
-            }
-        }
-    }
-    
-   
-    _manifold.clear();
-    _manifold.build(vertices.size(),
-                    reinterpret_cast<float*>(&vertices[0]),
-                    faces.size(),
-                    &faces[0],
-                    &indices[0]);
-    
-//    _branchWidth = 1;
-    modState = MODIFICATION_NONE;
-    
-    //Calculate Bounding Box
-    Manifold::Vec pmin = Manifold::Vec();
-    Manifold::Vec pmax = Manifold::Vec();
-    HMesh::bbox(_manifold, pmin, pmax);
-    
-    self.centerAtBoundingBox = YES;
-    _boundingBox.minBound = GLKVector3Make(pmin[0], pmin[1], pmin[2]);
-    _boundingBox.maxBound = GLKVector3Make(pmax[0], pmax[1], pmax[2]);
-    _boundingBox.center = GLKVector3MultiplyScalar(GLKVector3Add(_boundingBox.minBound, _boundingBox.maxBound), 0.5f);
-    
-    GLKVector3 mid = GLKVector3MultiplyScalar(GLKVector3Subtract(_boundingBox.maxBound, _boundingBox.minBound), 0.5f);
-    _boundingBox.radius = GLKVector3Length(mid);
-    _boundingBox.width = fabsf(_boundingBox.maxBound.x - _boundingBox.minBound.x);
-    _boundingBox.height = fabsf(_boundingBox.maxBound.y - _boundingBox.minBound.y);
-    _boundingBox.depth = fabsf(_boundingBox.maxBound.z - _boundingBox.minBound.z);
-    
-
-    [self rebufferWithCleanup:YES edgeTrace:YES];
-}
-
--(int)indexForCentroid:(int)centeroid rib:(int)rib totalCentroid:(int)totalCentroid totalRib:(int)totalRib
-{
-    if (centeroid == 0) {
-        return 0;
-    } else if (centeroid == totalCentroid - 1) {
-        return (totalCentroid - 2)*totalRib + 2 - 1;
-    } else {
-        return 1 + (centeroid - 1)*totalRib + rib;
-    }
-}
 
 #pragma mark - TOUCHES: FACE PICKING
 
@@ -2083,37 +2092,55 @@ using namespace HMesh;
     }
 
     Walker ribWalker = _manifold.walker(vID);
-    if (_edgeInfo[ribWalker.halfedge()].edge_type != RIB) {
+    if (_edgeInfo[ribWalker.halfedge()].is_spine()) {
         ribWalker = ribWalker.opp().next();
     }
-
-    assert(_edgeInfo[ribWalker.halfedge()].edge_type == RIB);
+    assert(_edgeInfo[ribWalker.halfedge()].is_rib());
     
     [self saveState];
     
     _edges_to_scale.clear();
     _all_vector_vid.clear();
+    
+    Walker upWalker = _manifold.walker(ribWalker.next().halfedge());
+    Walker downWalker = _manifold.walker(ribWalker.opp().next().halfedge());
 
-    Walker oneWay = _manifold.walker(ribWalker.next().halfedge());
-    Walker otherWay = _manifold.walker(ribWalker.opp().next().halfedge());
-
+    Vec origin = _manifold.pos(vID);
+    float brushSize = 0.1;
+    vector<float> allDistances;
+    
     vector<VertexID> vector_vid;
-    if (!is_pole(_manifold, oneWay.vertex())) {
-        _edges_to_scale.push_back(oneWay.next().halfedge());
-        vector_vid = verticies_along_the_rib(_manifold, oneWay.next().halfedge(), _edgeInfo);
+    float distance = (origin - _manifold.pos(upWalker.vertex())).length();
+    while (distance <= brushSize) {
+        if (is_pole(_manifold, upWalker.vertex())) {
+            break;
+        }
+        _edges_to_scale.push_back(upWalker.next().halfedge());
+        vector_vid = verticies_along_the_rib(_manifold, upWalker.next().halfedge(), _edgeInfo);
         _all_vector_vid.insert(_all_vector_vid.end(), vector_vid.begin(), vector_vid.end());
+        allDistances.push_back(distance);
+        upWalker = upWalker.next().opp().next();
+        distance = (origin - _manifold.pos(upWalker.vertex())).length();
     }
 
+    distance = 0;
+    allDistances.push_back(distance);
     _edges_to_scale.push_back(ribWalker.halfedge());
     vector_vid = verticies_along_the_rib(_manifold, ribWalker.halfedge(), _edgeInfo);
     _all_vector_vid.insert(_all_vector_vid.end(), vector_vid.begin(), vector_vid.end());
-
-    if (!is_pole(_manifold, otherWay.vertex())) {
-        _edges_to_scale.push_back(otherWay.next().halfedge());
-        vector_vid = verticies_along_the_rib(_manifold, otherWay.next().halfedge(), _edgeInfo);
+    
+    distance = (origin - _manifold.pos(downWalker.vertex())).length();
+    while (distance <= brushSize) {
+        if (is_pole(_manifold, downWalker.vertex())) {
+            break;
+        }
+        _edges_to_scale.push_back(downWalker.next().halfedge());
+        vector_vid = verticies_along_the_rib(_manifold, downWalker.next().halfedge(), _edgeInfo);
         _all_vector_vid.insert(_all_vector_vid.end(), vector_vid.begin(), vector_vid.end());
+        allDistances.push_back(distance);
+        downWalker = downWalker.next().opp().next();
+        distance = (origin - _manifold.pos(downWalker.vertex())).length();
     }
-
     
     _current_scale_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
     
@@ -2121,6 +2148,8 @@ using namespace HMesh;
     
     //Calculate centroids and gaussian weights
     _centroids = centroid_for_ribs(_manifold, _edges_to_scale, _edgeInfo);
+    assert(_centroids.size() == allDistances.size());
+    
     Vec3f base;
     if (_centroids.size() % 2 == 0) {
         Vec3f b1 = _centroids[_centroids.size()/2 -1];
@@ -2134,12 +2163,21 @@ using namespace HMesh;
     if (_centroids.size() == 1) {
         _scale_weight_vector.push_back(1.0f);
     } else {
-        float r = (base - _centroids[0]).length();
+//        float r = (base - _centroids[0]).length();
         for(int i = 0; i < _centroids.size(); i++)
         {
-            CGLA::Vec3f c = _centroids[i];
-            float l = sqr_length(base - c);
-            _scale_weight_vector.push_back(exp(-l/(2*r*r)));
+            float distance = allDistances[i];
+            
+//            CGLA::Vec3f c = _centroids[i];
+//            float l = (base - c).length();
+            float x = distance/brushSize;
+            float weight;
+            if (x <= 1) {
+                weight = pow(pow(x, 2) - 1, 2);
+            } else {
+                weight = 0;
+            }
+            _scale_weight_vector.push_back(weight);
         }
     }
     

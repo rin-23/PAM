@@ -14,12 +14,16 @@
 -(void)setMeshFromObjFile:(NSString*)objFile;
 
 #pragma mark - TOUCHES: BRANCH/BUMPS CREATION ONE FINGER
--(void)startCreateBranch:(GLKVector3)touchPoint;
+-(void)startCreateBranch:(GLKVector3)touchPoint closestPoint:(GLKVector3)closestPoint;
 -(void)continueCreateBranch:(GLKVector3)touchPoint;
 -(void)endCreateBranchBended:(GLKVector3)touchPoint
                 touchedModel:(BOOL)touchedModel
                    touchSize:(float)touchSize
            averageTouchSpeed:(float)touchSpeed;
+-(std::vector<std::vector<GLKVector3>>)end3DCreateBranchBended:(GLKVector3)touchPoint
+                    touchedModel:(BOOL)touchedModel
+                     touchSize:(float)touchSize
+             averageTouchSpeed:(float)touchSpeed;
 
 #pragma mark - TOUCHES: BRANCH CREATION TWO FINGERS
 -(void)startCreateBranchFinger1:(GLKVector3)touchPoint1 finger2:(GLKVector3)touchPoint2;
@@ -65,6 +69,9 @@
                                     translation:(GLKVector3)translation;
 -(void)continueTranslatingBranchTree:(GLKVector3)translation;
 -(void)endTranslatingBranchTree:(GLKVector3)translation;
+
+#pragma mark - SMOOTHING
+-(void)smoothAtPoint:(GLKVector3)touchPoint;
 
 #pragma mark - UTILITIES
 -(void)clear;

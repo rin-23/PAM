@@ -152,6 +152,28 @@
     }
 }
 
++(void)normals3D:(std::vector<GLKVector3>&)normals
+      tangents3D:(std::vector<GLKVector3>&)tangents
+     forSkeleton:(std::vector<GLKVector3>)skeleton
+{
+    for (int i = 0; i < skeleton.size(); i++) {
+        GLKVector3 t;
+        if (i == 0) {
+            t = GLKVector3Subtract(skeleton[1], skeleton[0]);
+        } else if (i == (skeleton.size() - 1)) {
+            t = GLKVector3Subtract(skeleton[i], skeleton[i-1]);
+        } else {
+            GLKVector3 v1 = GLKVector3Subtract(skeleton[i], skeleton[i-1]);
+            GLKVector3 v2 = GLKVector3Subtract(skeleton[i+1], skeleton[i]);
+            t = GLKVector3Lerp(v1, v2, 0.5f);
+        }
+        tangents.push_back(GLKVector3Normalize(t));
+        GLKMatrix4 rotMat = GLKMatrix4MakeRotation(GLKMathDegreesToRadians(90), 0, 0, 1);
+        GLKVector3 n = [Utilities matrix4:rotMat multiplyVector3:t];
+        normals.push_back(GLKVector3Normalize(n));
+    }
+}
+
 +(std::vector<GLKVector2>)laplacianSmoothing:(std::vector<GLKVector2>)points
                                   iterations:(int)iterations
 {
@@ -165,30 +187,72 @@
     return smoothed;
 }
 
++(std::vector<GLKVector3>)laplacianSmoothing3D:(std::vector<GLKVector3>)points
+iterations:(int)iterations
+{
+    std::vector<GLKVector3> smoothed = points;
+    for (int j = 0; j < iterations; j++) {
+        for (int i = 1; i < points.size() - 1; i++) {
+            smoothed[i] = GLKVector3Lerp(points[i-1], points[i+1], 0.5f);
+        }
+        points = smoothed;
+    }
+    return smoothed;
+}
+
 +(void)centroids:(std::vector<GLKVector2>&)centroids
 forOneFingerTouchPoint:(std::vector<GLKVector2>)touchPointsWorld
-        withNextCentroidStep:(double)step
+        withNextCentroidStep:(float)step
 {
     //Add first centroid for pole
-    double accumLen = 0.0f;
+    float accumLen = 0.0f;
     GLKVector2 lastCentroid = touchPointsWorld[0];
     centroids.push_back(lastCentroid);
     
     //Add all other centroids
-    for (int i = 1; i < touchPointsWorld.size(); i++) {
+    int i = 1;
+    while (i < touchPointsWorld.size()) {
         GLKVector2 centroid = touchPointsWorld[i];
-        double curLen = GLKVector2Distance(lastCentroid, centroid);
+        float curLen = GLKVector2Distance(lastCentroid, centroid);
         accumLen += curLen;
         
-        if (accumLen > step) {
+        if (accumLen >= step) {
             GLKVector2 dir = GLKVector2Normalize(GLKVector2Subtract(centroid, lastCentroid));
             GLKVector2 newCenter = GLKVector2Add(lastCentroid, GLKVector2MultiplyScalar(dir, step - (accumLen - curLen)));
             centroids.push_back(newCenter);
             accumLen = 0.0f;
             lastCentroid = newCenter;
-            i--;
         } else {
             lastCentroid = centroid;
+            i++;
+        }
+    }
+}
+
++(void)centroids3D:(std::vector<GLKVector3>&)centroids forOneFingerTouchPoint:(std::vector<GLKVector3>)touchPointsWorld
+                                                         withNextCentroidStep:(float)step
+{
+    //Add first centroid for pole
+    float accumLen = 0.0f;
+    GLKVector3 lastCentroid = touchPointsWorld[0];
+    centroids.push_back(lastCentroid);
+    
+    //Add all other centroids
+    int i = 1;
+    while (i < touchPointsWorld.size()) {
+        GLKVector3 centroid = touchPointsWorld[i];
+        float curLen = GLKVector3Distance(lastCentroid, centroid);
+        accumLen += curLen;
+        
+        if (accumLen >= step) {
+            GLKVector3 dir = GLKVector3Normalize(GLKVector3Subtract(centroid, lastCentroid));
+            GLKVector3 newCenter = GLKVector3Add(lastCentroid, GLKVector3MultiplyScalar(dir, step - (accumLen - curLen)));
+            centroids.push_back(newCenter);
+            accumLen = 0.0f;
+            lastCentroid = newCenter;
+        } else {
+            lastCentroid = centroid;
+            i++;
         }
     }
 }
@@ -204,12 +268,13 @@ forTwoFingerTouchPoint:(std::vector<GLKVector2>)touchPointsWorld
     centroids.push_back(lastCentroid);
     
     //Add all other centroids
-    for (int i = 2; i < touchPointsWorld.size(); i += 2) {
+    int i = 2;
+    while (i < touchPointsWorld.size()) {
         GLKVector2 centroid = GLKVector2Lerp(touchPointsWorld[i], touchPointsWorld[i+1], 0.5f);
         double curLen = GLKVector2Distance(lastCentroid, centroid);
         accumLen += curLen;
         
-        if (accumLen > step) {
+        if (accumLen >= step) {
             GLKVector2 dir = GLKVector2Normalize(GLKVector2Subtract(centroid, lastCentroid));
             GLKVector2 newCenter = GLKVector2Add(lastCentroid, GLKVector2MultiplyScalar(dir, step - (accumLen - curLen)));
             centroids.push_back(newCenter);
@@ -218,6 +283,7 @@ forTwoFingerTouchPoint:(std::vector<GLKVector2>)touchPointsWorld
             lastCentroid = newCenter;
         } else {
             lastCentroid = centroid;
+            i += 2;
         }
     }
 }

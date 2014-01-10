@@ -335,6 +335,11 @@ double triangleAngleWithSides(double a, double b, double c) {
 }
 
 
++(GLKVector3) matrix4:(GLKMatrix4)matrix multiplyVector3NoTranslation:(GLKVector3) vector3 {
+    GLKVector4 vector4 = GLKVector4MakeWithVector3(vector3, 0.0f);
+    return [self  matrix4:matrix multiplyVector4:vector4];
+}
+
 +(GLKVector3) matrix4:(GLKMatrix4)matrix multiplyVector3:(GLKVector3) vector3 {
     GLKVector4 vector4 = GLKVector4MakeWithVector3(vector3, 1.0f);
     return [self  matrix4:matrix multiplyVector4:vector4];

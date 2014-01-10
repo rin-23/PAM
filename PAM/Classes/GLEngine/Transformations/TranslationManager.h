@@ -15,5 +15,5 @@
 @property (nonatomic, assign) float scaleFactor;
 
 - (void)handlePanGesture:(UIGestureRecognizer *)sender withViewMatrix:(GLKMatrix4)viewMatrix;
-
+- (void)reset;
 @end

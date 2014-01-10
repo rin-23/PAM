@@ -218,7 +218,7 @@ typedef enum {
         return;
     }
     
-    [_pMesh createPivotPoint:modelCoord];
+    [_pMesh smoothAtPoint:modelCoord];
 }
 
 -(void)handlePinchGesture:(UIGestureRecognizer*)sender {
@@ -337,7 +337,7 @@ typedef enum {
                 _state = TOUCHED_MODEL;
             }
             
-            [_pMesh startCreateBranch:modelCoord];
+            [_pMesh startCreateBranch:rayOrigin closestPoint:modelCoord];
         }
         else if (sender.state == UIGestureRecognizerStateChanged)
         {
@@ -366,23 +366,50 @@ typedef enum {
             float averageSpeed = _speedSum/_touchCount;
             NSLog(@"Average Speed: %f", averageSpeed);
             
+            std::vector<std::vector<GLKVector3>> allRibs;
             if (_state == TOUCHED_MODEL) {
                 BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, _gaussianDepth)];
                 if (!result) {
                     NSLog(@"[WARNING] Couldn determine touch area");
                     return;
                 }
-                [_pMesh endCreateBranchBended:modelCoord touchedModel:YES  touchSize:_touchSize averageTouchSpeed:averageSpeed];
+                allRibs = [_pMesh end3DCreateBranchBended:modelCoord touchedModel:YES  touchSize:_touchSize averageTouchSpeed:averageSpeed];
             } else if (_state == TOUCHED_BACKGROUND){
                 BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, 0)];
                 if (!result) {
                     NSLog(@"[WARNING] Couldn't determine touch area");
                     return;
                 }
-                [_pMesh endCreateBranchBended:modelCoord touchedModel:NO touchSize:_touchSize averageTouchSpeed:averageSpeed];
+                allRibs = [_pMesh end3DCreateBranchBended:modelCoord touchedModel:NO touchSize:_touchSize averageTouchSpeed:averageSpeed];
             }
             _state = TOUCHED_NONE;
             _selectionLine = nil;
+            
+//            _ribsLines = [[NSMutableArray alloc] initWithCapacity:allRibs.size()];
+//            for (int i = 0; i <allRibs.size();i++) {
+//                std::vector<GLKVector3> rib = allRibs[i];
+//                NSMutableData* vData = [[NSMutableData alloc] init];
+////                for (GLKVector3 v: rib) {
+//
+//                for (int j = 0; j < rib.size(); j++) {
+//                    GLKVector3 v = rib[j];
+//                    GLubyte b = 0;
+//                    GLubyte r = 0;
+////                                            GLubyte b = j * (255.0f/rib.size());
+//                    if (j%2 ==0) {
+//                        r = 255;
+//                    } else {
+//                        b = 255;
+//                    }
+//                    VertexRGBA vertex1 = {{v.x, v.y, v.z}, {r,b,0,255}};
+//                    [vData appendBytes:&vertex1 length:sizeof(VertexRGBA)];
+//                }
+//                Line* line = [[Line alloc] initWithVertexData:vData];
+//                [_ribsLines addObject:line];
+//            }
+
+//            _bbox = _pMesh.boundingBox;
+//            _translationManager.scaleFactor = _bbox.radius;
         }
     }
 }
@@ -680,7 +707,7 @@ typedef enum {
     _pMesh.projectionMatrix = projectionMatrix;
     [_pMesh draw];
     
-    glLineWidth(3.0f);
+    glLineWidth(2.0f);
     _selectionLine.viewMatrix = viewMatrix;
     _selectionLine.projectionMatrix = projectionMatrix;
     [_selectionLine draw];
@@ -923,8 +950,8 @@ typedef enum {
 -(void)resetTransformations {
     //overwrite
     [_rotationManager reset];
+    [_translationManager reset];
     viewMatrix = GLKMatrix4Identity;
-    _translationManager.translationMatrix = GLKMatrix4Identity;
     _zoomManager.scaleMatrix = GLKMatrix4Identity;
     //    [_branchPoints removeAllObjects];
 }

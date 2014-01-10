@@ -52,5 +52,12 @@
 //    NSLog(@"Pan: %f/%f",  x_ndc, y_ndc);
 }
 
+-(void)reset {
+    _translationMatrix = GLKMatrix4Identity;
+    accumulatedTranslation = GLKMatrix4Identity;
+}
+
+
+
 
 @end

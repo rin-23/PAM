@@ -1169,8 +1169,41 @@ using namespace HMesh;
         skeleton[i] = GLKVector3Add(skeleton[i], translate);
     }
     
-    GLKVector3 holeNormWorld = [Utilities matrix4:self.modelViewMatrix multiplyVector3NoTranslation:holeNorm];
+    //Length
+    float totalLength = 0;
+    GLKVector3 lastSkelet = skeleton[0];
+    for (int i = 1; i < skeleton.size(); i++) {
+        totalLength += GLKVector3Distance(lastSkelet, skeleton[i]);
+        lastSkelet = skeleton[i];
+    }
     
+    float deformLength = 0.2f * totalLength;
+    int deformIndex;
+    totalLength = 0;
+    lastSkelet = skeleton[0];
+
+    for (int i = 1; i < skeleton.size(); i++) {
+        totalLength += GLKVector3Distance(lastSkelet, skeleton[i]);
+        lastSkelet = skeleton[i];
+        if (totalLength > deformLength) {
+            deformIndex = i;
+            break;
+        }
+    }
+    
+    GLKVector3 holeNormWorld = GLKVector3Normalize([Utilities matrix4:self.modelViewMatrix multiplyVector3NoTranslation:holeNorm]);
+    holeNormWorld = GLKVector3MultiplyScalar(holeNormWorld, deformLength);
+    for (int i = 0; i < skeleton.size(); i++) {
+        if (i < deformIndex) {
+            float x = (float)i/(float)deformIndex;
+            float weight = sqrt(x);
+            skeleton[i] = GLKVector3Add(skeleton[i], GLKVector3MultiplyScalar(holeNormWorld, weight));
+        } else {
+            skeleton[i] = GLKVector3Add(skeleton[i], holeNormWorld);
+        }
+    }
+    
+    skeleton = [PAMUtilities laplacianSmoothing3D:skeleton iterations:1];
     
     
     //Get norm vectors for skeleton joints

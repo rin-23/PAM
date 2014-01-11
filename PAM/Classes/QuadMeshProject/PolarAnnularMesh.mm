@@ -1108,17 +1108,9 @@ using namespace HMesh;
     [self stitchBranch:boundaryHalfEdge toBody:limbBoundaryHalfEdge];
     [self rebufferWithCleanup:YES edgeTrace:YES];
     number_rib_edges(_manifold, _edgeInfo);
-
-    
-    vector<VertexID> test;
     
     Walker toJunctionWalker = _manifold.walker(limbOuterHalfEdge);
     toJunctionWalker = toJunctionWalker.prev().opp();
-    
-    test.push_back(toJunctionWalker.vertex());
-    //    test.push_back(boundaryWalker.next().vertex());
-    test.push_back(toJunctionWalker.opp().vertex());
-
     
     EdgeType t = _edgeInfo[toJunctionWalker.next().halfedge()].edge_type;
     
@@ -1128,19 +1120,14 @@ using namespace HMesh;
     }
     
     vector<VertexID> floodVerticies;
-
-    test.push_back(toJunctionWalker.vertex());
-//    test.push_back(boundaryWalker.next().vertex());
-    test.push_back(toJunctionWalker.opp().vertex());
     
     Walker boundaryWalker = _manifold.walker(toJunctionWalker.next().halfedge());
 
-    vector<float>weights;
+//    vector<float>weights;
     float brush_size = 0.2;
     
     HalfEdgeAttributeVector<EdgeInfo> edge_info(_manifold.allocated_halfedges());
     for (; !boundaryWalker.full_circle(); boundaryWalker = boundaryWalker.next().opp().next()) {
-
 
         VertexID closestPoint = boundaryWalker.vertex();
         Vec originPos = _manifold.pos(closestPoint);
@@ -1148,16 +1135,16 @@ using namespace HMesh;
         queue<HalfEdgeID> hq;
         circulate_vertex_ccw(_manifold, closestPoint, [&](Walker w) {
             floodVerticies.push_back(w.vertex());
-            Vec pos = _manifold.pos(w.vertex());
-            float d = (pos - originPos).length();
-            float x = d/brush_size;
-            float weight;
-            if (x <= 1) {
-                weight = pow(pow(x, 2) - 1, 2);
-            } else {
-                weight = 0;
-            }
-            weights.push_back(weight);
+//            Vec pos = _manifold.pos(w.vertex());
+//            float d = (pos - originPos).length();
+//            float x = d/brush_size;
+//            float weight;
+//            if (x <= 1) {
+//                weight = pow(pow(x, 2) - 1, 2);
+//            } else {
+//                weight = 0;
+//            }
+//            weights.push_back(weight);
 
             edge_info[w.halfedge()] = EdgeInfo(SPINE, 0);
             edge_info[w.opp().halfedge()] = EdgeInfo(SPINE, 0);
@@ -1166,7 +1153,7 @@ using namespace HMesh;
         
         
         floodVerticies.push_back(closestPoint);
-        weights.push_back(1);
+//        weights.push_back(1);
         while(!hq.empty())
         {
             HalfEdgeID h = hq.front();
@@ -1180,18 +1167,14 @@ using namespace HMesh;
                     float d = (pos - originPos).length();
                     if (d <= brush_size) {
                         floodVerticies.push_back(w.vertex());
-                        Vec pos = _manifold.pos(w.vertex());
-                        float d = (pos - originPos).length();
-                        float x = d/brush_size;
-                        float weight;
-                        if (x <= 1) {
-                            weight = pow(pow(x, 2) - 1, 2);
-                        } else {
-                            weight = 0;
-                        }
-                        weights.push_back(weight);
-
-//                        floodVerticiesSet.insert(w.opp().vertex());
+//                        float x = d/brush_size;
+//                        float weight;
+//                        if (x <= 1) {
+//                            weight = pow(pow(x, 2) - 1, 2);
+//                        } else {
+//                            weight = 0;
+//                        }
+//                        weights.push_back(weight);
                         edge_info[w.halfedge()] = EdgeInfo(SPINE,0);
                         edge_info[w.opp().halfedge()] = EdgeInfo(SPINE,0);
                         
@@ -1201,27 +1184,11 @@ using namespace HMesh;
             }
         }
     }
-    
-//    vector<VertexID> floodVerticiesVector(floodVerticiesSet.begin(), floodVerticiesSet.end());
-//    int num = _manifold.no_vertices();
-    
 //    taubin_smooth(_manifold, 10);
 //    _edgeInfo = trace_spine_edges(_manifold);
     laplacian_spine_smooth_verticies(_manifold, floodVerticies, _edgeInfo, 10);
 //    laplacian_smooth_verticies(_manifold, floodVerticies, weights, 2);
-
-//    laplacian_smooth_vertex(_manifold, floodVerticies, _edgeInfo, 10);
-//    laplacian_smooth(_manifold);
     [self rebufferWithCleanup:NO edgeTrace:NO];
-//    laplacian_smooth(_manifold, 1.0, 10);
-    
-
-
-//    taubin_smooth_vertex(_manifold, floodVerticiesVector, 100);
-    
-    
-    
-    [self changeVerticiesColor:test toSelected:YES];
     return allRibs;
 }
 

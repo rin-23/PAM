@@ -1193,7 +1193,6 @@ using namespace HMesh;
 }
 
 
-
 #pragma mark - BRANCH CREATION TWO FINGERS
 
 -(void)startCreateBranchFinger1:(GLKVector3)touchPoint1 finger2:(GLKVector3)touchPoint2 {
@@ -1208,9 +1207,12 @@ using namespace HMesh;
 }
 
 -(std::vector<std::vector<GLKVector3>>)endCreateBranchTwoFingersWithTouchedModel:(BOOL)touchedModel {
-//    if (![self manifoldIsLoaded]) {
+    if (![self manifoldIsLoaded]) {
         return [self endCreateNewBodyTwoFingers];
-//    }
+    } else {
+        std::vector<std::vector<GLKVector3>> empty;
+        return empty;
+    }
     
     if (_touchPoints.size() < 8 || _touchPoints.size() % 2 != 0) {
         NSLog(@"[PolarAnnularMesh][WARNING] Garbage point data");

@@ -574,9 +574,9 @@ typedef enum {
     } else {
         _transformModeLabel.text = @"Model";
     }
-    [UIView animateWithDuration:1.0f animations:^{
-        _transformModeLabel.alpha = 0.0f;
-    }];
+//    [UIView animateWithDuration:1.0f animations:^{
+//        _transformModeLabel.alpha = 0.0f;
+//    }];
 }
 
 -(void)handleRotationGesture:(UIGestureRecognizer*)sender {

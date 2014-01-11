@@ -388,4 +388,13 @@ double triangleAngleWithSides(double a, double b, double c) {
     float angle = acosf(dotP);
     return angle;
 }
+
++(GLKVector3)orthogonalVectorTo:(GLKVector3)vector {
+    float x = 1;
+    float y = 1;
+    float z = (vector.x*x + vector.y*y) / -vector.z;
+    GLKVector3 orthoVector = GLKVector3Normalize(GLKVector3Make(x, y, z));
+    return orthoVector;
+}
+
 @end

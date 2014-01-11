@@ -155,7 +155,7 @@ using namespace HMesh;
     _boundingBox.height = fabsf(_boundingBox.maxBound.y - _boundingBox.minBound.y);
     _boundingBox.depth = fabsf(_boundingBox.maxBound.z - _boundingBox.minBound.z);
     
-    [self rebufferWithCleanup:NO edgeTrace:NO];
+    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
 }
 
 
@@ -226,12 +226,14 @@ using namespace HMesh;
                                                                                    target:GL_ELEMENT_ARRAY_BUFFER];
 }
 
--(void)rebufferWithCleanup:(BOOL)shouldClean edgeTrace:(BOOL)shouldEdgeTrace {
+-(void)rebufferWithCleanup:(BOOL)shouldClean bufferData:(BOOL)bufferData edgeTrace:(BOOL)shouldEdgeTrace {
     if (shouldClean) {
         _manifold.cleanup();
     }
     
-    [self rebufferNoEdgetrace];
+    if (bufferData) {
+        [self rebufferNoEdgetrace];
+    }
 
     if (shouldEdgeTrace) {
         _edgeInfo = trace_spine_edges(_manifold);
@@ -320,7 +322,7 @@ using namespace HMesh;
 
 -(void)undo {
     _manifold = undoMani;
-    [self rebufferWithCleanup:NO edgeTrace:YES];
+    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:YES];
 }
 
 -(void)showSkeleton:(BOOL)show {
@@ -330,7 +332,7 @@ using namespace HMesh;
     } else {
         _manifold = _skeletonMani;
     }
-    [self rebufferWithCleanup:NO edgeTrace:NO];
+    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
 }
 
 -(void)showRibJunctions
@@ -354,7 +356,7 @@ using namespace HMesh;
 
 -(void)clear {
     _manifold.clear();
-    [self rebufferWithCleanup:NO edgeTrace:YES];
+    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:YES];
 }
 
 #pragma mark - FIND VERTEX/FACE NEAR TOUCH POINT
@@ -678,10 +680,14 @@ using namespace HMesh;
     Vec originPos = _manifold.pos(closestPoint);
 
     queue<HalfEdgeID> hq;
-    set<VertexID> floodVerticiesSet;
-    floodVerticiesSet.insert(closestPoint);
+    vector<VertexID> floodVerticies;
+    vector<float> weights;
+    
+    floodVerticies.push_back(closestPoint);
+    weights.push_back(1.0f);
     circulate_vertex_ccw(_manifold, closestPoint, [&](Walker w) {
-        floodVerticiesSet.insert(w.vertex());
+        floodVerticies.push_back(w.vertex());
+        weights.push_back(1.0f);
         edge_info[w.halfedge()] = EdgeInfo(SPINE, 0);
         edge_info[w.opp().halfedge()] = EdgeInfo(SPINE, 0);
         hq.push(w.opp().halfedge());
@@ -695,17 +701,17 @@ using namespace HMesh;
         Walker w = _manifold.walker(h);
         hq.pop();
 
-        for (;!w.full_circle(); w=w.circulate_vertex_ccw()) {
+        for (;!w.full_circle(); w = w.circulate_vertex_ccw()) {
             if(edge_info[w.halfedge()].edge_type == UNKNOWN)
             {
                 Vec pos = _manifold.pos(w.vertex());
                 float d = (pos - originPos).length();
                 if (d <= brush_size) {
-                    floodVerticiesSet.insert(w.vertex());
-//                    floodVerticiesSet.insert(w.opp().vertex());
+                    floodVerticies.push_back(w.vertex());
+                    weights.push_back(1.0f);
+
                     edge_info[w.halfedge()] = EdgeInfo(SPINE,0);
                     edge_info[w.opp().halfedge()] = EdgeInfo(SPINE,0);
-                    
                     
                     hq.push(w.opp().halfedge());
                 }
@@ -713,13 +719,10 @@ using namespace HMesh;
         }
     }
     
-    vector<VertexID> floodVerticiesVector(floodVerticiesSet.begin(), floodVerticiesSet.end());
-
-//    [self changeVerticiesColor:floodVerticiesVector toSelected:YES];
-    
-    laplacian_smooth_vertex(_manifold, floodVerticiesVector, _edgeInfo, 1);
-    [self rebufferWithCleanup:NO edgeTrace:NO];
-    
+    laplacian_smooth_verticies(_manifold, floodVerticies, weights, 1);
+//    laplacian_smooth_vertex(_manifold, floodVerticiesVector, _edgeInfo, 1);
+    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
+//    [self changeVerticiesColor:floodVerticies toSelected:YES];
 }
 
 
@@ -755,10 +758,10 @@ using namespace HMesh;
     VertexID touchedVID;
     if (touchedModel) {
         //closest vertex in 3D space
-        touchedVID = [self closestVertexID_3D:tPoints[0]];
+        touchedVID = [self closestVertexID_3D:_startPoint];
     } else {
         //closest vertex in 2D space
-        touchedVID = [self closestVertexID_2D:tPoints[0]];
+        touchedVID = [self closestVertexID_2D:_startPoint];
     }
     
 //    Vec c;
@@ -799,7 +802,7 @@ using namespace HMesh;
 //        }
     }
     
-    [self rebufferWithCleanup:NO edgeTrace:NO];
+    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
 }
 
 #pragma mark - UTILITIES BRANCH CREATION
@@ -911,7 +914,7 @@ using namespace HMesh;
         return empty;
     }
     
-    if ( _touchPoints.size() < 4) {
+    if ( _touchPoints.size() < 8) {
         if (_touchPoints.size() >= 2) {
             [self createBumpAtPoint:_touchPoints touchedModel:touchedModel touchSpeed:touchSpeed touchSize:touchSize];
         } else {
@@ -931,7 +934,7 @@ using namespace HMesh;
     GLKMatrix3 m = GLKMatrix4GetMatrix3(self.modelViewMatrix);
     float c_step = GLKVector3Length(GLKMatrix3MultiplyVector3(m, GLKVector3Make(kCENTROID_STEP, 0, 0)));
     [PAMUtilities centroids3D:rawSkeleton forOneFingerTouchPoint:touchPointsWorld withNextCentroidStep:c_step];
-    if (rawSkeleton.size() < 5) {
+    if (rawSkeleton.size() < 8) {
         NSLog(@"[PolarAnnularMesh][WARNING] Not enough controids");
         [self createBumpAtPoint:_touchPoints touchedModel:touchedModel touchSpeed:touchSpeed touchSize:touchSize];
         return empty;
@@ -1106,7 +1109,7 @@ using namespace HMesh;
     HalfEdgeID limbBoundaryHalfEdge = wBase1.next().opp().halfedge();
     
     [self stitchBranch:boundaryHalfEdge toBody:limbBoundaryHalfEdge];
-    [self rebufferWithCleanup:YES edgeTrace:YES];
+    [self rebufferWithCleanup:YES bufferData:NO edgeTrace:YES];
     number_rib_edges(_manifold, _edgeInfo);
     
     Walker toJunctionWalker = _manifold.walker(limbOuterHalfEdge);
@@ -1151,7 +1154,6 @@ using namespace HMesh;
             hq.push(w.opp().halfedge());
         });
         
-        
         floodVerticies.push_back(closestPoint);
 //        weights.push_back(1);
         while(!hq.empty())
@@ -1184,11 +1186,12 @@ using namespace HMesh;
             }
         }
     }
+    
 //    taubin_smooth(_manifold, 10);
 //    _edgeInfo = trace_spine_edges(_manifold);
-    laplacian_spine_smooth_verticies(_manifold, floodVerticies, _edgeInfo, 10);
+    laplacian_spine_smooth_verticies(_manifold, floodVerticies, _edgeInfo, 15);
 //    laplacian_smooth_verticies(_manifold, floodVerticies, weights, 2);
-    [self rebufferWithCleanup:NO edgeTrace:NO];
+    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
     return allRibs;
 }
 
@@ -1389,7 +1392,7 @@ using namespace HMesh;
     _edgeInfo = trace_spine_edges(_manifold);
     laplacian_smooth_vertex(_manifold, verteciesToSmooth, _edgeInfo, 5);
     
-    [self rebufferWithCleanup:YES edgeTrace:YES];
+    [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
 
     return vector<vector<GLKVector3>>();
 }
@@ -1735,7 +1738,7 @@ using namespace HMesh;
 //    polar_subdivide(_manifold, 1);
 //    taubin_smooth(_manifold, 10);
     laplacian_smooth(_manifold, 1.0, 3);
-    [self rebufferWithCleanup:YES edgeTrace:YES];
+    [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
 }
 
 -(int)indexForCentroid:(int)centeroid rib:(int)rib totalCentroid:(int)totalCentroid totalRib:(int)totalRib
@@ -2007,7 +2010,7 @@ using namespace HMesh;
     
     [self rotateRingsFrom:_deformDirHalfEdge toRingID:_pivotHalfEdgeID];
     
-    [self rebufferWithCleanup:NO edgeTrace:NO];
+    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
 
 }
 
@@ -2078,7 +2081,7 @@ using namespace HMesh;
     modState = MODIFICATION_NONE;
     _all_vector_vid.clear();
     
-    [self rebufferWithCleanup:NO edgeTrace:NO];
+    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
 }
 
 #pragma mark - ROTATION THE BRANCH TREE
@@ -2148,7 +2151,7 @@ using namespace HMesh;
     
     [self rotateRingsFrom:_deformDirHalfEdge toRingID:_pivotHalfEdgeID];
     
-    [self rebufferWithCleanup:NO edgeTrace:NO];
+    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
 }
 
 
@@ -2344,27 +2347,14 @@ using namespace HMesh;
     //Calculate centroids and gaussian weights
     _centroids = centroid_for_ribs(_manifold, _edges_to_scale, _edgeInfo);
     assert(_centroids.size() == allDistances.size());
-    
-    Vec3f base;
-    if (_centroids.size() % 2 == 0) {
-        Vec3f b1 = _centroids[_centroids.size()/2 -1];
-        Vec3f b2 = _centroids[_centroids.size()/2];
-        base = 0.5*(b1 + b2);
-    } else {
-        base = _centroids[_centroids.size()/2];
-    }
-    
+
     _scale_weight_vector.clear();
     if (_centroids.size() == 1) {
         _scale_weight_vector.push_back(1.0f);
     } else {
-//        float r = (base - _centroids[0]).length();
         for(int i = 0; i < _centroids.size(); i++)
         {
             float distance = allDistances[i];
-            
-//            CGLA::Vec3f c = _centroids[i];
-//            float l = (base - c).length();
             float x = distance/brushSize;
             float weight;
             if (x <= 1) {
@@ -2400,7 +2390,7 @@ using namespace HMesh;
     _edges_to_scale.clear();
     _all_vector_vid.clear();
     
-    [self rebufferWithCleanup:NO edgeTrace:NO];
+    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
 }
 
 
@@ -2525,7 +2515,7 @@ using namespace HMesh;
     _edges_to_scale.clear();
     _all_vector_vid.clear();
     
-    [self rebufferWithCleanup:NO edgeTrace:NO];
+    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
 }
  
 #pragma mark - SELECTION

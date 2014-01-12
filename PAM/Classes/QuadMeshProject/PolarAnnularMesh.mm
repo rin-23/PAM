@@ -66,6 +66,7 @@ using namespace HMesh;
     HMesh::VertexAttributeVector<Vecf> _current_scale_position;
     
     //Rotation
+    VertexID _pinVertexID;
     HalfEdgeID _pinHalfEdgeID;
     HalfEdgeID _pivotHalfEdgeID;
     float _rotAngle;
@@ -674,42 +675,41 @@ using namespace HMesh;
 
 
 #pragma mark - SMOOTH
--(void)smoothAtPoint:(GLKVector3)touchPoint {
+-(void)neighbours:(vector<VertexID>&)neighbours
+        weigths:(vector<float>&)weights
+    forVertexID:(VertexID)vID
+      brushSize:(float)brush_size
+{
     HalfEdgeAttributeVector<EdgeInfo> edge_info(_manifold.allocated_halfedges());
-    VertexID closestPoint = [self closestVertexID_3D:touchPoint];
-    Vec originPos = _manifold.pos(closestPoint);
-
-    queue<HalfEdgeID> hq;
-    vector<VertexID> floodVerticies;
-    vector<float> weights;
+    Vec originPos = _manifold.pos(vID);
     
-    floodVerticies.push_back(closestPoint);
+    queue<HalfEdgeID> hq;
+    
+    neighbours.push_back(vID);
     weights.push_back(1.0f);
-    circulate_vertex_ccw(_manifold, closestPoint, [&](Walker w) {
-        floodVerticies.push_back(w.vertex());
+    circulate_vertex_ccw(_manifold, vID, [&](Walker w) {
+        neighbours.push_back(w.vertex());
         weights.push_back(1.0f);
         edge_info[w.halfedge()] = EdgeInfo(SPINE, 0);
         edge_info[w.opp().halfedge()] = EdgeInfo(SPINE, 0);
         hq.push(w.opp().halfedge());
     });
     
-    float brush_size = 0.1;
-
     while(!hq.empty())
     {
         HalfEdgeID h = hq.front();
         Walker w = _manifold.walker(h);
         hq.pop();
-
+        
         for (;!w.full_circle(); w = w.circulate_vertex_ccw()) {
             if(edge_info[w.halfedge()].edge_type == UNKNOWN)
             {
                 Vec pos = _manifold.pos(w.vertex());
                 float d = (pos - originPos).length();
                 if (d <= brush_size) {
-                    floodVerticies.push_back(w.vertex());
+                    neighbours.push_back(w.vertex());
                     weights.push_back(1.0f);
-
+                    
                     edge_info[w.halfedge()] = EdgeInfo(SPINE,0);
                     edge_info[w.opp().halfedge()] = EdgeInfo(SPINE,0);
                     
@@ -718,12 +718,94 @@ using namespace HMesh;
             }
         }
     }
-    
-    laplacian_smooth_verticies(_manifold, floodVerticies, weights, 1);
-//    laplacian_smooth_vertex(_manifold, floodVerticiesVector, _edgeInfo, 1);
-    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
-//    [self changeVerticiesColor:floodVerticies toSelected:YES];
 }
+
+
+//Smooth according to number of edges from the vertex
+-(void)smoothPole:(VertexID)vID edgeDepth:(int)depth iter:(int)iter {
+    assert(is_pole(_manifold, vID));
+    Walker walker = _manifold.walker(vID);
+    int cur_depth = 0;
+    vector<VertexID> allVert;
+    allVert.push_back(vID);
+    while (cur_depth <= depth) {
+        vector<VertexID> vert = verticies_along_the_rib(_manifold, walker.next().halfedge(), _edgeInfo);
+        allVert.insert(allVert.end(), vert.begin(), vert.end());
+        walker = walker.next().opp().next();
+        cur_depth++;
+    }
+    laplacian_spine_smooth_verticies(_manifold, allVert, _edgeInfo, iter);
+}
+
+-(void)smoothVertexID:(VertexID)vID iter:(int)iter isSpine:(bool)isSpine brushSize:(float)brushSize{
+    vector<VertexID> neighbours;
+    vector<float> weights;
+    [self neighbours:neighbours weigths:weights forVertexID:vID brushSize:brushSize];
+    if (isSpine) {
+        laplacian_spine_smooth_verticies(_manifold, neighbours, _edgeInfo, iter);
+    } else {
+        laplacian_smooth_verticies(_manifold, neighbours, weights, iter);
+    }
+    
+//    [self changeVerticiesColor:neighbours toSelected:YES];
+}
+
+-(void)smoothAtPoint:(GLKVector3)touchPoint {
+    VertexID closestPoint = [self closestVertexID_3D:touchPoint];
+    [self smoothVertexID:closestPoint iter:1 isSpine:NO brushSize:0.1];
+    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
+}
+
+//-(void)smoothAtPoint:(GLKVector3)touchPoint {
+//    HalfEdgeAttributeVector<EdgeInfo> edge_info(_manifold.allocated_halfedges());
+//    VertexID closestPoint = [self closestVertexID_3D:touchPoint];
+//    Vec originPos = _manifold.pos(closestPoint);
+//
+//    queue<HalfEdgeID> hq;
+//    vector<VertexID> floodVerticies;
+//    vector<float> weights;
+//    
+//    floodVerticies.push_back(closestPoint);
+//    weights.push_back(1.0f);
+//    circulate_vertex_ccw(_manifold, closestPoint, [&](Walker w) {
+//        floodVerticies.push_back(w.vertex());
+//        weights.push_back(1.0f);
+//        edge_info[w.halfedge()] = EdgeInfo(SPINE, 0);
+//        edge_info[w.opp().halfedge()] = EdgeInfo(SPINE, 0);
+//        hq.push(w.opp().halfedge());
+//    });
+//    
+//    float brush_size = 0.1;
+//
+//    while(!hq.empty())
+//    {
+//        HalfEdgeID h = hq.front();
+//        Walker w = _manifold.walker(h);
+//        hq.pop();
+//
+//        for (;!w.full_circle(); w = w.circulate_vertex_ccw()) {
+//            if(edge_info[w.halfedge()].edge_type == UNKNOWN)
+//            {
+//                Vec pos = _manifold.pos(w.vertex());
+//                float d = (pos - originPos).length();
+//                if (d <= brush_size) {
+//                    floodVerticies.push_back(w.vertex());
+//                    weights.push_back(1.0f);
+//
+//                    edge_info[w.halfedge()] = EdgeInfo(SPINE,0);
+//                    edge_info[w.opp().halfedge()] = EdgeInfo(SPINE,0);
+//                    
+//                    hq.push(w.opp().halfedge());
+//                }
+//            }
+//        }
+//    }
+//    
+//    laplacian_smooth_verticies(_manifold, floodVerticies, weights, 1);
+////    laplacian_smooth_vertex(_manifold, floodVerticiesVector, _edgeInfo, 1);
+//    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
+////    [self changeVerticiesColor:floodVerticies toSelected:YES];
+//}
 
 
 #pragma mark - TOUCHES: SCULPTING A SMALL BUMP 
@@ -1757,13 +1839,14 @@ using namespace HMesh;
 -(void)createPinPoint:(GLKVector3)touchPoint
 {
     VertexID vID = [self closestVertexID_3D:touchPoint];
+    _pinVertexID = vID;
     
     Walker walker = _manifold.walker(vID).opp();
-    while (_edgeInfo[walker.halfedge()].edge_type != RIB) {
+    if (_edgeInfo[walker.halfedge()].is_spine()) {
         walker = walker.next();
     }
     
-    assert(_edgeInfo[walker.halfedge()].edge_type == RIB);
+    assert(!_edgeInfo[walker.halfedge()].is_spine());
     
     _pinHalfEdgeID = walker.halfedge();
     
@@ -1782,10 +1865,10 @@ using namespace HMesh;
     VertexID vID = [self closestVertexID_3D:touchPoint];
     
     Walker walker = _manifold.walker(vID).opp();
-    while (_edgeInfo[walker.halfedge()].edge_type != RIB) {
+    if (_edgeInfo[walker.halfedge()].is_spine()) {
         walker = walker.next();
     }
-    assert(_edgeInfo[walker.halfedge()].edge_type == RIB);
+    assert(!_edgeInfo[walker.halfedge()].is_spine());
     
     _pivotHalfEdgeID = walker.halfedge();
     
@@ -2517,7 +2600,238 @@ using namespace HMesh;
     
     [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
 }
- 
+
+#pragma mark - DELETING BRANCH
+-(void)deleteBranch:(GLKVector3)touchPoint
+{
+    VertexID touchVID = [self closestVertexID_3D:touchPoint];
+    VertexID pinV = _pinVertexID;
+
+    //snap to RIB_JUNCTION. Check if RIB_JUNCTION is close to pin point;
+    BOOL IS_RIB_JUNCTION = NO;
+    number_rib_edges(_manifold, _edgeInfo);
+    if (_edgeInfo[_pinHalfEdgeID].edge_type == RIB_JUNCTION) {
+        IS_RIB_JUNCTION = YES;
+    } else {
+        
+        Walker upToJunction = _manifold.walker(_pinVertexID);
+        if (!_edgeInfo[upToJunction.halfedge()].is_spine()) {
+            upToJunction = upToJunction.prev().opp();
+        }
+        assert(_edgeInfo[upToJunction.halfedge()].is_spine());
+        Walker downToJunction = upToJunction.prev().opp().prev().opp();
+        assert(_edgeInfo[downToJunction.halfedge()].is_spine());
+        
+        float brush_size = 0.1;
+        Vec pinPos = _manifold.pos(pinV);
+        float distance = (_manifold.pos(upToJunction.vertex()) - pinPos).length();
+        while (distance < brush_size) {
+            if (_edgeInfo[upToJunction.next().halfedge()].edge_type == RIB_JUNCTION) {
+                IS_RIB_JUNCTION = YES;
+                pinV = upToJunction.vertex();
+                break;
+            }
+            upToJunction = upToJunction.next().opp().next();
+            distance = (_manifold.pos(upToJunction.vertex()) - pinPos).length();
+        }
+        if (!IS_RIB_JUNCTION) { //try another way
+            float distance = (_manifold.pos(downToJunction.vertex()) - pinPos).length();
+            while (distance < brush_size) {
+                if (_edgeInfo[downToJunction.next().halfedge()].edge_type == RIB_JUNCTION) {
+                    IS_RIB_JUNCTION = YES;
+                    pinV = downToJunction.vertex();
+                    break;
+                }
+                downToJunction = downToJunction.next().opp().next();
+                distance = (_manifold.pos(downToJunction.vertex()) - pinPos).length();
+            }
+        }
+    }
+    
+    
+    if (valency(_manifold, pinV) == 6) {
+        return;
+    }
+
+    Vec pinPos = _manifold.pos(pinV);
+    //Decide which side to delete
+    Walker up = _manifold.walker(pinV);
+    if (!_edgeInfo[up.halfedge()].is_spine()) {
+        up = up.prev().opp();
+    }
+    assert(_edgeInfo[up.halfedge()].is_spine());
+    Walker down = up.prev().opp().prev().opp();
+    assert(_edgeInfo[down.halfedge()].is_spine());
+
+    Vec downVec = _manifold.pos(down.vertex()) - pinPos;
+    downVec.normalize();
+    Vec upVec = _manifold.pos(up.vertex()) - pinPos;
+    upVec.normalize();
+    Vec touchVec = _manifold.pos(touchVID) - pinPos;
+    touchVec.normalize();
+    
+    float downDotP = dot(downVec, touchVec);
+    float upDotP = dot(upVec, touchVec);
+    
+    
+    //find walker pointing to the area to delete
+//    BOOL deletingBody = NO;
+    BOOL deletingBranchFromBody = NO;
+    Walker toWalker = up;
+    if (IS_RIB_JUNCTION) {
+        //Get ring sizes
+        int upSize = 0, downSize = 0;
+        for (Walker w = _manifold.walker(up.prev().halfedge()); !w.full_circle(); w = w.next().opp().next()){
+            upSize += 1;
+        }
+        for (Walker w = _manifold.walker(down.prev().halfedge()); !w.full_circle(); w = w.next().opp().next()){
+            downSize += 1;
+        }
+        BOOL upIsChild = upSize < downSize;
+        if (upDotP >= downDotP) {
+            if (upIsChild) {
+                deletingBranchFromBody = YES;
+                toWalker = up;
+            } else{
+                toWalker = down.opp();
+            }
+        } else {
+            if (upIsChild) {
+                toWalker = up.opp();
+            } else{
+                deletingBranchFromBody = YES;
+                toWalker = down;
+            }
+        }
+    } else {
+        deletingBranchFromBody = NO;
+        if (downDotP >= 0) {
+            toWalker = down;
+        }
+    }
+    
+//    if (deletingBody) {
+//        if (downDotP >= 0) {
+//            if (upIsChild) {
+//                toWalker = up.opp();
+//            } else {
+//                toWalker = down;
+//            }
+//        } else {
+//            if (upIsChild) {
+//                toWalker = up;
+//            } else {
+//                toWalker = down.opp();
+//            }
+//        }
+//    } else {
+//        if (downDotP >= 0) {
+//            toWalker = down;
+//        }
+//    }
+    
+    
+    //Start flooding
+    [self setBranchToDelete:toWalker];
+
+    Walker boundaryW = _manifold.walker(toWalker.prev().halfedge());
+
+    for (VertexID vID: _all_vector_vid) {
+        _manifold.remove_vertex(vID);
+    }
+    
+    if (deletingBranchFromBody) {
+//        Walker findJunctionWalker = _manifold.walker(toWalker.prev().halfedge());
+//        assert(_edgeInfo[findJunctionWalker.halfedge()].edge_type == RIB_JUNCTION);
+        while (valency(_manifold, boundaryW.vertex()) != 5) {
+            boundaryW = boundaryW.next();
+        }
+//        boundaryW = boundaryW.next(); //outwards from junction vertex
+        Walker bWalkerOuter = _manifold.walker(boundaryW.opp().halfedge());
+        Walker bWalker1 = _manifold.walker(boundaryW.halfedge());
+        Walker bWalker2 = _manifold.walker(boundaryW.next().halfedge());
+        
+        vector<HalfEdgeID> bEdges1;
+        vector<HalfEdgeID> bEdges2;
+        while (valency(_manifold, bWalker2.vertex()) != 5)
+        {
+            bEdges1.push_back(bWalker1.halfedge());
+            bEdges2.push_back(bWalker2.halfedge());
+            bWalker1 = bWalker1.prev();
+            bWalker2 = bWalker2.next();
+        }
+        
+        for (int i = 0; i < bEdges1.size() ; i++) {
+            BOOL didStich = _manifold.stitch_boundary_edges(bEdges1[i], bEdges2[i]);
+            NSLog(@"%i", didStich);
+//            assert(didStich);
+        }
+        
+        vector<VertexID> vertexToSmooth;
+        vector<float> weights;
+
+        for (int i = 0; i < bEdges1.size() ; i++) {
+            vertexToSmooth.push_back(bWalkerOuter.vertex());
+            weights.push_back(1.0f);
+            bWalkerOuter = bWalkerOuter.next().opp().next();
+        }
+        
+        [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
+        
+        laplacian_smooth_verticies(_manifold, vertexToSmooth, weights, 10);
+    } else {
+        VertexID poleVID = pole_from_hole(_manifold, boundaryW.halfedge());
+        [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
+        [self smoothPole:poleVID edgeDepth:3 iter:2];
+    }
+    [self rebufferWithCleanup:YES bufferData:YES edgeTrace:NO];
+    _all_vector_vid.clear();
+}
+
+-(void)setBranchToDelete:(Walker)deleteDir {
+    
+    //Flood rotational area
+    HalfEdgeAttributeVector<EdgeInfo> sEdgeInfo(_manifold.allocated_halfedges());
+    Walker bWalker = _manifold.walker(deleteDir.next().halfedge()); //Walk along pivot boundary loop
+    queue<HalfEdgeID> hq;
+    
+    for (;!bWalker.full_circle(); bWalker = bWalker.next().opp().next()) {
+        HalfEdgeID hID = bWalker.next().halfedge();
+        HalfEdgeID opp_hID = bWalker.next().opp().halfedge();
+        sEdgeInfo[hID] = EdgeInfo(SPINE, 0);
+        sEdgeInfo[opp_hID] = EdgeInfo(SPINE, 0);
+        hq.push(hID);
+    }
+    
+    set<VertexID> floodVerticiesSet;
+    while(!hq.empty())
+    {
+        HalfEdgeID h = hq.front();
+        Walker w = _manifold.walker(h);
+        hq.pop();
+        bool is_spine = _edgeInfo[h].edge_type == SPINE;
+        for (;!w.full_circle(); w=w.circulate_vertex_ccw(),is_spine = !is_spine) {
+            if(sEdgeInfo[w.halfedge()].edge_type == UNKNOWN)
+            {
+                EdgeInfo ei = is_spine ? EdgeInfo(SPINE,0) : EdgeInfo(RIB,0);
+                
+                floodVerticiesSet.insert(w.vertex());
+                floodVerticiesSet.insert(w.opp().vertex());
+                
+                sEdgeInfo[w.halfedge()] = ei;
+                sEdgeInfo[w.opp().halfedge()] = ei;
+                hq.push(w.opp().halfedge());
+            }
+        }
+    }
+    
+    vector<VertexID> floodVerticiesVector(floodVerticiesSet.begin(), floodVerticiesSet.end());
+    _all_vector_vid = floodVerticiesVector;
+//    [self changeVerticiesColor:floodVerticiesVector toSelected:YES];
+}
+
+
+
 #pragma mark - SELECTION
 
 -(void)changeWireFrameColor:(vector<HMesh::VertexID>)vertecies toSelected:(BOOL)isSelected {

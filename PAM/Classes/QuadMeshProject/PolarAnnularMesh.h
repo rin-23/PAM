@@ -69,6 +69,9 @@
 #pragma mark - SMOOTHING
 -(void)smoothAtPoint:(GLKVector3)touchPoint;
 
+#pragma mark - DELETING BRANCH
+-(void)deleteBranch:(GLKVector3)touchPoint;
+
 #pragma mark - UTILITIES
 -(void)clear;
 -(void)undo;

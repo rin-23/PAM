@@ -287,7 +287,20 @@ typedef enum {
         [_rotationManager handlePanGesture:sender withViewMatrix:GLKMatrix4Identity];
     } else if ([SettingsManager sharedInstance].showSkeleton) {
         return;
-    } else {
+    } else if (_bending) {
+        if (sender.state == UIGestureRecognizerStateEnded) {
+            CGPoint touchPoint = [self touchPointFromGesture:sender];
+            NSMutableData* pixelData = [self renderToOffscreenDepthBuffer:@[_pMesh]];
+            GLKVector3 modelCoord;
+            BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:touchPoint depthBuffer:pixelData];
+            if (!result) {
+                NSLog(@"[WARNING] Couldn't determine touch area");
+                return;
+            }
+            [_pMesh deleteBranch:modelCoord];
+            _bending = NO;
+        }
+    } else{
         PAMPanGestureRecognizer* oneFingerPAMGesture = (PAMPanGestureRecognizer*)sender;
 
 //        CGPoint V = [oneFingerPAMGesture velocityInView:self.view];

@@ -197,15 +197,28 @@ typedef enum {
     CGPoint touchPoint = [self touchPointFromGesture:sender];
     GLKVector3 modelCoord;
     NSMutableData* pixelData = [self renderToOffscreenDepthBuffer:@[_pMesh]];
-     BOOL result  = [self modelCoordinates:&modelCoord forTouchPoint:touchPoint depthBuffer:pixelData];
 
-    if (!result) {
-        NSLog(@"[WARNING] Couldn't determine touch area");
-        return;
+    if (_bending) {
+        BOOL result  = [self modelCoordinates:&modelCoord forTouchPoint:touchPoint depthBuffer:pixelData];
+        _bending = NO;
+        if (!result) {
+            [_pMesh endDeletingBranch:modelCoord touchedModel:NO];
+        } else {
+            [_pMesh endDeletingBranch:modelCoord touchedModel:YES];
+        }
+    } else {
+        BOOL result  = [self modelCoordinates:&modelCoord forTouchPoint:touchPoint depthBuffer:pixelData];
+        
+        if (!result) {
+            NSLog(@"[WARNING] Couldn't determine touch area");
+            return;
+        }
+        _bending = YES;
+        [_pMesh createPinPoint:modelCoord];
     }
-    _bending = YES;
     
-    [_pMesh createPinPoint:modelCoord];
+    
+    
 }
 
 -(void)handleDoubleTapGesture:(UIGestureRecognizer*)sender {
@@ -299,7 +312,7 @@ typedef enum {
                 return;
             }
             [_pMesh startDeletingBranch:modelCoord];
-            _bending = NO;
+//            _bending = NO;
         }
     } else{
         PAMPanGestureRecognizer* oneFingerPAMGesture = (PAMPanGestureRecognizer*)sender;

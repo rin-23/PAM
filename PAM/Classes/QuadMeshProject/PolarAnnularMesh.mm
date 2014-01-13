@@ -90,9 +90,11 @@ using namespace HMesh;
     
     //Deleting
     BOOL _deletingBranchFromBody;
-    HalfEdgeID _deleteBoundaryRibEdge;
-    HalfEdgeID _deletedBranchBoundaryEdge;
+    HalfEdgeID _deleteLowerBoundaryRibEdge;
+    HalfEdgeID _deleteUpperBoundaryRibEdge;
     HalfEdgeID _deleteDirectionSpineEdge;
+    Vec _boundaryCentroid;
+    Vec _secondRingCentroid;
     
     //Undo
     HMesh::Manifold undoMani;
@@ -785,6 +787,8 @@ using namespace HMesh;
     [self smoothVertexID:closestPoint iter:1 isSpine:NO brushSize:0.1];
     [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
 }
+
+
 
 #pragma mark - TOUCHES: SCULPTING A SMALL BUMP 
 -(void)createBumpAtPoint:(vector<GLKVector3>)tPoints
@@ -2688,74 +2692,29 @@ using namespace HMesh;
     }
     _deletingBranchFromBody = deletingBranchFromBody;
     
-    //Start flooding
+    //Start flooding and get all the verticies to delete/move
     [self setBranchToDelete:toWalker];
 
-    _deleteBoundaryRibEdge = toWalker.prev().halfedge();
-    _deleteDirectionSpineEdge = toWalker.halfedge();
-    _deletedBranchBoundaryEdge = toWalker.next().halfedge();
+    //Save info
+    _deleteLowerBoundaryRibEdge = toWalker.prev().halfedge(); //botton rib
+    _deleteDirectionSpineEdge = toWalker.halfedge(); //spine
+    _deleteUpperBoundaryRibEdge = toWalker.next().halfedge(); //top rib
+    _boundaryCentroid = Vec(centroid_for_rib(_manifold, _deleteUpperBoundaryRibEdge, _edgeInfo));
+    _secondRingCentroid = Vec(centroid_for_rib(_manifold, toWalker.next().opp().next().next().opp().next().next().halfedge(), _edgeInfo));
     
     //Delet all connecting boundary spine edges
-    Walker boundaryW = _manifold.walker(_deleteBoundaryRibEdge);
-    
     vector<HalfEdgeID> edgesToDelete;
-    for (;!boundaryW.full_circle(); boundaryW = boundaryW.next().opp().next()) {
+    for (Walker boundaryW = _manifold.walker(_deleteLowerBoundaryRibEdge);
+         !boundaryW.full_circle();
+         boundaryW = boundaryW.next().opp().next())
+    {
         edgesToDelete.push_back(boundaryW.next().halfedge());
     }
     for (HalfEdgeID hID: edgesToDelete) {
         _manifold.remove_edge(hID);
     }
     
-    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:YES];
-    
-//    
-//    float boundaryRadius = rib_radius(_manifold, _deleteBoundaryRibEdge, _edgeInfo);
-//    
-//    if (_deletingBranchFromBody) {
-//        //        Walker findJunctionWalker = _manifold.walker(toWalker.prev().halfedge());
-//        //        assert(_edgeInfo[findJunctionWalker.halfedge()].edge_type == RIB_JUNCTION);
-//        while (valency(_manifold, boundaryW.vertex()) != 5) {
-//            boundaryW = boundaryW.next();
-//        }
-//        //        boundaryW = boundaryW.next(); //outwards from junction vertex
-//        Walker bWalkerOuter = _manifold.walker(boundaryW.opp().halfedge());
-//        Walker bWalker1 = _manifold.walker(boundaryW.halfedge());
-//        Walker bWalker2 = _manifold.walker(boundaryW.next().halfedge());
-//        
-//        vector<HalfEdgeID> bEdges1;
-//        vector<HalfEdgeID> bEdges2;
-//        while (valency(_manifold, bWalker2.vertex()) != 5)
-//        {
-//            bEdges1.push_back(bWalker1.halfedge());
-//            bEdges2.push_back(bWalker2.halfedge());
-//            bWalker1 = bWalker1.prev();
-//            bWalker2 = bWalker2.next();
-//        }
-//        
-//        for (int i = 0; i < bEdges1.size() ; i++) {
-//            BOOL didStich = _manifold.stitch_boundary_edges(bEdges1[i], bEdges2[i]);
-//            NSLog(@"%i", didStich);
-//            //            assert(didStich);
-//        }
-//        
-//        vector<VertexID> vertexToSmooth;
-//        vector<float> weights;
-//        for (int i = 0; i < bEdges1.size() ; i++) {
-//            vertexToSmooth.push_back(bWalkerOuter.vertex());
-//            weights.push_back(1.0f);
-//            bWalkerOuter = bWalkerOuter.next().opp().next();
-//        }
-//        
-//        [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
-//        
-//        [self smoothVerticies:vertexToSmooth iter:20 isSpine:YES brushSize:1.5*boundaryRadius];
-//        [self smoothVerticies:vertexToSmooth iter:5 isSpine:NO brushSize:boundaryRadius];
-//    } else {
-//        VertexID poleVID = pole_from_hole(_manifold, boundaryW.halfedge());
-//        [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
-//        [self smoothPole:poleVID edgeDepth:3 iter:2];
-//    }
-//    [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
+    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
     
     //hide the branch I want to delete
 //    [self changeVerticiesColor:_all_vector_vid toColor:Vec4uc(0, 0, 0, 0)];
@@ -2769,64 +2728,94 @@ using namespace HMesh;
         for (VertexID vID: _all_vector_vid) {
             _manifold.remove_vertex(vID);
         }
+        
+        Walker boundaryW = _manifold.walker(_deleteLowerBoundaryRibEdge);
+        float boundaryRadius = rib_radius(_manifold, _deleteLowerBoundaryRibEdge, _edgeInfo);
+        
+        if (_deletingBranchFromBody) {
+            int numOfEdges;
+            [self closeHole:_deleteLowerBoundaryRibEdge numberOfRingEdges:&numOfEdges];
+            Walker bWalkerOuter = _manifold.walker(boundaryW.opp().halfedge());
+            
+            vector<VertexID> vertexToSmooth;
+            for (int i = 0; i < numOfEdges; i++) {
+                vertexToSmooth.push_back(bWalkerOuter.vertex());
+                bWalkerOuter = bWalkerOuter.next().opp().next();
+            }
+            
+            [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
+            
+            [self smoothVerticies:vertexToSmooth iter:20 isSpine:YES brushSize:boundaryRadius];
+            [self smoothVerticies:vertexToSmooth iter:2 isSpine:NO brushSize:boundaryRadius/2];
+        } else {
+            VertexID poleVID = pole_from_hole(_manifold, boundaryW.halfedge());
+            [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
+            [self smoothPole:poleVID edgeDepth:3 iter:2];
+        }
+        [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
     } else {
-        VertexID touchVID = [self closestVertexID_3D:touchPoint];
-        Vec3d normal = HMesh::normal(_manifold, touchVID);
-    }
-    
-    
-    
-    Walker boundaryW = _manifold.walker(_deleteBoundaryRibEdge);
-    float boundaryRadius = rib_radius(_manifold, _deleteBoundaryRibEdge, _edgeInfo);
-    Vec3f boundaryCeneter = centroid_for_rib(_manifold,  _deleteBoundaryRibEdge, _edgeInfo);
+        [self moveBranchToPoint:touchPoint];
+        
+        Walker boundaryW = _manifold.walker(_deleteLowerBoundaryRibEdge);
+        float boundaryRadius = rib_radius(_manifold, _deleteLowerBoundaryRibEdge, _edgeInfo);
+        
+        int numOfEdges;
+        if (_deletingBranchFromBody) {
+            [self closeHole:_deleteLowerBoundaryRibEdge numberOfRingEdges:&numOfEdges];
+            Walker bWalkerOuter = _manifold.walker(boundaryW.opp().halfedge());
+            
+            vector<VertexID> vertexToSmooth;
+            for (int i = 0; i < numOfEdges; i++) {
+                vertexToSmooth.push_back(bWalkerOuter.vertex());
+                bWalkerOuter = bWalkerOuter.next().opp().next();
+            }
+            
+            [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
+            
+            [self smoothVerticies:vertexToSmooth iter:20 isSpine:YES brushSize:boundaryRadius];
+            [self smoothVerticies:vertexToSmooth iter:2 isSpine:NO brushSize:boundaryRadius/2];
+        } else {
+            VertexID poleVID = pole_from_hole(_manifold, boundaryW.halfedge());
+            numOfEdges = valency(_manifold, poleVID)/2;
+            [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
+            [self smoothPole:poleVID edgeDepth:3 iter:2];
+        }
 
-    if (_deletingBranchFromBody) {
-        //        Walker findJunctionWalker = _manifold.walker(toWalker.prev().halfedge());
-        //        assert(_edgeInfo[findJunctionWalker.halfedge()].edge_type == RIB_JUNCTION);
-        while (valency(_manifold, boundaryW.vertex()) != 5) {
-            boundaryW = boundaryW.next();
-        }
-        //        boundaryW = boundaryW.next(); //outwards from junction vertex
-        Walker bWalkerOuter = _manifold.walker(boundaryW.opp().halfedge());
-        Walker bWalker1 = _manifold.walker(boundaryW.halfedge());
-        Walker bWalker2 = _manifold.walker(boundaryW.next().halfedge());
+        VertexID touchedVID = [self closestVertexID_3D:touchPoint];
+
+        //Create new pole
+        VertexID newPoleID;
+        float bWidth;
+        GLKVector3 holeCenter, holeNorm;
+        HalfEdgeID boundaryHalfEdge;
+        int limbWidth = numOfEdges/2;
+        BOOL result = [self createHoleAtVertex:touchedVID
+                                   numOfSpines:limbWidth
+                                      vertexID:&newPoleID
+                                   branchWidth:&bWidth
+                                    holeCenter:&holeCenter
+                                      holeNorm:&holeNorm
+                              boundaryHalfEdge:&boundaryHalfEdge];
+
+        HalfEdgeID deleteBranchUpperOppRibEdge = _manifold.walker(_deleteUpperBoundaryRibEdge).opp().halfedge();
+        [self stitchBranch:_deleteUpperBoundaryRibEdge toBody:boundaryHalfEdge];
         
-        vector<HalfEdgeID> bEdges1;
-        vector<HalfEdgeID> bEdges2;
-        while (valency(_manifold, bWalker2.vertex()) != 5)
-        {
-            bEdges1.push_back(bWalker1.halfedge());
-            bEdges2.push_back(bWalker2.halfedge());
-            bWalker1 = bWalker1.prev();
-            bWalker2 = bWalker2.next();
-        }
         
-        for (int i = 0; i < bEdges1.size() ; i++) {
-            BOOL didStich = _manifold.stitch_boundary_edges(bEdges1[i], bEdges2[i]);
-            NSLog(@"%i", didStich);
-            //            assert(didStich);
-        }
+//        vector<VertexID> verteciesToSmooth;
+//        for (Walker w = _manifold.walker(deleteBranchUpperOppRibEdge); !w.full_circle(); w = w.next().opp().next()) {
+//            verteciesToSmooth.push_back(w.vertex());
+//        }        
+//        verteciesToSmooth = verticies_along_the_rib(_manifold, deleteBranchUpperOppRibEdge, _edgeInfo);
+//        [self smoothVerticies:verteciesToSmooth iter:10 isSpine:YES brushSize:0.1];
         
-        vector<VertexID> vertexToSmooth;
-        vector<float> weights;
-        for (int i = 0; i < bEdges1.size() ; i++) {
-            vertexToSmooth.push_back(bWalkerOuter.vertex());
-            weights.push_back(1.0f);
-            bWalkerOuter = bWalkerOuter.next().opp().next();
-        }
         
-        [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
-        
-        [self smoothVerticies:vertexToSmooth iter:20 isSpine:YES brushSize:1.5*boundaryRadius];
-        [self smoothVerticies:vertexToSmooth iter:5 isSpine:NO brushSize:boundaryRadius];
-    } else {
-        VertexID poleVID = pole_from_hole(_manifold, boundaryW.halfedge());
-        [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
-        [self smoothPole:poleVID edgeDepth:3 iter:2];
+        [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
+//        [self changeVerticiesColor:_all_vector_vid toSelected:YES];
     }
-    [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
+    
+
+
     //    _all_vector_vid.clear();
-
 }
 
 -(void)setBranchToDelete:(Walker)deleteDir {
@@ -2873,30 +2862,66 @@ using namespace HMesh;
 -(void)moveBranchToPoint:(GLKVector3)touchPoint {
     if (_all_vector_vid.size() > 0) {
         VertexID touchVID = [self closestVertexID_3D:touchPoint];
-        Vecf touchPos = _manifold.posf(touchVID);
-        Vec3f normal = HMesh::normalf(_manifold, touchVID);
-        
-        Walker boundaryW = _manifold.walker(_deleteBoundaryRibEdge);
-        float boundaryRadius = rib_radius(_manifold, _deleteBoundaryRibEdge, _edgeInfo);
-        Vec3f boundaryCenter = centroid_for_rib(_manifold,  _deleteBoundaryRibEdge, _edgeInfo);
-        Vec3f toTouchPos = touchPos - boundaryCenter;
-        
+        Vec touchPos = _manifold.pos(touchVID);
+        Vec normal = HMesh::normal(_manifold, touchVID);
+
+//        Vec boundaryCenter = Vec(centroid_for_rib(_manifold,  _deleteLowerBoundaryRibEdge, _edgeInfo));
+        Vec toTouchPos = touchPos - _boundaryCentroid;
+        _secondRingCentroid += toTouchPos;
         for (VertexID vid: _all_vector_vid) {
-            _manifold.posf(vid) = _manifold.posf(vid) + toTouchPos;
+            _manifold.pos(vid) = _manifold.pos(vid) + toTouchPos;
         }
-        
-//        Walker outerWalker = _manifold.walker(_deletedBranchBoundaryEdge);
-        Vecf firstCenter = centroid_for_rib(_manifold, _deletedBranchBoundaryEdge, _edgeInfo);
-        Vecf currentNorm = firstCenter - touchPos;
+
+        Walker w = _manifold.walker(_deleteUpperBoundaryRibEdge);
+//        Vec secondCenter = Vec(centroid_for_rib(_manifold, w.opp().next().next().opp().next().halfedge(), _edgeInfo));
+        Vec currentNorm = _secondRingCentroid - touchPos;
+
+//        GLKMatrix4 fromOrigin = GLKMatrix4MakeTranslation(toTouchPos[0], toTouchPos[1], toTouchPos[2]);
+//        GLKMatrix4 toOrigin = GLKMatrix4MakeTranslation(-toTouchPos[0], -toTouchPos[1], -toTouchPos[2]);
+//        GLKVector3 currentNormGLK = GLKVector3Normalize(GLKVector3Make(currentNorm[0], currentNorm[1], currentNorm[2]));
+//        GLKVector3 normalGLK = GLKVector3Normalize(GLKVector3Make(normal[0], normal[1], normal[2]));
+//        float angle = [Utilities signedAngleBetweenReferenceVector3:currentNormGLK andVector:normalGLK];
         
         CGLA::Quatd q;
-        q.make_rot(Vec(currentNorm), Vec(normal));
+        q.make_rot(normalize(currentNorm), normalize(normal));
+        
         for (VertexID vid: _all_vector_vid) {
-            _manifold.pos(vid) = q.apply(_manifold.pos(vid));
+            Vec p = _manifold.pos(vid);
+            p -= touchPos;
+            p = q.apply(p);
+            p += touchPos;
+            _manifold.pos(vid) = p;
         }
     }
 }
 
+-(void)closeHole:(HalfEdgeID)hID numberOfRingEdges:(int*)numOfEdges{
+    Walker boundaryW = _manifold.walker(hID);
+    while (valency(_manifold, boundaryW.vertex()) != 5) {
+        boundaryW = boundaryW.next();
+    }
+
+    Walker bWalker1 = _manifold.walker(boundaryW.halfedge());
+    Walker bWalker2 = _manifold.walker(boundaryW.next().halfedge());
+    
+    vector<HalfEdgeID> bEdges1;
+    vector<HalfEdgeID> bEdges2;
+    while (valency(_manifold, bWalker2.vertex()) != 5)
+    {
+        bEdges1.push_back(bWalker1.halfedge());
+        bEdges2.push_back(bWalker2.halfedge());
+        bWalker1 = bWalker1.prev();
+        bWalker2 = bWalker2.next();
+    }
+    
+    for (int i = 0; i < bEdges1.size() ; i++) {
+        BOOL didStich = _manifold.stitch_boundary_edges(bEdges1[i], bEdges2[i]);
+        NSLog(@"%i", didStich);
+        //            assert(didStich);
+    }
+    
+    *numOfEdges = bEdges1.size() + 1;
+}
 
 #pragma mark - SELECTION
 

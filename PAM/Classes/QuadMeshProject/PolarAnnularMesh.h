@@ -71,7 +71,7 @@
 
 #pragma mark - DELETING BRANCH
 -(void)startDeletingBranch:(GLKVector3)touchPoint;
--(void)endDeletingBranch:(GLKVector3)touchPoint;
+-(void)endDeletingBranch:(GLKVector3)touchPoint touchedModel:(BOOL)touchedModel;
 
 #pragma mark - UTILITIES
 -(void)clear;

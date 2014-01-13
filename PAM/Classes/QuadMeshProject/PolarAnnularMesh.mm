@@ -28,6 +28,7 @@
 #import <OpenGLES/ES2/gl.h>
 #import <OpenGLES/ES2/glext.h>
 #import "PAMUtilities.h"
+#include "Quatd.h"
 
 #include "eigensolution.h"
 
@@ -86,6 +87,12 @@ using namespace HMesh;
     vector<CGLA::Vec3f> _centroids;
     vector<GLKVector3> _touchPoints;
     GLKVector3 _startPoint;
+    
+    //Deleting
+    BOOL _deletingBranchFromBody;
+    HalfEdgeID _deleteBoundaryRibEdge;
+    HalfEdgeID _deletedBranchBoundaryEdge;
+    HalfEdgeID _deleteDirectionSpineEdge;
     
     //Undo
     HMesh::Manifold undoMani;
@@ -750,63 +757,34 @@ using namespace HMesh;
 //    [self changeVerticiesColor:neighbours toSelected:YES];
 }
 
+-(void)smoothVerticies:(vector<VertexID>)vIDs iter:(int)iter isSpine:(bool)isSpine brushSize:(float)brushSize{
+    
+    set<VertexID> allVerticiesSet;
+    for (VertexID vID: vIDs) {
+        vector<VertexID> neighbours;
+        vector<float> weights;
+        [self neighbours:neighbours weigths:weights forVertexID:vID brushSize:brushSize];
+        for (VertexID neighboutVID: neighbours) {
+            allVerticiesSet.insert(neighboutVID);
+        }
+    }
+    
+    vector<VertexID> allVerticiesVector(allVerticiesSet.begin(), allVerticiesSet.end());
+    
+    if (isSpine) {
+        laplacian_spine_smooth_verticies(_manifold, allVerticiesVector, _edgeInfo, iter);
+    } else {
+        laplacian_smooth_verticies(_manifold, allVerticiesVector, iter);
+    }
+    
+    [self changeVerticiesColor:allVerticiesVector toSelected:YES];
+}
+
 -(void)smoothAtPoint:(GLKVector3)touchPoint {
     VertexID closestPoint = [self closestVertexID_3D:touchPoint];
     [self smoothVertexID:closestPoint iter:1 isSpine:NO brushSize:0.1];
     [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
 }
-
-//-(void)smoothAtPoint:(GLKVector3)touchPoint {
-//    HalfEdgeAttributeVector<EdgeInfo> edge_info(_manifold.allocated_halfedges());
-//    VertexID closestPoint = [self closestVertexID_3D:touchPoint];
-//    Vec originPos = _manifold.pos(closestPoint);
-//
-//    queue<HalfEdgeID> hq;
-//    vector<VertexID> floodVerticies;
-//    vector<float> weights;
-//    
-//    floodVerticies.push_back(closestPoint);
-//    weights.push_back(1.0f);
-//    circulate_vertex_ccw(_manifold, closestPoint, [&](Walker w) {
-//        floodVerticies.push_back(w.vertex());
-//        weights.push_back(1.0f);
-//        edge_info[w.halfedge()] = EdgeInfo(SPINE, 0);
-//        edge_info[w.opp().halfedge()] = EdgeInfo(SPINE, 0);
-//        hq.push(w.opp().halfedge());
-//    });
-//    
-//    float brush_size = 0.1;
-//
-//    while(!hq.empty())
-//    {
-//        HalfEdgeID h = hq.front();
-//        Walker w = _manifold.walker(h);
-//        hq.pop();
-//
-//        for (;!w.full_circle(); w = w.circulate_vertex_ccw()) {
-//            if(edge_info[w.halfedge()].edge_type == UNKNOWN)
-//            {
-//                Vec pos = _manifold.pos(w.vertex());
-//                float d = (pos - originPos).length();
-//                if (d <= brush_size) {
-//                    floodVerticies.push_back(w.vertex());
-//                    weights.push_back(1.0f);
-//
-//                    edge_info[w.halfedge()] = EdgeInfo(SPINE,0);
-//                    edge_info[w.opp().halfedge()] = EdgeInfo(SPINE,0);
-//                    
-//                    hq.push(w.opp().halfedge());
-//                }
-//            }
-//        }
-//    }
-//    
-//    laplacian_smooth_verticies(_manifold, floodVerticies, weights, 1);
-////    laplacian_smooth_vertex(_manifold, floodVerticiesVector, _edgeInfo, 1);
-//    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
-////    [self changeVerticiesColor:floodVerticies toSelected:YES];
-//}
-
 
 #pragma mark - TOUCHES: SCULPTING A SMALL BUMP 
 -(void)createBumpAtPoint:(vector<GLKVector3>)tPoints
@@ -2602,7 +2580,7 @@ using namespace HMesh;
 }
 
 #pragma mark - DELETING BRANCH
--(void)deleteBranch:(GLKVector3)touchPoint
+-(void)startDeletingBranch:(GLKVector3)touchPoint
 {
     VertexID touchVID = [self closestVertexID_3D:touchPoint];
     VertexID pinV = _pinVertexID;
@@ -2673,7 +2651,6 @@ using namespace HMesh;
     float downDotP = dot(downVec, touchVec);
     float upDotP = dot(upVec, touchVec);
     
-    
     //find walker pointing to the area to delete
 //    BOOL deletingBody = NO;
     BOOL deletingBranchFromBody = NO;
@@ -2709,44 +2686,107 @@ using namespace HMesh;
             toWalker = down;
         }
     }
-    
-//    if (deletingBody) {
-//        if (downDotP >= 0) {
-//            if (upIsChild) {
-//                toWalker = up.opp();
-//            } else {
-//                toWalker = down;
-//            }
-//        } else {
-//            if (upIsChild) {
-//                toWalker = up;
-//            } else {
-//                toWalker = down.opp();
-//            }
-//        }
-//    } else {
-//        if (downDotP >= 0) {
-//            toWalker = down;
-//        }
-//    }
-    
+    _deletingBranchFromBody = deletingBranchFromBody;
     
     //Start flooding
     [self setBranchToDelete:toWalker];
 
-    Walker boundaryW = _manifold.walker(toWalker.prev().halfedge());
-
-    for (VertexID vID: _all_vector_vid) {
-        _manifold.remove_vertex(vID);
+    _deleteBoundaryRibEdge = toWalker.prev().halfedge();
+    _deleteDirectionSpineEdge = toWalker.halfedge();
+    _deletedBranchBoundaryEdge = toWalker.next().halfedge();
+    
+    //Delet all connecting boundary spine edges
+    Walker boundaryW = _manifold.walker(_deleteBoundaryRibEdge);
+    
+    vector<HalfEdgeID> edgesToDelete;
+    for (;!boundaryW.full_circle(); boundaryW = boundaryW.next().opp().next()) {
+        edgesToDelete.push_back(boundaryW.next().halfedge());
+    }
+    for (HalfEdgeID hID: edgesToDelete) {
+        _manifold.remove_edge(hID);
     }
     
-    if (deletingBranchFromBody) {
-//        Walker findJunctionWalker = _manifold.walker(toWalker.prev().halfedge());
-//        assert(_edgeInfo[findJunctionWalker.halfedge()].edge_type == RIB_JUNCTION);
+    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:YES];
+    
+//    
+//    float boundaryRadius = rib_radius(_manifold, _deleteBoundaryRibEdge, _edgeInfo);
+//    
+//    if (_deletingBranchFromBody) {
+//        //        Walker findJunctionWalker = _manifold.walker(toWalker.prev().halfedge());
+//        //        assert(_edgeInfo[findJunctionWalker.halfedge()].edge_type == RIB_JUNCTION);
+//        while (valency(_manifold, boundaryW.vertex()) != 5) {
+//            boundaryW = boundaryW.next();
+//        }
+//        //        boundaryW = boundaryW.next(); //outwards from junction vertex
+//        Walker bWalkerOuter = _manifold.walker(boundaryW.opp().halfedge());
+//        Walker bWalker1 = _manifold.walker(boundaryW.halfedge());
+//        Walker bWalker2 = _manifold.walker(boundaryW.next().halfedge());
+//        
+//        vector<HalfEdgeID> bEdges1;
+//        vector<HalfEdgeID> bEdges2;
+//        while (valency(_manifold, bWalker2.vertex()) != 5)
+//        {
+//            bEdges1.push_back(bWalker1.halfedge());
+//            bEdges2.push_back(bWalker2.halfedge());
+//            bWalker1 = bWalker1.prev();
+//            bWalker2 = bWalker2.next();
+//        }
+//        
+//        for (int i = 0; i < bEdges1.size() ; i++) {
+//            BOOL didStich = _manifold.stitch_boundary_edges(bEdges1[i], bEdges2[i]);
+//            NSLog(@"%i", didStich);
+//            //            assert(didStich);
+//        }
+//        
+//        vector<VertexID> vertexToSmooth;
+//        vector<float> weights;
+//        for (int i = 0; i < bEdges1.size() ; i++) {
+//            vertexToSmooth.push_back(bWalkerOuter.vertex());
+//            weights.push_back(1.0f);
+//            bWalkerOuter = bWalkerOuter.next().opp().next();
+//        }
+//        
+//        [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
+//        
+//        [self smoothVerticies:vertexToSmooth iter:20 isSpine:YES brushSize:1.5*boundaryRadius];
+//        [self smoothVerticies:vertexToSmooth iter:5 isSpine:NO brushSize:boundaryRadius];
+//    } else {
+//        VertexID poleVID = pole_from_hole(_manifold, boundaryW.halfedge());
+//        [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
+//        [self smoothPole:poleVID edgeDepth:3 iter:2];
+//    }
+//    [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
+    
+    //hide the branch I want to delete
+//    [self changeVerticiesColor:_all_vector_vid toColor:Vec4uc(0, 0, 0, 0)];
+//    [self changeWireFrameColor:_all_vector_vid toColor:Vec4uc(0, 0, 0, 0)];
+    [self changeVerticiesColor:_all_vector_vid toSelected:YES];
+}
+
+-(void)endDeletingBranch:(GLKVector3)touchPoint touchedModel:(BOOL)touchedModel {
+    if (!touchedModel) {
+        //Delete verticies
+        for (VertexID vID: _all_vector_vid) {
+            _manifold.remove_vertex(vID);
+        }
+    } else {
+        VertexID touchVID = [self closestVertexID_3D:touchPoint];
+        Vec3d normal = HMesh::normal(_manifold, touchVID);
+    }
+    
+    
+    
+    Walker boundaryW = _manifold.walker(_deleteBoundaryRibEdge);
+    float boundaryRadius = rib_radius(_manifold, _deleteBoundaryRibEdge, _edgeInfo);
+    Vec3f boundaryCeneter = centroid_for_rib(_manifold,  _deleteBoundaryRibEdge, _edgeInfo);
+
+    if (_deletingBranchFromBody) {
+        //        Walker findJunctionWalker = _manifold.walker(toWalker.prev().halfedge());
+        //        assert(_edgeInfo[findJunctionWalker.halfedge()].edge_type == RIB_JUNCTION);
         while (valency(_manifold, boundaryW.vertex()) != 5) {
             boundaryW = boundaryW.next();
         }
-//        boundaryW = boundaryW.next(); //outwards from junction vertex
+        //        boundaryW = boundaryW.next(); //outwards from junction vertex
         Walker bWalkerOuter = _manifold.walker(boundaryW.opp().halfedge());
         Walker bWalker1 = _manifold.walker(boundaryW.halfedge());
         Walker bWalker2 = _manifold.walker(boundaryW.next().halfedge());
@@ -2764,12 +2804,11 @@ using namespace HMesh;
         for (int i = 0; i < bEdges1.size() ; i++) {
             BOOL didStich = _manifold.stitch_boundary_edges(bEdges1[i], bEdges2[i]);
             NSLog(@"%i", didStich);
-//            assert(didStich);
+            //            assert(didStich);
         }
         
         vector<VertexID> vertexToSmooth;
         vector<float> weights;
-
         for (int i = 0; i < bEdges1.size() ; i++) {
             vertexToSmooth.push_back(bWalkerOuter.vertex());
             weights.push_back(1.0f);
@@ -2778,18 +2817,19 @@ using namespace HMesh;
         
         [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
         
-        laplacian_smooth_verticies(_manifold, vertexToSmooth, weights, 10);
+        [self smoothVerticies:vertexToSmooth iter:20 isSpine:YES brushSize:1.5*boundaryRadius];
+        [self smoothVerticies:vertexToSmooth iter:5 isSpine:NO brushSize:boundaryRadius];
     } else {
         VertexID poleVID = pole_from_hole(_manifold, boundaryW.halfedge());
         [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
         [self smoothPole:poleVID edgeDepth:3 iter:2];
     }
-    [self rebufferWithCleanup:YES bufferData:YES edgeTrace:NO];
-    _all_vector_vid.clear();
+    [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
+    //    _all_vector_vid.clear();
+
 }
 
 -(void)setBranchToDelete:(Walker)deleteDir {
-    
     //Flood rotational area
     HalfEdgeAttributeVector<EdgeInfo> sEdgeInfo(_manifold.allocated_halfedges());
     Walker bWalker = _manifold.walker(deleteDir.next().halfedge()); //Walk along pivot boundary loop
@@ -2830,9 +2870,47 @@ using namespace HMesh;
 //    [self changeVerticiesColor:floodVerticiesVector toSelected:YES];
 }
 
+-(void)moveBranchToPoint:(GLKVector3)touchPoint {
+    if (_all_vector_vid.size() > 0) {
+        VertexID touchVID = [self closestVertexID_3D:touchPoint];
+        Vecf touchPos = _manifold.posf(touchVID);
+        Vec3f normal = HMesh::normalf(_manifold, touchVID);
+        
+        Walker boundaryW = _manifold.walker(_deleteBoundaryRibEdge);
+        float boundaryRadius = rib_radius(_manifold, _deleteBoundaryRibEdge, _edgeInfo);
+        Vec3f boundaryCenter = centroid_for_rib(_manifold,  _deleteBoundaryRibEdge, _edgeInfo);
+        Vec3f toTouchPos = touchPos - boundaryCenter;
+        
+        for (VertexID vid: _all_vector_vid) {
+            _manifold.posf(vid) = _manifold.posf(vid) + toTouchPos;
+        }
+        
+//        Walker outerWalker = _manifold.walker(_deletedBranchBoundaryEdge);
+        Vecf firstCenter = centroid_for_rib(_manifold, _deletedBranchBoundaryEdge, _edgeInfo);
+        Vecf currentNorm = firstCenter - touchPos;
+        
+        CGLA::Quatd q;
+        q.make_rot(Vec(currentNorm), Vec(normal));
+        for (VertexID vid: _all_vector_vid) {
+            _manifold.pos(vid) = q.apply(_manifold.pos(vid));
+        }
+    }
+}
 
 
 #pragma mark - SELECTION
+
+-(void)changeWireFrameColor:(vector<HMesh::VertexID>)vertecies toColor:(Vec4uc) selectColor {
+    [self.wireframeColorDataBuffer bind];
+    unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
+    for (VertexID vid: vertecies) {
+        int index = vid.index;
+        memcpy(temp + index*COLOR_SIZE, selectColor.get(), COLOR_SIZE);
+    }
+    glUnmapBufferOES(GL_ARRAY_BUFFER);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+}
 
 -(void)changeWireFrameColor:(vector<HMesh::VertexID>)vertecies toSelected:(BOOL)isSelected {
     
@@ -2842,25 +2920,11 @@ using namespace HMesh;
     } else {
         selectColor = Vec4uc(0,0,0,255);
     }
+    [self changeWireFrameColor:vertecies toColor:selectColor];
     
-    [self.wireframeColorDataBuffer bind];
-    unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
-    for (VertexID vid: vertecies) {
-        int index = vid.index;
-        memcpy(temp + index*COLOR_SIZE, selectColor.get(), COLOR_SIZE);
-    }
-    glUnmapBufferOES(GL_ARRAY_BUFFER);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
--(void)changeVerticiesColor:(vector<HMesh::VertexID>) vertecies toSelected:(BOOL)isSelected {
-    
-    Vec4uc selectColor;
-    if (isSelected) {
-        selectColor = Vec4uc(240, 0, 0, 255);
-    } else {
-        selectColor = Vec4uc(0,0,0,255);
-    }
+-(void)changeVerticiesColor:(vector<HMesh::VertexID>) vertecies toColor:(Vec4uc) selectColor {
     
     [self.colorDataBuffer bind];
     unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
@@ -2870,6 +2934,17 @@ using namespace HMesh;
     }
     glUnmapBufferOES(GL_ARRAY_BUFFER);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+}
+
+-(void)changeVerticiesColor:(vector<HMesh::VertexID>) vertecies toSelected:(BOOL)isSelected {
+    Vec4uc selectColor;
+    if (isSelected) {
+        selectColor = Vec4uc(240, 0, 0, 255);
+    } else {
+        selectColor = Vec4uc(0,0,0,255);
+    }
+    [self changeVerticiesColor:vertecies toColor:selectColor];
 }
 
 

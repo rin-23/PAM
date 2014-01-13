@@ -70,7 +70,8 @@
 -(void)smoothAtPoint:(GLKVector3)touchPoint;
 
 #pragma mark - DELETING BRANCH
--(void)deleteBranch:(GLKVector3)touchPoint;
+-(void)startDeletingBranch:(GLKVector3)touchPoint;
+-(void)endDeletingBranch:(GLKVector3)touchPoint;
 
 #pragma mark - UTILITIES
 -(void)clear;

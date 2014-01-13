@@ -140,6 +140,7 @@ typedef enum {
 -(void)setupGL {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
+
 }
 
 -(void)addGestureRecognizersToView:(UIView*)view {
@@ -297,7 +298,7 @@ typedef enum {
                 NSLog(@"[WARNING] Couldn't determine touch area");
                 return;
             }
-            [_pMesh deleteBranch:modelCoord];
+            [_pMesh startDeletingBranch:modelCoord];
             _bending = NO;
         }
     } else{
@@ -717,8 +718,11 @@ typedef enum {
 //Draw callback
 - (void)glkView:(GLKView *)view drawInRect:(CGRect)rect {
 
+
     [(AGLKContext *)view.context clear:GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT];
 
+    
+    
     glLineWidth(1.0f);
     _pMesh.viewMatrix = viewMatrix;
     _pMesh.projectionMatrix = projectionMatrix;

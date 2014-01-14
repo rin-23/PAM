@@ -85,6 +85,10 @@ using namespace HMesh;
     HalfEdgeID _deleteBranchSecondRingEdge;
     VertexID _newAttachVertexID;
     Line* _pinPointLine;
+    Vec _zRotateVec;
+    Vec _zRotatePos;
+    
+    CurrentModification _prevMod;
 
 }
 
@@ -2478,7 +2482,6 @@ using namespace HMesh;
         return NO;
     }
     
-
     VertexID touchVID = [self closestVertexID_3D:touchPoint];
     _newAttachVertexID = touchVID ;
     Vec touchPos = _manifold.pos(touchVID);
@@ -2511,22 +2514,53 @@ using namespace HMesh;
     return YES;
 }
 
--(BOOL)rotateDetachedBranch {
-    if (_modState!=MODIFICATION_BRANCH_DETACHED &&
+-(BOOL)startRotateDetachedBranch:(float)angle {
+    if (_modState!= MODIFICATION_BRANCH_DETACHED &&
         _modState != MODIFICATION_BRANCH_DETACHED_AN_MOVED)
     {
         NSLog(@"[WARNING][PolarAnnularMesh] Cant rotate non detached branch");
         return NO;
     }
     
+    _rotAngle = angle;
+    Vec boundaryCentroid = Vec(centroid_for_boundary_rib(_manifold, _deleteBranchLowerRibEdge, _edgeInfo));
+    Vec secondRingCentroid = Vec(centroid_for_rib(_manifold, _deleteBranchSecondRingEdge, _edgeInfo));
+    Vec boundaryBodyCentroid = Vec(centroid_for_boundary_rib(_manifold, _deleteBodyUpperRibEdge, _edgeInfo));
+    Vec currentNorm;
     if (_modState == MODIFICATION_BRANCH_DETACHED) {
-        
+        currentNorm = boundaryCentroid - boundaryBodyCentroid;
+        _zRotatePos = boundaryBodyCentroid;
     } else if (_modState == MODIFICATION_BRANCH_DETACHED_AN_MOVED) {
-    
+        Vec touchPos = _manifold.pos(_newAttachVertexID);
+        currentNorm = secondRingCentroid - touchPos;
+        _zRotatePos = touchPos;
     }
-
+    _zRotateVec = currentNorm;
+    _prevMod = _modState;
+    _current_rot_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
     
+    _modState = MODIFICATION_BRANCH_DETACHED_ROTATE;
     return YES;
+}
+
+-(void)continueRotateDetachedBranch:(float)angle {
+    _rotAngle = angle;
+}
+
+-(void)endRotateDetachedBranch:(float)angle {
+    _rotAngle = angle;
+    _modState = _prevMod;
+
+    CGLA::Quatd q;
+    q.make_rot(_rotAngle, _zRotateVec);
+    
+    for (VertexID vid: _all_vector_vid) {
+        Vec p = _manifold.pos(vid);
+        p -= _zRotatePos;
+        p = q.apply(p);
+        p += _zRotatePos;
+        _manifold.pos(vid) = p;
+    }
 }
 
 -(void)setBranchToDelete:(Walker)deleteDir {
@@ -2569,7 +2603,6 @@ using namespace HMesh;
     _all_vector_vid = floodVerticiesVector;
 //    [self changeVerticiesColor:floodVerticiesVector toSelected:YES];
 }
-
 
 -(void)closeHole:(HalfEdgeID)hID numberOfRingEdges:(int*)numOfEdges{
     Walker boundaryW = _manifold.walker(hID);
@@ -2877,6 +2910,28 @@ using namespace HMesh;
             memcpy(temp + index*VERTEX_SIZE, newPos.get(), VERTEX_SIZE);
         }
         
+        glUnmapBufferOES(GL_ARRAY_BUFFER);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+    } else if (_modState == MODIFICATION_BRANCH_DETACHED_ROTATE) {
+        CGLA::Quatd q;
+        q.make_rot(_rotAngle, _zRotateVec);
+        
+        for (VertexID vid: _all_vector_vid) {
+            Vec p = _manifold.pos(vid);
+            p -= _zRotatePos;
+            p = q.apply(p);
+            p += _zRotatePos;
+            _current_rot_position[vid] = Vecf(p);
+        }
+        
+        [self.vertexDataBuffer bind];
+        unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
+        for (VertexID vid: _all_vector_vid) {
+            Vecf pos = _current_rot_position[vid];
+            int index = vid.index;
+            memcpy(temp + index*VERTEX_SIZE, pos.get(), VERTEX_SIZE);
+        }
+
         glUnmapBufferOES(GL_ARRAY_BUFFER);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }

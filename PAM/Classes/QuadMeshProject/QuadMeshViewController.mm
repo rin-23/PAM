@@ -609,11 +609,10 @@ typedef enum {
     } else if ([SettingsManager sharedInstance].showSkeleton) {
         return;
     } else {
+          UIRotationGestureRecognizer* rotGesture =( UIRotationGestureRecognizer*) sender;
         if (_pMesh.modState == MODIFICATION_PIN_POINT_SET ||
             _pMesh.modState == MODIFICATION_BRANCH_ROTATION)
         {
-        
-            UIRotationGestureRecognizer* rotGesture =( UIRotationGestureRecognizer*) sender;
             if (sender.state == UIGestureRecognizerStateBegan) {
                 GLKVector3 modelCoord;
                 if (![self modelCoordinates:&modelCoord forGesture:sender]) {
@@ -625,6 +624,17 @@ typedef enum {
                 [_pMesh continueBendingWithWithAngle:rotGesture.rotation];
             } else if (sender.state == UIGestureRecognizerStateEnded) {
                 [_pMesh endBendingWithAngle:rotGesture.rotation];
+            }
+        } else if (_pMesh.modState == MODIFICATION_BRANCH_DETACHED ||
+                   _pMesh.modState == MODIFICATION_BRANCH_DETACHED_AN_MOVED ||
+                   _pMesh.modState == MODIFICATION_BRANCH_DETACHED_ROTATE)
+        {
+            if (sender.state == UIGestureRecognizerStateBegan) {
+                [_pMesh startRotateDetachedBranch:rotGesture.rotation];
+            } else if (sender.state == UIGestureRecognizerStateChanged) {
+                [_pMesh continueRotateDetachedBranch:rotGesture.rotation];
+            } else if (sender.state == UIGestureRecognizerStateEnded) {
+                [_pMesh endRotateDetachedBranch:rotGesture.rotation];
             }
         }
     }

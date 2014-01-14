@@ -99,6 +99,15 @@ typedef enum {
  */
 -(BOOL)attachDetachedBranch;
 
+/*
+ * Rotating detached branch araound base norm axis
+ */
+-(BOOL)startRotateDetachedBranch:(float)angle;
+-(void)continueRotateDetachedBranch:(float)angle;
+-(void)endRotateDetachedBranch:(float)angle;
+
+
+
 #pragma mark - UTILITIES
 -(void)clear;
 -(void)undo;

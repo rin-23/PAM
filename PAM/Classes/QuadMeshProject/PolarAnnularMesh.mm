@@ -83,12 +83,15 @@ using namespace HMesh;
     HalfEdgeID _deleteBranchLowerRibEdge;
     HalfEdgeID _deleteDirectionSpineEdge;
     HalfEdgeID _deleteBranchSecondRingEdge;
+    int _deleteBranchNumberOfBoundaryRibs;
     VertexID _newAttachVertexID;
     Line* _pinPointLine;
     Vec _zRotateVec;
     Vec _zRotatePos;
     
     CurrentModification _prevMod;
+    
+    BOOL _objLoaded;
 
 }
 
@@ -119,6 +122,8 @@ using namespace HMesh;
         uniforms[UNIFORM_NORMAL_MATRIX] = [self.drawShaderProgram uniformLocation:"normalMatrix"];
         _manifold = HMesh::Manifold();
         
+          _objLoaded = NO;
+        
         _modState = MODIFICATION_NONE;
     }
     return self;
@@ -127,6 +132,7 @@ using namespace HMesh;
 -(void)setMeshFromObjFile:(NSString*)objFilePath {
 
     _modState = MODIFICATION_NONE;
+    _objLoaded = YES;
     
     //Load manifold
     _manifold = HMesh::Manifold();
@@ -135,6 +141,16 @@ using namespace HMesh;
     //Calculate Bounding Box
     Manifold::Vec pmin = Manifold::Vec();
     Manifold::Vec pmax = Manifold::Vec();
+    HMesh::bbox(_manifold, pmin, pmax);
+    
+    Vec midV = 0.5 * (pmax - pmin);
+    float rad = midV.length();
+    
+    for (VertexID vID: _manifold.vertices()) {
+        Vec pos = _manifold.pos(vID);
+        Vec newPos = (pos - pmin - midV) / rad;
+        _manifold.pos(vID) = newPos;
+    }
     HMesh::bbox(_manifold, pmin, pmax);
     
     self.centerAtBoundingBox = YES;
@@ -148,7 +164,7 @@ using namespace HMesh;
     _boundingBox.height = fabsf(_boundingBox.maxBound.y - _boundingBox.minBound.y);
     _boundingBox.depth = fabsf(_boundingBox.maxBound.z - _boundingBox.minBound.z);
     
-    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:YES];
+    [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
 }
 
 -(void)rebufferNoEdgetrace {
@@ -856,8 +872,8 @@ using namespace HMesh;
         return;
     }
     
-    //    GLKVector3 middlePoint = GLKVector3Lerp(touchPoint1, touchPoint2, 0.5f);
-    VertexID vID = [self closestVertexID_2D:touchPoint1];
+    GLKVector3 middlePoint = GLKVector3Lerp(touchPoint1, touchPoint2, 0.5f);
+    VertexID vID = [self closestVertexID_2D:middlePoint];
     if (is_pole(_manifold, vID)) {
         return;
     }
@@ -935,6 +951,7 @@ using namespace HMesh;
             } else {
                 weight = 0;
             }
+            NSLog(@"%f", weight);
             _scale_weight_vector.push_back(weight);
         }
     }
@@ -1025,9 +1042,22 @@ using namespace HMesh;
                                            touchSize:(float)touchSize
                                    averageTouchSpeed:(float)touchSpeed
 {
+    
+    
     vector<vector<GLKVector3>> empty;
     
     if (![self isLoaded]) {
+        return empty;
+    }
+    
+    VertexID touchedVID;
+    if (touchedModel) {
+        touchedVID = [self closestVertexID_3D:_startPoint];
+    } else {
+        touchedVID = [self closestVertexID_2D:_startPoint];
+    }
+    
+    if (is_pole(_manifold, touchedVID)) {
         return empty;
     }
     
@@ -1058,13 +1088,6 @@ using namespace HMesh;
     }
     
     [self saveState];
-    
-    VertexID touchedVID;
-    if (touchedModel) {
-        touchedVID = [self closestVertexID_3D:_startPoint];
-    } else {
-        touchedVID = [self closestVertexID_2D:_startPoint];
-    }
     
     //Create new pole
     VertexID newPoleID;
@@ -1243,8 +1266,13 @@ using namespace HMesh;
     
     Walker boundaryWalker = _manifold.walker(toJunctionWalker.next().halfedge());
 
-//    vector<float>weights;
-    float brush_size = 0.2;
+    vector<float>weights;
+    float brush_size;
+    if (_objLoaded) {
+        brush_size = 0.1;
+    } else {
+        brush_size = 0.2;
+    }
     
     HalfEdgeAttributeVector<EdgeInfo> edge_info(_manifold.allocated_halfedges());
     for (; !boundaryWalker.full_circle(); boundaryWalker = boundaryWalker.next().opp().next()) {
@@ -1255,16 +1283,16 @@ using namespace HMesh;
         queue<HalfEdgeID> hq;
         circulate_vertex_ccw(_manifold, closestPoint, [&](Walker w) {
             floodVerticies.push_back(w.vertex());
-//            Vec pos = _manifold.pos(w.vertex());
-//            float d = (pos - originPos).length();
-//            float x = d/brush_size;
-//            float weight;
-//            if (x <= 1) {
-//                weight = pow(pow(x, 2) - 1, 2);
-//            } else {
-//                weight = 0;
-//            }
-//            weights.push_back(weight);
+            Vec pos = _manifold.pos(w.vertex());
+            float d = (pos - originPos).length();
+            float x = d/brush_size;
+            float weight;
+            if (x <= 1) {
+                weight = pow(pow(x, 2) - 1, 2);
+            } else {
+                weight = 0;
+            }
+            weights.push_back(weight);
 
             edge_info[w.halfedge()] = EdgeInfo(SPINE, 0);
             edge_info[w.opp().halfedge()] = EdgeInfo(SPINE, 0);
@@ -1272,7 +1300,7 @@ using namespace HMesh;
         });
         
         floodVerticies.push_back(closestPoint);
-//        weights.push_back(1);
+        weights.push_back(1);
         while(!hq.empty())
         {
             HalfEdgeID h = hq.front();
@@ -1286,14 +1314,14 @@ using namespace HMesh;
                     float d = (pos - originPos).length();
                     if (d <= brush_size) {
                         floodVerticies.push_back(w.vertex());
-//                        float x = d/brush_size;
-//                        float weight;
-//                        if (x <= 1) {
-//                            weight = pow(pow(x, 2) - 1, 2);
-//                        } else {
-//                            weight = 0;
-//                        }
-//                        weights.push_back(weight);
+                        float x = d/brush_size;
+                        float weight;
+                        if (x <= 1) {
+                            weight = pow(pow(x, 2) - 1, 2);
+                        } else {
+                            weight = 0;
+                        }
+                        weights.push_back(weight);
                         edge_info[w.halfedge()] = EdgeInfo(SPINE,0);
                         edge_info[w.opp().halfedge()] = EdgeInfo(SPINE,0);
                         
@@ -1305,9 +1333,15 @@ using namespace HMesh;
     }
     
 //    taubin_smooth(_manifold, 10);
-//    _edgeInfo = trace_spine_edges(_manifold);
-    laplacian_spine_smooth_verticies(_manifold, floodVerticies, _edgeInfo, 15);
-//    laplacian_smooth_verticies(_manifold, floodVerticies, weights, 2);
+    _edgeInfo = trace_spine_edges(_manifold);
+    if (_objLoaded) {
+        laplacian_spine_smooth_verticies(_manifold, floodVerticies, _edgeInfo, 5);
+        laplacian_smooth_verticies(_manifold, floodVerticies, weights,  1);
+    } else {
+        laplacian_spine_smooth_verticies(_manifold, floodVerticies, _edgeInfo, 15);
+    }
+    
+
     [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
     return allRibs;
 }
@@ -2104,7 +2138,6 @@ using namespace HMesh;
     vector<GLKVector3> currentNorms;
     vector<GLKVector3> desiredNorms;
     
-
     Walker pivotDir = _manifold.walker(pivotDirHID);
     
     //Get a centroid before the first one. For better quality
@@ -2240,7 +2273,7 @@ using namespace HMesh;
         Walker downToJunction = upToJunction.prev().opp().prev().opp();
         assert(_edgeInfo[downToJunction.halfedge()].is_spine());
         
-        float brush_size = 0.1;
+        float brush_size = 0.05;
         Vec pinPos = _manifold.pos(pinV);
         float distance = (_manifold.pos(upToJunction.vertex()) - pinPos).length();
         while (distance < brush_size) {
@@ -2344,6 +2377,7 @@ using namespace HMesh;
     {
         edgesToDelete.push_back(boundaryW.next().halfedge());
     }
+    _deleteBranchNumberOfBoundaryRibs = edgesToDelete.size();
     for (HalfEdgeID hID: edgesToDelete) {
         _manifold.remove_edge(hID);
     }
@@ -2457,7 +2491,6 @@ using namespace HMesh;
         HalfEdgeID deleteBranchUpperOppRibEdge = _manifold.walker(_deleteBranchLowerRibEdge).opp().halfedge();
         [self stitchBranch:_deleteBranchLowerRibEdge toBody:boundaryHalfEdge];
         
-        
         vector<VertexID> verteciesToSmooth;
         for (Walker w = _manifold.walker(deleteBranchUpperOppRibEdge); !w.full_circle(); w = w.next().opp().next()) {
             verteciesToSmooth.push_back(w.vertex());
@@ -2483,6 +2516,12 @@ using namespace HMesh;
     }
     
     VertexID touchVID = [self closestVertexID_3D:touchPoint];
+    //check if you can possible move here
+    int numRibSegments = count_rib_segments(_manifold, _edgeInfo, touchVID);
+    if (numRibSegments - 2 < _deleteBranchNumberOfBoundaryRibs) {
+        return NO;
+    }
+    
     _newAttachVertexID = touchVID ;
     Vec touchPos = _manifold.pos(touchVID);
     Vec normal = HMesh::normal(_manifold, touchVID);
@@ -2552,7 +2591,7 @@ using namespace HMesh;
     _modState = _prevMod;
 
     CGLA::Quatd q;
-    q.make_rot(_rotAngle, _zRotateVec);
+    q.make_rot(-_rotAngle, _zRotateVec);
     
     for (VertexID vid: _all_vector_vid) {
         Vec p = _manifold.pos(vid);
@@ -2606,7 +2645,7 @@ using namespace HMesh;
 
 -(void)closeHole:(HalfEdgeID)hID numberOfRingEdges:(int*)numOfEdges{
     Walker boundaryW = _manifold.walker(hID);
-    while (valency(_manifold, boundaryW.vertex()) != 5) {
+    while (valency(_manifold, boundaryW.vertex()) <= 4) {
         boundaryW = boundaryW.next();
     }
 
@@ -2615,7 +2654,7 @@ using namespace HMesh;
     
     vector<HalfEdgeID> bEdges1;
     vector<HalfEdgeID> bEdges2;
-    while (valency(_manifold, bWalker2.vertex()) != 5)
+    while (valency(_manifold, bWalker2.vertex()) <= 4)
     {
         bEdges1.push_back(bWalker1.halfedge());
         bEdges2.push_back(bWalker2.halfedge());
@@ -2914,7 +2953,7 @@ using namespace HMesh;
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     } else if (_modState == MODIFICATION_BRANCH_DETACHED_ROTATE) {
         CGLA::Quatd q;
-        q.make_rot(_rotAngle, _zRotateVec);
+        q.make_rot(-_rotAngle, _zRotateVec);
         
         for (VertexID vid: _all_vector_vid) {
             Vec p = _manifold.pos(vid);

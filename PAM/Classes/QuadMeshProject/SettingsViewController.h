@@ -23,6 +23,7 @@
     UIButton* _clearModelBtn;
     UIButton* _resetBtn;
     UIButton* _showRibJunctionsBtn;
+    UIButton* _loadArmadillo;
 }
 
 @property (nonatomic, weak) id<SettingsViewControllerDelegate> delegate;

@@ -86,8 +86,8 @@ typedef enum {
 {
     [super viewDidLoad];
 	// Do any additional setup after loading the view.
-//    [self loadMeshData];
-    [self loadEmptyWorspace];
+    [self loadMeshData];
+//    [self loadEmptyWorspace];
     
     [self setupGL];
     [self addGestureRecognizersToView:self.view];
@@ -367,7 +367,7 @@ typedef enum {
                 GLKVector3 rayOrigin, rayDirection;
                 BOOL result = [self rayOrigin:&rayOrigin rayDirection:&rayDirection forTouchPoint:touchPoint];
                 if (!result) {
-                    NSLog(@"[WARNING] Couldn't determine touch area");
+                    NSLog(@"[WARNING] Touched background");
                     return;
                 }
                 
@@ -384,7 +384,7 @@ typedef enum {
                 if (depth < 0) { //clicked on background
                     BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, 0)];
                     if (!result) {
-                        NSLog(@"[WARNING] Couldn't determine touch area");
+                        NSLog(@"[WARNING] Touched background");
                         return;
                     }
                     _drawingState = TOUCHED_BACKGROUND;
@@ -392,7 +392,7 @@ typedef enum {
                     _gaussianDepth = depth;
                     BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, _gaussianDepth)];
                     if (!result) {
-                        NSLog(@"[WARNING] Couldn't determine touch area");
+                        NSLog(@"[WARNING] Touched background");
                         return;
                     }
                     _drawingState = TOUCHED_MODEL;
@@ -412,7 +412,7 @@ typedef enum {
                 GLKVector3 rayOrigin, rayDirection;
                 BOOL result = [self rayOrigin:&rayOrigin rayDirection:&rayDirection forTouchPoint:touchPoint];
                 if (!result) {
-                    NSLog(@"[WARNING] Couldn't determine touch area");
+                    NSLog(@"[WARNING] Touched background");
                     return;
                 }
                 rayOrigin = GLKVector3Add(rayOrigin, rayDirection);
@@ -743,7 +743,7 @@ typedef enum {
     }
 
     //Load obj file
-    NSString* objPath = [[NSBundle mainBundle] pathForResource:@"sphere_mid_res" ofType:@"obj"];
+    NSString* objPath = [[NSBundle mainBundle] pathForResource:@"polarized_from_075_100_refit_simpl_600" ofType:@"obj"];
     [_pMesh setMeshFromObjFile:objPath];
     _bbox = _pMesh.boundingBox;
     _translationManager.scaleFactor = _bbox.radius;

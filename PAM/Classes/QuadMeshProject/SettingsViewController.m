@@ -72,9 +72,16 @@
     [_showRibJunctionsBtn setContentHorizontalAlignment:UIControlContentHorizontalAlignmentLeft];
     [_showRibJunctionsBtn setTitle:@"Show Rib Junctions" forState:UIControlStateNormal];
     [_showRibJunctionsBtn addTarget:self action:@selector(showRibJunctions:) forControlEvents:UIControlEventTouchUpInside];
-    [_showRibJunctionsBtn setFrame:CGRectMake(15, nextY + 10, 100, 30)];
+    [_showRibJunctionsBtn setFrame:CGRectMake(15, nextY + 10, 200, 30)];
     [self.view addSubview:_showRibJunctionsBtn];
     
+    nextY = CGRectGetMaxY(_showRibJunctionsBtn.frame);
+    _loadArmadillo = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+    [_loadArmadillo setContentHorizontalAlignment:UIControlContentHorizontalAlignmentLeft];
+    [_loadArmadillo setTitle:@"Load Armadillo" forState:UIControlStateNormal];
+    [_loadArmadillo addTarget:self action:@selector(loadArmadillo:) forControlEvents:UIControlEventTouchUpInside];
+    [_loadArmadillo setFrame:CGRectMake(15, nextY + 10, 200, 30)];
+    [self.view addSubview:_showRibJunctionsBtn];
     
     if ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPhone) {
         UIButton* dismissButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];

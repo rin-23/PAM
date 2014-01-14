@@ -66,6 +66,7 @@
 		1A408F4018357CAA0044E48E /* quad_sphere_high_res.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1A408F3F18357CAA0044E48E /* quad_sphere_high_res.obj */; };
 		1A9438AD1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m in Sources */ = {isa = PBXBuildFile; fileRef = 1A9438AC1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m */; };
 		1A976FC0184683EF0022AC3D /* PAMUtilities.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1A976FBF184683EF0022AC3D /* PAMUtilities.mm */; };
+		1ABD4F401885D684001FA009 /* polarized_from_075_100_refit_simpl_600.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1ABD4F3F1885D684001FA009 /* polarized_from_075_100_refit_simpl_600.obj */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -202,6 +203,7 @@
 		1A9438AC1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = UITwoFingerHoldGestureRecognizer.m; path = Classes/QuadMeshProject/UITwoFingerHoldGestureRecognizer.m; sourceTree = "<group>"; };
 		1A976FBE184683EF0022AC3D /* PAMUtilities.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PAMUtilities.h; sourceTree = "<group>"; };
 		1A976FBF184683EF0022AC3D /* PAMUtilities.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = PAMUtilities.mm; sourceTree = "<group>"; };
+		1ABD4F3F1885D684001FA009 /* polarized_from_075_100_refit_simpl_600.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = polarized_from_075_100_refit_simpl_600.obj; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -438,6 +440,7 @@
 		15646602182033920000B985 /* ObjFiles */ = {
 			isa = PBXGroup;
 			children = (
+				1ABD4F3F1885D684001FA009 /* polarized_from_075_100_refit_simpl_600.obj */,
 				158D8BB41841765C00FA8AFB /* sphere_mid_res.obj */,
 				1A408F3F18357CAA0044E48E /* quad_sphere_high_res.obj */,
 				1A408F3D18357BAB0044E48E /* quad_sphere.obj */,
@@ -622,6 +625,7 @@
 				153B4E5918206CF400962DB2 /* TextureShader.fsh in Resources */,
 				1A408F3E18357BAB0044E48E /* quad_sphere.obj in Resources */,
 				153B4E5A18206CF400962DB2 /* TextureShader.vsh in Resources */,
+				1ABD4F401885D684001FA009 /* polarized_from_075_100_refit_simpl_600.obj in Resources */,
 				15646613182033920000B985 /* newTEST.obj in Resources */,
 				156463F51820266E0000B985 /* InfoPlist.strings in Resources */,
 				1A408F3918357A8D0044E48E /* sphere.obj in Resources */,

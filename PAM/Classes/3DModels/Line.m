@@ -13,7 +13,8 @@
 -(id)initWithVertexData:(NSMutableData*)vertexData {
     self = [super init];
     if (self) {
-       
+        _lineDrawingMode = GL_LINE_STRIP;
+        
         NSString* vShaderPath = [[NSBundle mainBundle] pathForResource:@"PointCloudRGBAShader" ofType:@"vsh"];
         NSString* fShaderPath = [[NSBundle mainBundle] pathForResource:@"PointCloudRGBAShader" ofType:@"fsh"];
         self.drawShaderProgram = [[ShaderProgram alloc] initWithVertexShader:vShaderPath fragmentShader:fShaderPath];
@@ -88,7 +89,7 @@
                                               dataType:GL_UNSIGNED_BYTE
                                              normalize:GL_TRUE];
         
-        [AGLKVertexAttribArrayBuffer drawPreparedArraysWithMode:GL_LINE_STRIP
+        [AGLKVertexAttribArrayBuffer drawPreparedArraysWithMode:self.lineDrawingMode
                                                startVertexIndex:0
                                                numberOfVertices:self.numVertices];
         

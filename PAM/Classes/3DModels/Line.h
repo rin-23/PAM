@@ -14,4 +14,6 @@
 -(void)addVertex:(GLKVector3)vector3;
 -(void)reBuffer:(NSMutableData*)vertexData;
 
+@property (nonatomic, assign) GLenum lineDrawingMode;
+
 @end

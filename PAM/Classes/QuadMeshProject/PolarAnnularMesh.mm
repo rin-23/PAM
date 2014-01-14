@@ -22,7 +22,7 @@
 #include <map>
 #include <set>
 #include "smooth.h"
-
+#import "Line.h"
 #include <queue>
 #import "Vec4uc.h"
 #import <OpenGLES/ES2/gl.h>
@@ -37,14 +37,6 @@
 static int VERTEX_SIZE =  3 * sizeof(float);
 static int COLOR_SIZE =  4 * sizeof(unsigned char);
 static int INDEX_SIZE  = sizeof(unsigned int);
-
-typedef enum {
-    MODIFICATION_NONE,
-    MODIFICATION_SCALING,
-    MODIFICATION_BRANCH_ROTATION,
-    MODIFICATION_BRANCH_SCALING,
-    MODIFICATION_BRANCH_TRANSLATION
-} CurrentModification;
 
 typedef CGLA::Vec3d Vec;
 typedef CGLA::Vec3f Vecf;
@@ -88,19 +80,21 @@ using namespace HMesh;
     vector<GLKVector3> _touchPoints;
     GLKVector3 _startPoint;
     
-    //Deleting
+    //DELETING AND REPOSITIONING OF THE BRANCH
     BOOL _deletingBranchFromBody;
-    HalfEdgeID _deleteLowerBoundaryRibEdge;
-    HalfEdgeID _deleteUpperBoundaryRibEdge;
+    HalfEdgeID _deleteBodyUpperRibEdge;
+    HalfEdgeID _deleteBranchLowerRibEdge;
     HalfEdgeID _deleteDirectionSpineEdge;
-    Vec _boundaryCentroid;
-    Vec _secondRingCentroid;
+    HalfEdgeID _deleteBranchSecondRingEdge;
+    VertexID _newAttachVertexID;
     
     //Undo
     HMesh::Manifold undoMani;
     
-    CurrentModification modState;
+
     
+//    BOOL PIN_POINT_SELECTED;
+    Line* _pinPointLine;
 
 }
 
@@ -136,6 +130,8 @@ using namespace HMesh;
         uniforms[UNIFORM_MODELVIEWPROJECTION_MATRIX] = [self.drawShaderProgram uniformLocation:"modelViewProjectionMatrix"];
         uniforms[UNIFORM_NORMAL_MATRIX] = [self.drawShaderProgram uniformLocation:"normalMatrix"];
         _manifold = HMesh::Manifold();
+        
+        _modState = MODIFICATION_NONE;
     }
     return self;
 }
@@ -143,7 +139,7 @@ using namespace HMesh;
 -(void)setMeshFromObjFile:(NSString*)objFilePath {
 
 //    _branchWidth = 1;
-    modState = MODIFICATION_NONE;
+    _modState = MODIFICATION_NONE;
     
     //Load manifold
     _manifold = HMesh::Manifold();
@@ -360,7 +356,7 @@ using namespace HMesh;
     
 }
 
--(BOOL)manifoldIsLoaded {
+-(BOOL)isLoaded; {
     return _manifold.no_vertices() != 0;
 }
 
@@ -368,6 +364,7 @@ using namespace HMesh;
     _manifold.clear();
     [self rebufferWithCleanup:NO bufferData:YES edgeTrace:YES];
 }
+
 
 #pragma mark - FIND VERTEX/FACE NEAR TOUCH POINT
 
@@ -908,7 +905,7 @@ using namespace HMesh;
 #pragma mark - BRANCH CREATION ONE FINGER
 
 -(void)startCreateBranch:(GLKVector3)touchPoint closestPoint:(GLKVector3)closestPoint {
-    if (![self manifoldIsLoaded]) {
+    if (![self isLoaded]) {
         return;
     }
     _startPoint = closestPoint;
@@ -917,14 +914,14 @@ using namespace HMesh;
 }
 
 -(void)continueCreateBranch:(GLKVector3)touchPoint {
-    if (![self manifoldIsLoaded])
+    if (![self isLoaded])
         return;
     
     _touchPoints.push_back(touchPoint);
 }
 
 //-(void)endCreateBranch:(GLKVector3)touchPoint touchedModel:(BOOL)touchedModel{
-//    if(![self manifoldIsLoaded])
+//    if(![self isLoaded])
 //        return;
 //    
 //    [self saveState];
@@ -974,7 +971,7 @@ using namespace HMesh;
 {
     vector<vector<GLKVector3>> empty;
     
-    if (![self manifoldIsLoaded]) {
+    if (![self isLoaded]) {
         return empty;
     }
     
@@ -1260,208 +1257,20 @@ using namespace HMesh;
 }
 
 
-#pragma mark - BRANCH CREATION TWO FINGERS
+#pragma mark - BODY CREATION TWO FINGERS
 
--(void)startCreateBranchFinger1:(GLKVector3)touchPoint1 finger2:(GLKVector3)touchPoint2 {
+-(void)startCreateBodyFinger1:(GLKVector3)touchPoint1 finger2:(GLKVector3)touchPoint2 {
     _touchPoints.clear();
     _touchPoints.push_back(touchPoint1);
     _touchPoints.push_back(touchPoint2);
 }
 
--(void)continueCreateBranchFinger1:(GLKVector3)touchPoint1 finger2:(GLKVector3)touchPoint2 {
+-(void)continueCreateBodyFinger1:(GLKVector3)touchPoint1 finger2:(GLKVector3)touchPoint2 {
     _touchPoints.push_back(touchPoint1);
     _touchPoints.push_back(touchPoint2);
 }
 
--(std::vector<std::vector<GLKVector3>>)endCreateBranchTwoFingersWithTouchedModel:(BOOL)touchedModel {
-    if (![self manifoldIsLoaded]) {
-        return [self endCreateNewBodyTwoFingers];
-    } else {
-        std::vector<std::vector<GLKVector3>> empty;
-        return empty;
-    }
-    
-    if (_touchPoints.size() < 8 || _touchPoints.size() % 2 != 0) {
-        NSLog(@"[PolarAnnularMesh][WARNING] Garbage point data");
-        return vector<vector<GLKVector3>>();
-    }
-    
-    //convert touch points to world space
-    vector<GLKVector2> touchPointsWorld(_touchPoints.size());
-    for (int i = 0; i < _touchPoints.size(); i++)
-    {
-        GLKVector3 worldSpace3 = [Utilities matrix4:self.viewMatrix multiplyVector3:_touchPoints[i]];
-        touchPointsWorld[i] = GLKVector2Make(worldSpace3.x, worldSpace3.y);
-    }
-    
-    //Get skeleton aka joint points
-    vector<GLKVector2> rawSkeleton;
-    vector<float> skeletonWidth;
-    
-    //Find scaled step
-    GLKMatrix3 m = GLKMatrix4GetMatrix3(self.modelViewMatrix);
-    float c_step = GLKVector3Length(GLKMatrix3MultiplyVector3(m, GLKVector3Make(kCENTROID_STEP, 0, 0)));
-//    float c_step = GLKVector3Length([Utilities matrix4:self.viewMatrix multiplyVector4:GLKVector4Make(kCENTROID_STEP, 0, 0, 0)]);
-    [PAMUtilities centroids:rawSkeleton ribWidth:skeletonWidth forTwoFingerTouchPoint:touchPointsWorld withNextCentroidStep:c_step];
-    if (rawSkeleton.size() < 4) {
-        NSLog(@"[PolarAnnularMesh][WARNING] Not enough controids");
-        return vector<vector<GLKVector3>>();
-    }
-    
-    [self saveState];
-    
-    //closest to the first centroid between two fingers vertex in 2D space
-    VertexID touchedVID;
-    GLKVector3 firstCentroid = GLKVector3Lerp(_touchPoints[0], _touchPoints[1], 0.5f);
-    float baseWidth = GLKVector3Distance([Utilities invertVector3:_touchPoints[0] withMatrix:self.modelMatrix],
-                                         [Utilities invertVector3:_touchPoints[1] withMatrix:self.modelMatrix]);
-  
-    if (touchedModel) {
-        touchedVID = [self closestVertexID_3D:firstCentroid];
-    } else {
-        touchedVID = [self closestVertexID_2D:firstCentroid];
-    }
-    
-    //Create new pole
-    VertexID newPoleID;
-    float bWidth;
-    GLKVector3 holeCenter;
-    GLKVector3 holeNorm;
-    HalfEdgeID boundaryHalfEdge;
-    int numOfSpines;
-    
-    BOOL result = [self createHoleAtVertex:touchedVID
-                                     width:baseWidth
-                                  vertexID:&newPoleID
-                               branchWidth:&bWidth
-                                holeCenter:&holeCenter
-                                  holeNorm:&holeNorm
-                          boundaryHalfEdge:&boundaryHalfEdge
-                               numOfSpines:&numOfSpines];
-    if (!result) {
-        return vector<vector<GLKVector3>>();
-    }
-
-    //closest to the first centroid between two fingers vertex in 2D space
-    GLKVector3 touchedV_world = [Utilities matrix4:self.modelViewMatrix
-                                   multiplyVector3:holeCenter];
-    float zValueTouched = touchedV_world.z;
-    
-
-    
-    //Smooth
-    vector<GLKVector2> skeleton = [PAMUtilities laplacianSmoothing:rawSkeleton iterations:3];
-    
-    //Skeleton should start from the branch point
-    GLKVector2 translate = GLKVector2Subtract(GLKVector2Make(touchedV_world.x, touchedV_world.y), skeleton[0]);
-    for (int i = 0; i < skeleton.size(); i++) {
-        skeleton[i] = GLKVector2Add(skeleton[i], translate);
-    }
-    
-    //Get norm vectors for skeleton joints
-    vector<GLKVector2> skeletonNormals;
-    vector<GLKVector2> skeletonTangents;
-    [PAMUtilities normals:skeletonNormals tangents:skeletonTangents forSkeleton:skeleton];
-    
-    //Parse new skeleton and create ribs
-    //Ingore first and last centroids since they are poles
-    int numSpines = numOfSpines * 4;
-    vector<vector<GLKVector3>> allRibs(skeleton.size());
-    vector<GLKVector3> skeletonModel;
-    vector<GLKVector3> skeletonNormalsModel;
-    for (int i = 0; i < skeleton.size(); i++) {
-        GLKVector3 sModel = [Utilities invertVector3:GLKVector3Make(skeleton[i].x, skeleton[i].y, zValueTouched)
-                                          withMatrix:self.modelViewMatrix];
-        
-        //dont preserve translation for norma and tangent
-        float ribWidth = skeletonWidth[i];
-        GLKVector2 stretchedNorm = GLKVector2MultiplyScalar(skeletonNormals[i], ribWidth);
-        GLKVector3 nModel = [Utilities invertVector4:GLKVector4Make(stretchedNorm.x, stretchedNorm.y, 0, 0)
-                                          withMatrix:self.modelViewMatrix];
-        GLKVector3 tModel = [Utilities invertVector4:GLKVector4Make(skeletonTangents[i].x, skeletonTangents[i].y, 0, 0)
-                                          withMatrix:self.modelViewMatrix];
-        
-        if (i == skeleton.size() - 1) {
-            vector<GLKVector3> secondPole;
-            secondPole.push_back(sModel);
-            allRibs[i] = secondPole;
-        } else {
-            vector<GLKVector3> ribs(numSpines);
-            float rot_step = 360.0f/numSpines;
-            for (int j = 0; j < numSpines; j++) {
-                float angle = j * rot_step;
-                GLKQuaternion quat = GLKQuaternionMakeWithAngleAndVector3Axis(GLKMathDegreesToRadians(angle), GLKVector3Normalize(tModel));
-                GLKVector3 newNorm = GLKQuaternionRotateVector3(quat, nModel);
-                GLKVector3 newRibPoint = GLKVector3Add(newNorm, sModel);
-                ribs[j] = newRibPoint;
-            }
-            allRibs[i] = ribs;
-        }
-        
-        skeletonModel.push_back(sModel);
-        skeletonNormalsModel.push_back(nModel);
-    }
-
-    
-    //Rotate the whole branch to go along norm vector of the point touched
-    {
-        GLKVector3 c1 = [Utilities invertVector3:GLKVector3Make(skeleton[0].x, skeleton[0].y, zValueTouched)
-                                      withMatrix:self.modelViewMatrix];
-        GLKVector3 c2 = [Utilities invertVector3:GLKVector3Make(skeleton[1].x, skeleton[1].y, zValueTouched)
-                                      withMatrix:self.modelViewMatrix];
-        GLKVector3 cur_dir = GLKVector3Subtract(c2, c1);
-        GLKVector3 axisOfRotation = GLKVector3CrossProduct(cur_dir, holeNorm);
-        
-        float angle = [Utilities signedAngleBetweenReferenceVector3:cur_dir andVector:holeNorm];
-        
-        GLKQuaternion q_rotate = GLKQuaternionMakeWithAngleAndVector3Axis(angle, GLKVector3Normalize(axisOfRotation));
-        
-        for (int i = 0; i < allRibs.size(); i++) {
-            vector<GLKVector3> ribs = allRibs[i];
-            for (int j = 0; j < ribs.size(); j++) {
-                GLKVector3 temp = GLKVector3Subtract(ribs[j], c1);
-                temp = GLKQuaternionRotateVector3(q_rotate, temp);
-                temp = GLKVector3Add(temp, c1);
-                ribs[j] = temp;
-            }
-            allRibs[i] = ribs;
-        }
-    }
-    
-    VertexID limbPole = [self populateNewLimb:allRibs];
-    assert(is_pole(_manifold, limbPole));
-    
-    Walker wBase1 = _manifold.walker(limbPole);
-    
-    for (; valency(_manifold, wBase1.vertex()) != 3; wBase1 = wBase1.next().opp().next());
-    HalfEdgeID secondLastBoundary = wBase1.prev().halfedge();
-    //    HalfEdgeID secondLastBoundary = wBase1.next().halfedge();
-    wBase1 = wBase1.next().opp(); //halfedge of the boundary ring
-    HalfEdgeID limbBoundaryHalfEdge = wBase1.halfedge();
-    
-    [self stitchBranch:boundaryHalfEdge toBody:limbBoundaryHalfEdge];
-    
-    //smooth
-    Walker smoothWalker = _manifold.walker(secondLastBoundary);
-    vector<VertexID> verteciesToSmooth;
-    for (;!smoothWalker.full_circle(); smoothWalker = smoothWalker.next().opp().next()) {
-        verteciesToSmooth.push_back(smoothWalker.next().vertex()); //boundary
-        verteciesToSmooth.push_back(smoothWalker.vertex()); //second last boundary
-        Walker ws = _manifold.walker(smoothWalker.next().halfedge());
-        for (int s = 0; s < numOfSpines + 1; s++) {
-            ws = ws.next().opp().next();
-            verteciesToSmooth.push_back(ws.vertex());
-        }
-    }
-    _edgeInfo = trace_spine_edges(_manifold);
-    laplacian_smooth_vertex(_manifold, verteciesToSmooth, _edgeInfo, 5);
-    
-    [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
-
-    return vector<vector<GLKVector3>>();
-}
-
--(std::vector<vector<GLKVector3>>)endCreateNewBodyTwoFingers {
+-(std::vector<vector<GLKVector3>>)endCreateBody {
     
     if (_touchPoints.size() < 8 || _touchPoints.size() % 2 != 0) {
         NSLog(@"[PolarAnnularMesh][WARNING] Garbage point data");
@@ -1563,15 +1372,15 @@ using namespace HMesh;
     float closestDist = FLT_MAX;
     
     for (Walker align2 = _manifold.walker(bodyHID); !align2.next().full_circle(); align2 = align2.next()) {
-        float cur_dist = (vPos1 - _manifold.posf(align2.vertex())).length();
+        float cur_dist = (vPos1 - _manifold.posf(align2.opp().vertex())).length();
         
         if (cur_dist < closestDist) {
             closestDist = cur_dist;
             closestHID = align2.halfedge();
         }
     }
-    Walker temp = _manifold.walker(closestHID);
-    closestHID = temp.next().halfedge();
+//    Walker temp = _manifold.walker(closestHID);
+//    closestHID = temp.next().halfedge();
     
     //Stich boundary edges
     vector<HalfEdgeID> bEdges1;
@@ -1781,7 +1590,7 @@ using namespace HMesh;
                     &indices[0]);
     
     //    _branchWidth = 1;
-    modState = MODIFICATION_NONE;
+    _modState = MODIFICATION_NONE;
     
     //Calculate Bounding Box
     Manifold::Vec pmin = Manifold::Vec();
@@ -1820,26 +1629,38 @@ using namespace HMesh;
 #pragma mark - UTILITIES: COMMON BENDING FUCNTIONS
 -(void)createPinPoint:(GLKVector3)touchPoint
 {
-    VertexID vID = [self closestVertexID_3D:touchPoint];
-    _pinVertexID = vID;
-    
-    Walker walker = _manifold.walker(vID).opp();
-    if (_edgeInfo[walker.halfedge()].is_spine()) {
-        walker = walker.next();
+    if (_modState == MODIFICATION_NONE) {
+        VertexID vID = [self closestVertexID_3D:touchPoint];
+        _pinVertexID = vID;
+        _modState = MODIFICATION_PIN_POINT_SET;
+        
+        Walker walker = _manifold.walker(vID).opp();
+        if (_edgeInfo[walker.halfedge()].is_spine()) {
+            walker = walker.next();
+        }
+        assert(!_edgeInfo[walker.halfedge()].is_spine());
+        _pinHalfEdgeID = walker.halfedge();
+        
+
+        NSMutableData* lineData = [[NSMutableData alloc] init];
+        for (Walker ringWalker = _manifold.walker(walker.halfedge());
+             !ringWalker.full_circle();
+             ringWalker = ringWalker.next().opp().next())
+        {
+            Vecf pos = _manifold.posf(ringWalker.vertex());
+            VertexRGBA vertex = {{pos[0], pos[1], pos[2]}, {255,0,0,255}};
+            [lineData appendBytes:&vertex length:sizeof(VertexRGBA)];
+        }
+        
+        _pinPointLine = [[Line alloc] initWithVertexData:lineData];
+        _pinPointLine.lineDrawingMode = GL_LINE_LOOP;
+
     }
-    
-    assert(!_edgeInfo[walker.halfedge()].is_spine());
-    
-    _pinHalfEdgeID = walker.halfedge();
-    
-    vector<VertexID> verticies;
-    for (Walker ringWalker = _manifold.walker(walker.halfedge());
-         !ringWalker.full_circle();
-         ringWalker = ringWalker.next().opp().next())
-    {
-        verticies.push_back(ringWalker.vertex());
-    }
-    [self changeVerticiesColor:verticies toSelected:YES];
+}
+
+-(void)deleteCurrentPinPoint {
+    _modState = MODIFICATION_NONE;
+    _pinPointLine = nil;
 }
 
 -(void)createPivotPoint:(GLKVector3)touchPoint
@@ -2003,7 +1824,7 @@ using namespace HMesh;
 -(void)startTranslatingBranchTreeWithTouchPoint:(GLKVector3)touchPoint
                                     translation:(GLKVector3)translation
 {
-    if (![self manifoldIsLoaded]) {
+    if (![self isLoaded]) {
         return;
     }
     
@@ -2011,14 +1832,14 @@ using namespace HMesh;
     [self setDeformableAreas];
     
     _translation = translation;
-    modState = MODIFICATION_BRANCH_TRANSLATION;
+    _modState = MODIFICATION_BRANCH_TRANSLATION;
     _current_rot_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
     
 }
 
 -(void)continueTranslatingBranchTree:(GLKVector3)translation
 {
-    if (![self manifoldIsLoaded])
+    if (![self isLoaded])
         return;
     
     _translation = translation;
@@ -2026,7 +1847,7 @@ using namespace HMesh;
 
 -(void)endTranslatingBranchTree:(GLKVector3)translation
 {
-    if (![self manifoldIsLoaded])
+    if (![self isLoaded])
         return;
     
     _translation = translation;
@@ -2070,7 +1891,7 @@ using namespace HMesh;
 
     
     
-    modState = MODIFICATION_NONE;
+    _modState = MODIFICATION_PIN_POINT_SET;
     _all_vector_vid.clear();
     
     [self rotateRingsFrom:_deformDirHalfEdge toRingID:_pivotHalfEdgeID];
@@ -2082,7 +1903,7 @@ using namespace HMesh;
 #pragma mark - SCALING THE BRANCH TREE
 
 -(void)startScalingBranchTreeWithTouchPoint:(GLKVector3)touchPoint scale:(float)scale {
-    if (![self manifoldIsLoaded]) {
+    if (![self isLoaded]) {
         return;
     }
     
@@ -2090,19 +1911,19 @@ using namespace HMesh;
     [self setDeformableAreas];
     
     _scaleFactor = scale;
-    modState = MODIFICATION_BRANCH_SCALING;
+    _modState = MODIFICATION_BRANCH_SCALING;
     _current_rot_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
 }
 
 -(void)continueScalingBranchTreeWithScale:(float)scale {
-    if (![self manifoldIsLoaded])
+    if (![self isLoaded])
         return;
     
     _scaleFactor = scale;
 }
 
 -(void)endScalingBranchTreeWithScale:(float)scale {
-    if (![self manifoldIsLoaded])
+    if (![self isLoaded])
         return;
     
     _scaleFactor = scale;
@@ -2143,7 +1964,7 @@ using namespace HMesh;
         _manifold.pos(vid) = newPos;
     }
     
-    modState = MODIFICATION_NONE;
+    _modState = MODIFICATION_PIN_POINT_SET;
     _all_vector_vid.clear();
     
     [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
@@ -2152,7 +1973,7 @@ using namespace HMesh;
 #pragma mark - ROTATION THE BRANCH TREE
 
 -(void)startBendingWithTouhcPoint:(GLKVector3)touchPoint angle:(float)angle {
-    if (![self manifoldIsLoaded]) {
+    if (![self isLoaded]) {
         return;
     }
     
@@ -2160,19 +1981,19 @@ using namespace HMesh;
     [self setDeformableAreas];
     
     _rotAngle = angle;
-    modState = MODIFICATION_BRANCH_ROTATION;
+    _modState = MODIFICATION_BRANCH_ROTATION;
     _current_rot_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
 }
 
 -(void)continueBendingWithWithAngle:(float)angle {
-    if (![self manifoldIsLoaded])
+    if (![self isLoaded])
         return;
     
     _rotAngle = angle;
 }
 
 -(void)endBendingWithAngle:(float)angle {
-    if (![self manifoldIsLoaded])
+    if (![self isLoaded])
         return;
     
     GLKVector3 zAxis = GLKMatrix4MultiplyVector3(GLKMatrix4Invert(self.viewMatrix, NULL), GLKVector3Make(0, 0, -1));
@@ -2211,7 +2032,7 @@ using namespace HMesh;
         _manifold.pos(vid) = newPos;
     }
 
-    modState = MODIFICATION_NONE;
+    _modState = MODIFICATION_PIN_POINT_SET;
     _all_vector_vid.clear();
     
     [self rotateRingsFrom:_deformDirHalfEdge toRingID:_pivotHalfEdgeID];
@@ -2344,7 +2165,7 @@ using namespace HMesh;
                                       scale:(float)scale
                                    velocity:(float)velocity
 {
-    if (![self manifoldIsLoaded]) {
+    if (![self isLoaded]) {
         return;
     }
     
@@ -2431,11 +2252,11 @@ using namespace HMesh;
         }
     }
     
-    modState = MODIFICATION_SCALING;
+    _modState = MODIFICATION_SCULPTING_SCALING;
 }
 
 -(void)changeScalingSingleRibWithScaleFactor:(float)scale {
-    if (![self manifoldIsLoaded])
+    if (![self isLoaded])
         return;
     
     _scaleFactor = scale;
@@ -2443,14 +2264,14 @@ using namespace HMesh;
 
 -(void)endScalingSingleRibWithScaleFactor:(float)scale {
     
-    if (![self manifoldIsLoaded])
+    if (![self isLoaded])
         return;
     
     for (int i = 0; i < _edges_to_scale.size(); i++) {
         change_rib_radius(_manifold, _edges_to_scale[i], _centroids[i], _edgeInfo, 1 + (_scaleFactor - 1)*_scale_weight_vector[i]); //update _manifold
     }
     
-    modState = MODIFICATION_NONE;
+    _modState = MODIFICATION_NONE;
     
     _edges_to_scale.clear();
     _all_vector_vid.clear();
@@ -2458,135 +2279,16 @@ using namespace HMesh;
     [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
 }
 
-
-
-#pragma mark - TOUCHES: MULTIPLE RING SCALING
--(void)startScalingRibsWithRayOrigin1:(GLKVector3)rayOrigin1
-                           rayOrigin2:(GLKVector3)rayOrigin2
-                        rayDirection1:(GLKVector3)rayDir1
-                        rayDirection2:(GLKVector3)rayDir2
-                                scale:(float)scale
-{
-    if (![self manifoldIsLoaded])
-        return;
-    
-    _scaleRibFace1 = [self closestFaceForRayOrigin:rayOrigin1 direction:rayDir1 didHitModel:NULL];
-    _scaleRibFace2 = [self closestFaceForRayOrigin:rayOrigin2 direction:rayDir2 didHitModel:NULL];
-    
-    Walker w1 = _manifold.walker(_scaleRibFace1);
-    Walker w2 = _manifold.walker(_scaleRibFace2);
-    
-    //TODO handle triangles
-    if (_edgeInfo[w1.halfedge()].edge_type != SPINE) {
-        w1 = w1.next();
-    }
-    assert(_edgeInfo[w1.halfedge()].edge_type == SPINE);
-    
-    if (_edgeInfo[w2.halfedge()].edge_type != SPINE) {
-        w2 = w2.next();
-    }
-    assert(_edgeInfo[w2.halfedge()].edge_type == SPINE);
-    
-    //test which direction to go from face1 to reach face2
-    //i.e. find out rib edges in between fingers
-    Vec w1pos1 = _manifold.pos(w1.vertex());
-    Vec w1pos2 = _manifold.pos(w1.opp().vertex());
-    Vec w2pos1 = _manifold.pos(w2.vertex());
-    Vec w2pos2 = _manifold.pos(w2.opp().vertex());
-    
-    if ((w1pos2 - w2pos1).length() < (w1pos1 - w2pos1).length()) {
-        //w1.opp is closer
-        w1 = w1.opp();
-    }
-    
-    if ((w2pos2 - w1pos1).length() < (w2pos1 - w1pos1).length()) {
-        //w2.opp is closer
-        w2 = w2.opp();
-    }
-    
-    HalfEdgeID finalRib = w2.next().halfedge();
-
-    _edges_to_scale.clear();
-    _all_vector_vid.clear();
-
-    while (!lie_on_same_rib(_manifold, w1.next().halfedge(), finalRib, _edgeInfo)) {
-        _edges_to_scale.push_back(w1.next().halfedge());
-        vector<VertexID> vector_vid = verticies_along_the_rib(_manifold, w1.next().halfedge(), _edgeInfo);
-        _all_vector_vid.insert(_all_vector_vid.end(), vector_vid.begin(), vector_vid.end());
-        w1 =  w1.next().opp().next();
-    }
-    _edges_to_scale.push_back(w1.next().halfedge());
-    vector<VertexID> vector_vid = verticies_along_the_rib(_manifold, w1.next().halfedge(), _edgeInfo); //last one
-    _all_vector_vid.insert(_all_vector_vid.end(), vector_vid.begin(), vector_vid.end());
-
-    _current_scale_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
-    
-    _scaleFactor = scale;
-    
-    //Calculate centroids and gaussian weights
-    _centroids = centroid_for_ribs(_manifold, _edges_to_scale, _edgeInfo);
-    Vec3f base;
-    if (_centroids.size() % 2 == 0) {
-        Vec3f b1 = _centroids[_centroids.size()/2 -1];
-        Vec3f b2 = _centroids[_centroids.size()/2];
-        base = 0.5*(b1 + b2);
-    } else {
-        base = _centroids[_centroids.size()/2];
-    }
-    
-    
-    _scale_weight_vector.clear();
-    if (_centroids.size() == 1) {
-        _scale_weight_vector.push_back(1.0f);
-    } else {
-        float r = (base - _centroids[0]).length();
-        for(int i = 0; i < _centroids.size(); i++)
-        {
-            CGLA::Vec3f c = _centroids[i];
-            float l = sqr_length(base - c);
-            _scale_weight_vector.push_back(exp(-l/(2*r*r)));
-        }
-    }
-    
-
-
-    
-    modState = MODIFICATION_SCALING;
-    [self changeVerticiesColor:_all_vector_vid toSelected:YES];
-    
-    NSLog(@"Finished calling begin scalling funtion");
-}
-
--(void)changeScalingRibsWithScaleFactor:(float)scale {
-    if (![self manifoldIsLoaded])
-        return;
-    
-    _scaleFactor = scale;
-}
-
--(void)endScalingRibsWithScaleFactor:(float)scale {
-    
-    if (![self manifoldIsLoaded])
-        return;
-    
-    for (int i = 0; i < _edges_to_scale.size(); i++) {
-        change_rib_radius(_manifold, _edges_to_scale[i], _centroids[i], _edgeInfo, 1 + (_scaleFactor - 1)*_scale_weight_vector[i]); //update _manifold
-    }
-
-    [self changeVerticiesColor:_all_vector_vid toSelected:NO];
-    
-    modState = MODIFICATION_NONE;
-
-    _edges_to_scale.clear();
-    _all_vector_vid.clear();
-    
-    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
-}
 
 #pragma mark - DELETING BRANCH
--(void)startDeletingBranch:(GLKVector3)touchPoint
+-(BOOL)detachBranch:(GLKVector3)touchPoint
 {
-    VertexID touchVID = [self closestVertexID_3D:touchPoint];
+    if (_modState != MODIFICATION_PIN_POINT_SET) {
+        NSLog(@"[WARNING][PolarAnnularMesh] Cant detach. Pin point is not chosen");
+        return NO;
+    }
+    
+    VertexID touchVID = [self closestVertexID_2D:touchPoint];
     VertexID pinV = _pinVertexID;
 
     //snap to RIB_JUNCTION. Check if RIB_JUNCTION is close to pin point;
@@ -2595,7 +2297,6 @@ using namespace HMesh;
     if (_edgeInfo[_pinHalfEdgeID].edge_type == RIB_JUNCTION) {
         IS_RIB_JUNCTION = YES;
     } else {
-        
         Walker upToJunction = _manifold.walker(_pinVertexID);
         if (!_edgeInfo[upToJunction.halfedge()].is_spine()) {
             upToJunction = upToJunction.prev().opp();
@@ -2630,9 +2331,9 @@ using namespace HMesh;
         }
     }
     
-    
     if (valency(_manifold, pinV) == 6) {
-        return;
+        NSLog(@"stop here");
+        return NO;
     }
 
     Vec pinPos = _manifold.pos(pinV);
@@ -2696,15 +2397,14 @@ using namespace HMesh;
     [self setBranchToDelete:toWalker];
 
     //Save info
-    _deleteLowerBoundaryRibEdge = toWalker.prev().halfedge(); //botton rib
+    _deleteBodyUpperRibEdge = toWalker.prev().halfedge(); //botton rib
     _deleteDirectionSpineEdge = toWalker.halfedge(); //spine
-    _deleteUpperBoundaryRibEdge = toWalker.next().halfedge(); //top rib
-    _boundaryCentroid = Vec(centroid_for_rib(_manifold, _deleteUpperBoundaryRibEdge, _edgeInfo));
-    _secondRingCentroid = Vec(centroid_for_rib(_manifold, toWalker.next().opp().next().next().opp().next().next().halfedge(), _edgeInfo));
+    _deleteBranchLowerRibEdge = toWalker.next().halfedge(); //top rib
+    _deleteBranchSecondRingEdge = toWalker.next().opp().next().next().opp().next().next().halfedge();
     
-    //Delet all connecting boundary spine edges
+    //Delete all connecting boundary spine edges
     vector<HalfEdgeID> edgesToDelete;
-    for (Walker boundaryW = _manifold.walker(_deleteLowerBoundaryRibEdge);
+    for (Walker boundaryW = _manifold.walker(_deleteBodyUpperRibEdge);
          !boundaryW.full_circle();
          boundaryW = boundaryW.next().opp().next())
     {
@@ -2715,53 +2415,76 @@ using namespace HMesh;
     }
     
     [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
-    
-    //hide the branch I want to delete
-//    [self changeVerticiesColor:_all_vector_vid toColor:Vec4uc(0, 0, 0, 0)];
-//    [self changeWireFrameColor:_all_vector_vid toColor:Vec4uc(0, 0, 0, 0)];
     [self changeVerticiesColor:_all_vector_vid toSelected:YES];
+    
+    _pinPointLine = nil;
+    _modState = MODIFICATION_BRANCH_DETACHED;
+    return YES;
 }
 
--(void)endDeletingBranch:(GLKVector3)touchPoint touchedModel:(BOOL)touchedModel {
-    if (!touchedModel) {
-        //Delete verticies
-        for (VertexID vID: _all_vector_vid) {
-            _manifold.remove_vertex(vID);
+-(BOOL)deleteBranch:(GLKVector3)touchPoint {
+    if (_modState != MODIFICATION_PIN_POINT_SET) {
+        NSLog(@"[WARNING][PolarAnnularMesh] Cant delete. Pin point is not chosen");
+        return NO;
+    }
+    
+    if (![self detachBranch:touchPoint]) {
+        return NO;
+    }
+    
+    //Delete verticies
+    for (VertexID vID: _all_vector_vid) {
+        _manifold.remove_vertex(vID);
+    }
+    
+    Walker boundaryW = _manifold.walker(_deleteBodyUpperRibEdge);
+    float boundaryRadius = rib_radius(_manifold, _deleteBodyUpperRibEdge, _edgeInfo);
+    
+    if (_deletingBranchFromBody) {
+        int numOfEdges;
+        [self closeHole:_deleteBodyUpperRibEdge numberOfRingEdges:&numOfEdges];
+        Walker bWalkerOuter = _manifold.walker(boundaryW.opp().halfedge());
+        
+        vector<VertexID> vertexToSmooth;
+        for (int i = 0; i < numOfEdges; i++) {
+            vertexToSmooth.push_back(bWalkerOuter.vertex());
+            bWalkerOuter = bWalkerOuter.next().opp().next();
         }
         
-        Walker boundaryW = _manifold.walker(_deleteLowerBoundaryRibEdge);
-        float boundaryRadius = rib_radius(_manifold, _deleteLowerBoundaryRibEdge, _edgeInfo);
+        [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
         
-        if (_deletingBranchFromBody) {
-            int numOfEdges;
-            [self closeHole:_deleteLowerBoundaryRibEdge numberOfRingEdges:&numOfEdges];
-            Walker bWalkerOuter = _manifold.walker(boundaryW.opp().halfedge());
-            
-            vector<VertexID> vertexToSmooth;
-            for (int i = 0; i < numOfEdges; i++) {
-                vertexToSmooth.push_back(bWalkerOuter.vertex());
-                bWalkerOuter = bWalkerOuter.next().opp().next();
-            }
-            
-            [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
-            
-            [self smoothVerticies:vertexToSmooth iter:20 isSpine:YES brushSize:boundaryRadius];
-            [self smoothVerticies:vertexToSmooth iter:2 isSpine:NO brushSize:boundaryRadius/2];
-        } else {
-            VertexID poleVID = pole_from_hole(_manifold, boundaryW.halfedge());
-            [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
-            [self smoothPole:poleVID edgeDepth:3 iter:2];
-        }
-        [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
+        [self smoothVerticies:vertexToSmooth iter:20 isSpine:YES brushSize:boundaryRadius];
+        [self smoothVerticies:vertexToSmooth iter:2 isSpine:NO brushSize:boundaryRadius/2];
     } else {
-        [self moveBranchToPoint:touchPoint];
-        
-        Walker boundaryW = _manifold.walker(_deleteLowerBoundaryRibEdge);
-        float boundaryRadius = rib_radius(_manifold, _deleteLowerBoundaryRibEdge, _edgeInfo);
+        VertexID poleVID = pole_from_hole(_manifold, boundaryW.halfedge());
+        [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
+        [self smoothPole:poleVID edgeDepth:3 iter:2];
+    }
+    [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
+    [self deleteCurrentPinPoint];
+    
+    return YES;
+}
+
+-(BOOL)attachDetachedBranch
+{
+    if (_modState != MODIFICATION_BRANCH_DETACHED &&
+        _modState != MODIFICATION_BRANCH_DETACHED_AN_MOVED)
+    {
+        NSLog(@"[WARNING][PolarAnnularMesh] Cant attach. Havent detached");
+        return NO;
+    }
+    
+    if (_modState == MODIFICATION_BRANCH_DETACHED) {
+        [self stitchBranch:_deleteBodyUpperRibEdge toBody:_deleteBranchLowerRibEdge];
+        [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
+    } else if (_modState == MODIFICATION_BRANCH_DETACHED_AN_MOVED) {
+        Walker boundaryW = _manifold.walker(_deleteBodyUpperRibEdge);
+        float boundaryRadius = rib_radius(_manifold, _deleteBodyUpperRibEdge, _edgeInfo);
         
         int numOfEdges;
         if (_deletingBranchFromBody) {
-            [self closeHole:_deleteLowerBoundaryRibEdge numberOfRingEdges:&numOfEdges];
+            [self closeHole:_deleteBodyUpperRibEdge numberOfRingEdges:&numOfEdges];
             Walker bWalkerOuter = _manifold.walker(boundaryW.opp().halfedge());
             
             vector<VertexID> vertexToSmooth;
@@ -2780,9 +2503,9 @@ using namespace HMesh;
             [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
             [self smoothPole:poleVID edgeDepth:3 iter:2];
         }
-
-        VertexID touchedVID = [self closestVertexID_3D:touchPoint];
-
+        
+        VertexID touchedVID = _newAttachVertexID;
+        
         //Create new pole
         VertexID newPoleID;
         float bWidth;
@@ -2796,27 +2519,163 @@ using namespace HMesh;
                                     holeCenter:&holeCenter
                                       holeNorm:&holeNorm
                               boundaryHalfEdge:&boundaryHalfEdge];
+        
+        HalfEdgeID deleteBranchUpperOppRibEdge = _manifold.walker(_deleteBranchLowerRibEdge).opp().halfedge();
+        [self stitchBranch:_deleteBranchLowerRibEdge toBody:boundaryHalfEdge];
+        
+        
+        vector<VertexID> verteciesToSmooth;
+        for (Walker w = _manifold.walker(deleteBranchUpperOppRibEdge); !w.full_circle(); w = w.next().opp().next()) {
+            verteciesToSmooth.push_back(w.vertex());
+        }
+        //        verteciesToSmooth = verticies_along_the_rib(_manifold, deleteBranchUpperOppRibEdge, _edgeInfo);
+        [self smoothVerticies:verteciesToSmooth iter:10 isSpine:YES brushSize:0.1];
+        
+        [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
+    }
+    
+    _all_vector_vid.clear();
+    _modState = MODIFICATION_NONE;
+    return YES;
+}
 
-        HalfEdgeID deleteBranchUpperOppRibEdge = _manifold.walker(_deleteUpperBoundaryRibEdge).opp().halfedge();
-        [self stitchBranch:_deleteUpperBoundaryRibEdge toBody:boundaryHalfEdge];
-        
-        
+-(BOOL)moveDetachedBranchToPoint:(GLKVector3)touchPoint
+{
+    if (_modState != MODIFICATION_BRANCH_DETACHED &&
+        _modState != MODIFICATION_BRANCH_DETACHED_AN_MOVED)
+    {
+        NSLog(@"[WARNING][PolarAnnularMesh] Cant move. Branch was not deattached");
+        return NO;
+    }
+    
+
+    VertexID touchVID = [self closestVertexID_3D:touchPoint];
+    _newAttachVertexID = touchVID ;
+    Vec touchPos = _manifold.pos(touchVID);
+    Vec normal = HMesh::normal(_manifold, touchVID);
+    
+    Vec boundaryCentroid = Vec(centroid_for_boundary_rib(_manifold, _deleteBranchLowerRibEdge, _edgeInfo));
+    Vec secondRingCentroid = Vec(centroid_for_rib(_manifold, _deleteBranchSecondRingEdge, _edgeInfo));
+    Vec toTouchPos = touchPos - boundaryCentroid;
+    secondRingCentroid += toTouchPos;
+    for (VertexID vid: _all_vector_vid) {
+        _manifold.pos(vid) = _manifold.pos(vid) + toTouchPos;
+    }
+
+    Vec currentNorm = secondRingCentroid - touchPos;
+    
+    CGLA::Quatd q;
+    q.make_rot(normalize(currentNorm), normalize(normal));
+    
+    for (VertexID vid: _all_vector_vid) {
+        Vec p = _manifold.pos(vid);
+        p -= touchPos;
+        p = q.apply(p);
+        p += touchPos;
+        _manifold.pos(vid) = p;
+    }
+    
+    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
+    [self changeVerticiesColor:_all_vector_vid toSelected:YES];
+    _modState = MODIFICATION_BRANCH_DETACHED_AN_MOVED;
+    return YES;
+}
+
+//-(void)endDeletingBranch:(GLKVector3)touchPoint touchedModel:(BOOL)touchedModel {
+//    if (!touchedModel) {
+//        //Delete verticies
+//        for (VertexID vID: _all_vector_vid) {
+//            _manifold.remove_vertex(vID);
+//        }
+//        
+//        Walker boundaryW = _manifold.walker(_deleteBodyUpperRibEdge);
+//        float boundaryRadius = rib_radius(_manifold, _deleteBodyUpperRibEdge, _edgeInfo);
+//        
+//        if (_deletingBranchFromBody) {
+//            int numOfEdges;
+//            [self closeHole:_deleteBodyUpperRibEdge numberOfRingEdges:&numOfEdges];
+//            Walker bWalkerOuter = _manifold.walker(boundaryW.opp().halfedge());
+//            
+//            vector<VertexID> vertexToSmooth;
+//            for (int i = 0; i < numOfEdges; i++) {
+//                vertexToSmooth.push_back(bWalkerOuter.vertex());
+//                bWalkerOuter = bWalkerOuter.next().opp().next();
+//            }
+//            
+//            [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
+//            
+//            [self smoothVerticies:vertexToSmooth iter:20 isSpine:YES brushSize:boundaryRadius];
+//            [self smoothVerticies:vertexToSmooth iter:2 isSpine:NO brushSize:boundaryRadius/2];
+//        } else {
+//            VertexID poleVID = pole_from_hole(_manifold, boundaryW.halfedge());
+//            [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
+//            [self smoothPole:poleVID edgeDepth:3 iter:2];
+//        }
+//        [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
+//    } else {
+//        [self moveBranchToPoint:touchPoint];
+//        
+//        Walker boundaryW = _manifold.walker(_deleteBodyUpperRibEdge);
+//        float boundaryRadius = rib_radius(_manifold, _deleteBodyUpperRibEdge, _edgeInfo);
+//        
+//        int numOfEdges;
+//        if (_deletingBranchFromBody) {
+//            [self closeHole:_deleteBodyUpperRibEdge numberOfRingEdges:&numOfEdges];
+//            Walker bWalkerOuter = _manifold.walker(boundaryW.opp().halfedge());
+//            
+//            vector<VertexID> vertexToSmooth;
+//            for (int i = 0; i < numOfEdges; i++) {
+//                vertexToSmooth.push_back(bWalkerOuter.vertex());
+//                bWalkerOuter = bWalkerOuter.next().opp().next();
+//            }
+//            
+//            [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
+//            
+//            [self smoothVerticies:vertexToSmooth iter:20 isSpine:YES brushSize:boundaryRadius];
+//            [self smoothVerticies:vertexToSmooth iter:2 isSpine:NO brushSize:boundaryRadius/2];
+//        } else {
+//            VertexID poleVID = pole_from_hole(_manifold, boundaryW.halfedge());
+//            numOfEdges = valency(_manifold, poleVID)/2;
+//            [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
+//            [self smoothPole:poleVID edgeDepth:3 iter:2];
+//        }
+//
+//        VertexID touchedVID = [self closestVertexID_3D:touchPoint];
+//
+//        //Create new pole
+//        VertexID newPoleID;
+//        float bWidth;
+//        GLKVector3 holeCenter, holeNorm;
+//        HalfEdgeID boundaryHalfEdge;
+//        int limbWidth = numOfEdges/2;
+//        BOOL result = [self createHoleAtVertex:touchedVID
+//                                   numOfSpines:limbWidth
+//                                      vertexID:&newPoleID
+//                                   branchWidth:&bWidth
+//                                    holeCenter:&holeCenter
+//                                      holeNorm:&holeNorm
+//                              boundaryHalfEdge:&boundaryHalfEdge];
+//
+//        HalfEdgeID deleteBranchUpperOppRibEdge = _manifold.walker(_deleteBranchLowerRibEdge).opp().halfedge();
+//        [self stitchBranch:_deleteBranchLowerRibEdge toBody:boundaryHalfEdge];
+//        
+//        
 //        vector<VertexID> verteciesToSmooth;
 //        for (Walker w = _manifold.walker(deleteBranchUpperOppRibEdge); !w.full_circle(); w = w.next().opp().next()) {
 //            verteciesToSmooth.push_back(w.vertex());
 //        }        
-//        verteciesToSmooth = verticies_along_the_rib(_manifold, deleteBranchUpperOppRibEdge, _edgeInfo);
+////        verteciesToSmooth = verticies_along_the_rib(_manifold, deleteBranchUpperOppRibEdge, _edgeInfo);
 //        [self smoothVerticies:verteciesToSmooth iter:10 isSpine:YES brushSize:0.1];
-        
-        
-        [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
-//        [self changeVerticiesColor:_all_vector_vid toSelected:YES];
-    }
-    
-
-
-    //    _all_vector_vid.clear();
-}
+//        
+//        
+//        [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
+////        [self changeVerticiesColor:_all_vector_vid toSelected:YES];
+//    }
+//    
+//    _modState = MODIFICATION_NONE;
+//
+//    //    _all_vector_vid.clear();
+//}
 
 -(void)setBranchToDelete:(Walker)deleteDir {
     //Flood rotational area
@@ -2859,41 +2718,6 @@ using namespace HMesh;
 //    [self changeVerticiesColor:floodVerticiesVector toSelected:YES];
 }
 
--(void)moveBranchToPoint:(GLKVector3)touchPoint {
-    if (_all_vector_vid.size() > 0) {
-        VertexID touchVID = [self closestVertexID_3D:touchPoint];
-        Vec touchPos = _manifold.pos(touchVID);
-        Vec normal = HMesh::normal(_manifold, touchVID);
-
-//        Vec boundaryCenter = Vec(centroid_for_rib(_manifold,  _deleteLowerBoundaryRibEdge, _edgeInfo));
-        Vec toTouchPos = touchPos - _boundaryCentroid;
-        _secondRingCentroid += toTouchPos;
-        for (VertexID vid: _all_vector_vid) {
-            _manifold.pos(vid) = _manifold.pos(vid) + toTouchPos;
-        }
-
-        Walker w = _manifold.walker(_deleteUpperBoundaryRibEdge);
-//        Vec secondCenter = Vec(centroid_for_rib(_manifold, w.opp().next().next().opp().next().halfedge(), _edgeInfo));
-        Vec currentNorm = _secondRingCentroid - touchPos;
-
-//        GLKMatrix4 fromOrigin = GLKMatrix4MakeTranslation(toTouchPos[0], toTouchPos[1], toTouchPos[2]);
-//        GLKMatrix4 toOrigin = GLKMatrix4MakeTranslation(-toTouchPos[0], -toTouchPos[1], -toTouchPos[2]);
-//        GLKVector3 currentNormGLK = GLKVector3Normalize(GLKVector3Make(currentNorm[0], currentNorm[1], currentNorm[2]));
-//        GLKVector3 normalGLK = GLKVector3Normalize(GLKVector3Make(normal[0], normal[1], normal[2]));
-//        float angle = [Utilities signedAngleBetweenReferenceVector3:currentNormGLK andVector:normalGLK];
-        
-        CGLA::Quatd q;
-        q.make_rot(normalize(currentNorm), normalize(normal));
-        
-        for (VertexID vid: _all_vector_vid) {
-            Vec p = _manifold.pos(vid);
-            p -= touchPos;
-            p = q.apply(p);
-            p += touchPos;
-            _manifold.pos(vid) = p;
-        }
-    }
-}
 
 -(void)closeHole:(HalfEdgeID)hID numberOfRingEdges:(int*)numOfEdges{
     Walker boundaryW = _manifold.walker(hID);
@@ -3027,7 +2851,7 @@ using namespace HMesh;
 
 #pragma mark - DRAWING
 -(void)updateMesh {
-    if (modState == MODIFICATION_SCALING) {        
+    if (_modState == MODIFICATION_SCULPTING_SCALING) {
         for (int i = 0; i < _edges_to_scale.size(); i ++) {
             scaled_pos_for_rib(_manifold,
                                _edges_to_scale[i],
@@ -3049,7 +2873,7 @@ using namespace HMesh;
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         
     }
-    else if (modState == MODIFICATION_BRANCH_ROTATION)
+    else if (_modState == MODIFICATION_BRANCH_ROTATION)
     {
         GLKVector3 zAxis = GLKMatrix4MultiplyVector3(GLKMatrix4Invert(self.viewMatrix, NULL), GLKVector3Make(0, 0, -1));
         GLKMatrix4 toOrigin = GLKMatrix4MakeTranslation(-_centerOfRotation.x, -_centerOfRotation.y, -_centerOfRotation.z);
@@ -3101,7 +2925,7 @@ using namespace HMesh;
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         
     }
-    else if (modState == MODIFICATION_BRANCH_SCALING)
+    else if (_modState == MODIFICATION_BRANCH_SCALING)
     {
         GLKMatrix4 toOrigin = GLKMatrix4MakeTranslation(-_centerOfRotation.x, -_centerOfRotation.y, -_centerOfRotation.z);
         GLKMatrix4 fromOrigin = GLKMatrix4MakeTranslation(_centerOfRotation.x, _centerOfRotation.y, _centerOfRotation.z);
@@ -3153,7 +2977,7 @@ using namespace HMesh;
         glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     }
-    else if (modState == MODIFICATION_BRANCH_TRANSLATION)
+    else if (_modState == MODIFICATION_BRANCH_TRANSLATION)
     {
         GLKMatrix4 toOrigin = GLKMatrix4MakeTranslation(-_centerOfRotation.x, -_centerOfRotation.y, -_centerOfRotation.z);
         GLKMatrix4 fromOrigin = GLKMatrix4MakeTranslation(_centerOfRotation.x, _centerOfRotation.y, _centerOfRotation.z);
@@ -3254,6 +3078,11 @@ using namespace HMesh;
     [AGLKVertexAttribArrayBuffer drawPreparedArraysWithMode:GL_LINES
                                                    dataType:GL_UNSIGNED_INT
                                                  indexCount:self.wireframeNumOfIndicies];
+    
+    glLineWidth(10.0f);
+    _pinPointLine.viewMatrix = self.viewMatrix;
+    _pinPointLine.projectionMatrix = self.projectionMatrix;
+    [_pinPointLine draw];
     
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);

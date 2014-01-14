@@ -17,7 +17,8 @@ typedef enum {
     MODIFICATION_BRANCH_SCALING,
     MODIFICATION_BRANCH_TRANSLATION,
     MODIFICATION_BRANCH_DETACHED,
-    MODIFICATION_BRANCH_DETACHED_AN_MOVED
+    MODIFICATION_BRANCH_DETACHED_AN_MOVED,
+    MODIFICATION_BRANCH_DETACHED_ROTATE    
 } CurrentModification;
 
 @interface PolarAnnularMesh : Mesh
@@ -104,5 +105,5 @@ typedef enum {
 -(void)showSkeleton:(BOOL)show;
 -(void)showRibJunctions;
 -(BOOL)isLoaded;
--(BOOL)notCurrentlytModified;
+
 @end

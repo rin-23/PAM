@@ -750,6 +750,15 @@ using namespace HMesh;
     laplacian_spine_smooth_verticies(_manifold, allVert, _edgeInfo, iter);
 }
 
+-(void)smoothPole:(VertexID)vID iter:(int)iter {
+    vector<VertexID> neighbours;
+    vector<float> weights;
+    Walker w = _manifold.walker(vID);
+    float brushSize = (_manifold.pos(w.vertex()) - _manifold.pos(vID)).length();
+    [self neighbours:neighbours weigths:weights forVertexID:vID brushSize:brushSize];
+    laplacian_smooth_verticies(_manifold, neighbours, weights, iter);
+}
+
 -(void)smoothVertexID:(VertexID)vID iter:(int)iter isSpine:(bool)isSpine brushSize:(float)brushSize{
     vector<VertexID> neighbours;
     vector<float> weights;
@@ -1118,9 +1127,6 @@ using namespace HMesh;
                                   holeNorm:&holeNorm
                           boundaryHalfEdge:&boundaryHalfEdge];
     
-//    [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
-//    return empty;
-    
     if (!result) {
         [self undo];
         return empty;
@@ -1285,7 +1291,7 @@ using namespace HMesh;
     if (_objLoaded) {
         brush_size = 0.1;
     } else {
-        brush_size = 0.2;
+        brush_size = 0.1;
     }
     
     HalfEdgeAttributeVector<EdgeInfo> edge_info(_manifold.allocated_halfedges());
@@ -1352,7 +1358,7 @@ using namespace HMesh;
         laplacian_spine_smooth_verticies(_manifold, floodVerticies, _edgeInfo, 5);
         laplacian_smooth_verticies(_manifold, floodVerticies, weights,  1);
     } else {
-        laplacian_spine_smooth_verticies(_manifold, floodVerticies, _edgeInfo, 15);
+        laplacian_spine_smooth_verticies(_manifold, floodVerticies, _edgeInfo, 10);
     }
     
 

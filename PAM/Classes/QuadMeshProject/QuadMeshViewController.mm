@@ -86,8 +86,8 @@ typedef enum {
 {
     [super viewDidLoad];
 	// Do any additional setup after loading the view.
-    [self loadMeshData];
-//    [self loadEmptyWorspace];
+//    [self loadMeshData];
+    [self loadEmptyWorspace];
     
     [self setupGL];
     [self addGestureRecognizersToView:self.view];
@@ -735,6 +735,8 @@ typedef enum {
     [self setPaused:YES]; //pause rendering
     
     //Reset all transformations. Remove all previous screws and plates
+    [_pMesh clear];
+    _pMesh = nil;
     [self resetTransformations];
     [self showLoadingIndicator];
     
@@ -927,6 +929,10 @@ typedef enum {
 }
 
 #pragma mark - SettingsViewControllerDelegate
+
+-(void)loadArmadillo {
+    [self loadMeshData];
+}
 
 -(void)showRibJunctions {
     [_pMesh showRibJunctions];

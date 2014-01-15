@@ -520,7 +520,7 @@ using namespace HMesh;
 
 //Create branch at a given vertex. Return VertexID of newly created pole.
 -(BOOL)createBranchAtVertex:(VertexID)vID
-                numOfSpines:(int)width
+                numOfSpines:(int)numOfSegments
                    vertexID:(VertexID*)newPoleID
                 branchWidth:(float*)bWidth
 {
@@ -529,7 +529,18 @@ using namespace HMesh;
         NSLog(@"[WARNING]Tried to create a branch at a pole");
         return NO;
     }
-        
+    
+
+    int leftWidth;
+    int rightWidth;
+    if (numOfSegments%2 != 0) {
+        leftWidth = numOfSegments/2;
+        rightWidth = numOfSegments/2 + 1;
+    } else {
+        leftWidth = numOfSegments/2;
+        rightWidth = numOfSegments/2;
+    }
+    
     //Find rib halfedge that points to a given vertex
     Walker walker = _manifold.walker(vID);
     if (_edgeInfo[walker.halfedge()].edge_type == SPINE) {
@@ -544,7 +555,7 @@ using namespace HMesh;
          !ribWalker.full_circle();
          ribWalker = ribWalker.next().opp().next(), num_of_rib_verticies++);
 
-    if (num_of_rib_verticies < 2*width + 1) {
+    if (num_of_rib_verticies < numOfSegments) {
         NSLog(@"[WARNING]Not enough points to create branh");
         return NO;
     }
@@ -557,7 +568,7 @@ using namespace HMesh;
     //walk right
     int num_rib_found = 0;
     for (Walker ribWalker = walker.next().opp().next();
-         num_rib_found < width;
+         num_rib_found < leftWidth;
          ribWalker = ribWalker.next().opp().next(), num_rib_found++)
     {
         ribs.push_back(ribWalker.vertex());
@@ -566,7 +577,7 @@ using namespace HMesh;
     //walk left
     num_rib_found = 0;
     for (Walker ribWalker = walker.opp();
-         num_rib_found < width;
+         num_rib_found < rightWidth;
          ribWalker = ribWalker.next().opp().next(), num_rib_found++)
     {
         ribs.push_back(ribWalker.vertex());
@@ -1015,7 +1026,7 @@ using namespace HMesh;
         walker = walker.next().opp().next();
     }
     
-    return width;
+    return 2*width + 1;
 }
 
 #pragma mark - BRANCH CREATION ONE FINGER
@@ -1107,6 +1118,9 @@ using namespace HMesh;
                                   holeNorm:&holeNorm
                           boundaryHalfEdge:&boundaryHalfEdge];
     
+//    [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
+//    return empty;
+    
     if (!result) {
         [self undo];
         return empty;
@@ -1175,7 +1189,7 @@ using namespace HMesh;
     
     //Parse new skeleton and create ribs
     //Ingore first and last centroids since they are poles
-    int numSpines = limbWidth * 4;
+    int numSpines = limbWidth*2;
     vector<vector<GLKVector3>> allRibs(skeleton.size());
     vector<GLKVector3> skeletonModel;
     vector<GLKVector3> skeletonNormalsModel;
@@ -2453,6 +2467,7 @@ using namespace HMesh;
         int numOfEdges;
         if (_deletingBranchFromBody) {
             [self closeHole:_deleteBodyUpperRibEdge numberOfRingEdges:&numOfEdges];
+//            numOfEdges = 2*numOfEdges;
             Walker bWalkerOuter = _manifold.walker(boundaryW.opp().halfedge());
             
             vector<VertexID> vertexToSmooth;
@@ -2479,9 +2494,8 @@ using namespace HMesh;
         float bWidth;
         GLKVector3 holeCenter, holeNorm;
         HalfEdgeID boundaryHalfEdge;
-        int limbWidth = numOfEdges/2;
         BOOL result = [self createHoleAtVertex:touchedVID
-                                   numOfSpines:limbWidth
+                                   numOfSpines:numOfEdges
                                       vertexID:&newPoleID
                                    branchWidth:&bWidth
                                     holeCenter:&holeCenter

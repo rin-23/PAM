@@ -14,6 +14,7 @@
 -(void)transformModeIsOn:(BOOL)isOn;
 -(void)clearModel;
 -(void)resetTransformations;
+-(void)loadArmadillo;
 -(void)dismiss;
 @end
 

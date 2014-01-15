@@ -81,7 +81,7 @@
     [_loadArmadillo setTitle:@"Load Armadillo" forState:UIControlStateNormal];
     [_loadArmadillo addTarget:self action:@selector(loadArmadillo:) forControlEvents:UIControlEventTouchUpInside];
     [_loadArmadillo setFrame:CGRectMake(15, nextY + 10, 200, 30)];
-    [self.view addSubview:_showRibJunctionsBtn];
+    [self.view addSubview:_loadArmadillo];
     
     if ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPhone) {
         UIButton* dismissButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
@@ -124,6 +124,10 @@
 
 -(void)showRibJunctions:(UIControl*)sender {
     [self.delegate showRibJunctions];
+}
+
+-(void)loadArmadillo:(UIControl*)sender {
+    [self.delegate loadArmadillo];
 }
 
 -(void)dismissButtonClicked:(UIControl*)sender {

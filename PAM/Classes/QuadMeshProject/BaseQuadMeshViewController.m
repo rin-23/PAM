@@ -56,6 +56,7 @@
     
     if ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad) {
         _settingsPopover = [[UIPopoverController alloc] initWithContentViewController:contentViewContoller];
+        _settingsPopover.popoverContentSize = CGSizeMake(350, 600);
     } else {
         _settingsController = contentViewContoller;
     }

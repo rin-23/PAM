@@ -14,5 +14,8 @@
 
 @property (nonatomic, assign) BOOL transform;
 @property (nonatomic, assign) BOOL showSkeleton;
+@property (nonatomic, assign) float smoothingBrushSize;
+@property (nonatomic, assign) float thinBranchWidth;
+@property (nonatomic, assign) int baseSmoothingIterations;
 
 @end

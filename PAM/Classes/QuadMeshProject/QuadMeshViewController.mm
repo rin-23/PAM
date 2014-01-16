@@ -144,7 +144,6 @@ typedef enum {
 -(void)setupGL {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
-
 }
 
 -(void)addGestureRecognizersToView:(UIView*)view {
@@ -966,6 +965,18 @@ typedef enum {
 -(void)clearModel {
     //overwrite
     [_pMesh clear];
+}
+
+-(void)smoothingBrushSize:(float)brushSize {
+    [SettingsManager sharedInstance].smoothingBrushSize = brushSize;
+}
+
+-(void) baseSmoothingIterations:(float)iter {
+    [SettingsManager sharedInstance].baseSmoothingIterations = iter;
+}
+
+-(void)thinBranchWidth:(float)width {
+    [SettingsManager sharedInstance].thinBranchWidth = width;
 }
 
 -(void)resetTransformations {

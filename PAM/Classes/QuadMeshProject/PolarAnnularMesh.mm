@@ -29,8 +29,9 @@
 #import <OpenGLES/ES2/glext.h>
 #import "PAMUtilities.h"
 #include "Quatd.h"
-
 #include "eigensolution.h"
+#import "SettingsManager.h"
+
 
 #define kCENTROID_STEP 0.025f
 
@@ -1026,7 +1027,7 @@ using namespace HMesh;
 -(int)branchWidthForTouchSpeed:(float)touchSpeed touchPoint:(VertexID)vID {
     float angle = 0;
     if (touchSpeed <= 500) {
-        angle = GLKMathDegreesToRadians(20);
+        angle = GLKMathDegreesToRadians([SettingsManager sharedInstance].thinBranchWidth);
     } else if (touchSpeed > 500  && touchSpeed <= 1100) {
         angle = GLKMathDegreesToRadians(40);
     } else if (touchSpeed > 1100) {
@@ -1045,7 +1046,7 @@ using namespace HMesh;
     
     float cur_angle = 0;
     int width = 0;
-    while (cur_angle <= angle/2) {
+    while (cur_angle < angle/2) {
         Vecf v2 = _manifold.posf(walker.vertex()) - centr;
         GLKVector3 v2glk = GLKVector3Make(v2[0], v2[1], v2[2]);
         cur_angle = [Utilities angleBetweenVector:v1glk andVector:v2glk];
@@ -1134,6 +1135,10 @@ using namespace HMesh;
     HalfEdgeID boundaryHalfEdge;
 
     int limbWidth = [self branchWidthForTouchSpeed:touchSpeed touchPoint:touchedVID];
+    if (limbWidth <= 1 ) {
+        return empty;
+    }
+
     NSLog(@"Limb Width: %i", limbWidth);
     
     BOOL result = [self createHoleAtVertex:touchedVID
@@ -1356,18 +1361,20 @@ using namespace HMesh;
     [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
     number_rib_edges(_manifold, _edgeInfo);
 
+    float smoothingBrushSize = [SettingsManager sharedInstance].smoothingBrushSize;
+    int iterations = [SettingsManager sharedInstance].baseSmoothingIterations;
     if (_objLoaded) {
-        [self smoothAlongRibg:limbOuterHalfEdge iter:5 isSpine:NO brushSize:0.1];
+        [self smoothAlongRibg:limbOuterHalfEdge iter:5 isSpine:NO brushSize:smoothingBrushSize];
     } else {
-        [self smoothAlongRibg:limbOuterHalfEdge iter:20 isSpine:YES brushSize:0.1];
+        [self smoothAlongRibg:limbOuterHalfEdge iter:iterations isSpine:YES brushSize:smoothingBrushSize];
 //        [self smoothAlongRibg:limbOuterHalfEdge iter:1 isSpine:NO brushSize:0.1];
     }
     
     if (shouldStick) {
         if (_objLoaded) {
-            [self smoothAlongRibg:endLimbOuterHaldEdge iter:5 isSpine:NO brushSize:0.1];
+            [self smoothAlongRibg:endLimbOuterHaldEdge iter:5 isSpine:NO brushSize:smoothingBrushSize];
         } else {
-            [self smoothAlongRibg:endLimbOuterHaldEdge iter:20 isSpine:YES brushSize:0.1];
+            [self smoothAlongRibg:endLimbOuterHaldEdge iter:iterations isSpine:YES brushSize:smoothingBrushSize];
 //            [self smoothAlongRibg:endLimbOuterHaldEdge iter:1 isSpine:NO brushSize:0.1];
         }
     }

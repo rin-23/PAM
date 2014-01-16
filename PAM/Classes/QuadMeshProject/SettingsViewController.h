@@ -17,9 +17,13 @@
 -(void)loadArmadillo;
 -(void)dismiss;
 -(void)subdivide;
+-(void)smoothingBrushSize:(float)brushSize;
+-(void)thinBranchWidth:(float)width;
+-(void)baseSmoothingIterations:(float)iter;
 @end
 
-@interface SettingsViewController : UIViewController {
+@interface SettingsViewController : UIViewController <UIScrollViewDelegate> {
+    UIScrollView* contentView;
     UISwitch* _transformSwitch;
     UISwitch* _skeletonSwitch;
     UIButton* _clearModelBtn;
@@ -27,6 +31,11 @@
     UIButton* _showRibJunctionsBtn;
     UIButton* _loadArmadillo;
     UIButton* _subdivide;
+    UISlider* _smoothingSlider;
+    UISlider* _baseSmoothingIterationsSlider;
+    UISlider* _thinBranchWidth;
+    UISlider* _mediumBranchWidthSize;
+    UISlider* _thickBranchWidthSize;
 }
 
 @property (nonatomic, weak) id<SettingsViewControllerDelegate> delegate;

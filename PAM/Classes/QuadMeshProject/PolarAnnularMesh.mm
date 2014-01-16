@@ -22,6 +22,7 @@
 #include <map>
 #include <set>
 #include "smooth.h"
+#include "obj_save.h"
 #import "Line.h"
 #include <queue>
 #import "Vec4uc.h"
@@ -368,6 +369,11 @@ using namespace HMesh;
 -(void)subdivide {
     polar_subdivide(_manifold, 1);
     [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
+}
+
+-(BOOL)saveAsObj:(NSString*)path {
+    bool saved = obj_save(path.UTF8String, _manifold);
+    return saved;
 }
 
 #pragma mark - FIND VERTEX/FACE NEAR TOUCH POINT

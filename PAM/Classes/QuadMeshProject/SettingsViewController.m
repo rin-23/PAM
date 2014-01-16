@@ -30,6 +30,8 @@
     [super viewDidLoad];
 	// Do any additional setup after loading the view.
     contentView = [[UIScrollView alloc] initWithFrame:self.view.bounds];
+    contentView.autoresizingMask=UIViewAutoresizingFlexibleHeight|UIViewAutoresizingFlexibleWidth;
+
     [self.view addSubview:contentView];
     self.view.backgroundColor = [UIColor whiteColor];
     contentView.backgroundColor = [UIColor whiteColor];
@@ -101,6 +103,14 @@
     [contentView addSubview:_subdivide];
     
     nextY = CGRectGetMaxY(_subdivide.frame);
+    _saveObjFile = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+    [_saveObjFile setContentHorizontalAlignment:UIControlContentHorizontalAlignmentLeft];
+    [_saveObjFile setTitle:@"Save and email obj" forState:UIControlStateNormal];
+    [_saveObjFile addTarget:self action:@selector(emailObj:) forControlEvents:UIControlEventTouchUpInside];
+    [_saveObjFile setFrame:CGRectMake(15, nextY + 10, 200, 30)];
+    [contentView addSubview:_saveObjFile];
+    
+    nextY = CGRectGetMaxY(_saveObjFile.frame);
     UILabel* branchCreationHeader = [[UILabel alloc] initWithFrame:CGRectMake(15, nextY + 10, 300, 30)];
     [branchCreationHeader setText:@"BRANCH CREATION"];
     branchCreationHeader.font = [UIFont boldSystemFontOfSize:15.0f];
@@ -161,7 +171,7 @@
         [dismissButton.titleLabel setFont:[UIFont systemFontOfSize:15.0f]];
         [contentView addSubview:dismissButton];
     }
-    contentView.contentSize = CGSizeMake(contentView.frame.size.width, CGRectGetMaxY(contentView.frame));
+    contentView.contentSize = CGSizeMake(300, CGRectGetMaxY(contentView.frame));
 }
 
 -(void)viewWillAppear:(BOOL)animated {
@@ -204,6 +214,10 @@
 
 -(void)subdivide:(UIControl*)sender {
     [self.delegate subdivide];
+}
+
+-(void)emailObj:(UIControl*)sender {
+    [self.delegate emailObj];
 }
 
 -(void)smoothingBrushSize:(UIControl*)sender {

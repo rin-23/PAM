@@ -116,5 +116,6 @@ typedef enum {
 -(void)showRibJunctions;
 -(BOOL)isLoaded;
 -(void)subdivide;
+-(BOOL)saveAsObj:(NSString*)filePath;
 
 @end

@@ -17,6 +17,7 @@
 -(void)loadArmadillo;
 -(void)dismiss;
 -(void)subdivide;
+-(void)emailObj;
 -(void)smoothingBrushSize:(float)brushSize;
 -(void)thinBranchWidth:(float)width;
 -(void)baseSmoothingIterations:(float)iter;
@@ -31,11 +32,13 @@
     UIButton* _showRibJunctionsBtn;
     UIButton* _loadArmadillo;
     UIButton* _subdivide;
+    UIButton* _saveObjFile;
     UISlider* _smoothingSlider;
     UISlider* _baseSmoothingIterationsSlider;
     UISlider* _thinBranchWidth;
     UISlider* _mediumBranchWidthSize;
     UISlider* _thickBranchWidthSize;
+    
 }
 
 @property (nonatomic, weak) id<SettingsViewControllerDelegate> delegate;

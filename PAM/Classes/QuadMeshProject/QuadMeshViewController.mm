@@ -21,6 +21,7 @@
 #import "SettingsManager.h"
 #import "PAMPanGestureRecognizer.h"
 
+
 typedef enum {
     TOUCHED_NONE,
     TOUCHED_MODEL,
@@ -937,7 +938,43 @@ typedef enum {
     }
 }
 
+- (void)mailComposeController:(MFMailComposeViewController*)controller
+          didFinishWithResult:(MFMailComposeResult)result error:(NSError*)error
+{
+	[self dismissViewControllerAnimated:YES completion:NULL];
+}
+
 #pragma mark - SettingsViewControllerDelegate
+
+-(void)emailObj {
+    if ([MFMailComposeViewController canSendMail]) {
+        NSArray* paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+        NSString* cacheFolder = [NSString stringWithFormat:@"%@/ObjFiles", [paths objectAtIndex:0]];
+        if (![[NSFileManager defaultManager] fileExistsAtPath:cacheFolder]) {
+            [[NSFileManager defaultManager] createDirectoryAtPath:cacheFolder withIntermediateDirectories:YES attributes:nil error:nil];
+        }
+        NSString *timeStampValue = [NSString stringWithFormat:@"%ld", (long)[[NSDate date] timeIntervalSince1970]];
+        NSString* filePath = [NSString stringWithFormat:@"%@/obj_%@.obj", cacheFolder, timeStampValue];
+        
+        BOOL saved = [_pMesh saveAsObj:filePath];
+        if (saved) {
+            MFMailComposeViewController *picker = [[MFMailComposeViewController alloc] init];
+            picker.mailComposeDelegate = self;
+            [picker setSubject:@"PAM obj"];
+            // Attach an image to the email
+            NSData *myData = [NSData dataWithContentsOfFile:filePath];
+            if (myData != nil) {
+                [picker addAttachmentData:myData mimeType:@"text/plain" fileName:@"PAM.obj"];
+                [self presentViewController:picker animated:YES completion:nil];
+            } else {
+                [[[UIAlertView alloc] initWithTitle:@"Error" message:@"Could not retrieve obj file" delegate:nil cancelButtonTitle:@"OK" otherButtonTitles:nil] show];
+            }
+        }
+    } else {
+        [[[UIAlertView alloc] initWithTitle:@"Error" message:@"No email account is setup" delegate:nil cancelButtonTitle:@"OK" otherButtonTitles:nil] show];
+    }
+}
+
 
 -(void)subdivide {
     [_pMesh subdivide];

@@ -7,10 +7,11 @@
 //
 
 #import "BaseQuadMeshViewController.h"
+#import <MessageUI/MessageUI.h>
 
 @class RotationManager, ZoomManager, TranslationManager;
 
-@interface QuadMeshViewController : BaseQuadMeshViewController <UIAlertViewDelegate, UIGestureRecognizerDelegate>
+@interface QuadMeshViewController : BaseQuadMeshViewController <UIAlertViewDelegate, UIGestureRecognizerDelegate,  MFMailComposeViewControllerDelegate>
 
 @property (nonatomic) RotationManager* rotationManager;
 @property (nonatomic) ZoomManager* zoomManager;

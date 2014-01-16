@@ -31,9 +31,10 @@ typedef enum {
 -(void)startCreateBranch:(GLKVector3)touchPoint closestPoint:(GLKVector3)closestPoint;
 -(void)continueCreateBranch:(GLKVector3)touchPoint;
 -(std::vector<std::vector<GLKVector3>>)endCreateBranchBended:(GLKVector3)touchPoint
-                                                touchedModel:(BOOL)touchedModel
-                                                   touchSize:(float)touchSize
-                                           averageTouchSpeed:(float)touchSpeed;
+                                 touchedModelStart:(BOOL)touchedModel
+                                   touchedModelEnd:(BOOL)touchedModelEnd                                        shouldStick:(BOOL)shouldStick
+                                         touchSize:(float)touchSize
+                                 averageTouchSpeed:(float)touchSpeed;
 
 #pragma mark - BODY CREATION TWO FINGERS
 -(void)startCreateBodyFinger1:(GLKVector3)touchPoint1 finger2:(GLKVector3)touchPoint2;
@@ -114,5 +115,6 @@ typedef enum {
 -(void)showSkeleton:(BOOL)show;
 -(void)showRibJunctions;
 -(BOOL)isLoaded;
+-(void)subdivide;
 
 @end

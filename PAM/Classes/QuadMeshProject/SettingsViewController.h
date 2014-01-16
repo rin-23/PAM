@@ -16,6 +16,7 @@
 -(void)resetTransformations;
 -(void)loadArmadillo;
 -(void)dismiss;
+-(void)subdivide;
 @end
 
 @interface SettingsViewController : UIViewController {
@@ -25,6 +26,7 @@
     UIButton* _resetBtn;
     UIButton* _showRibJunctionsBtn;
     UIButton* _loadArmadillo;
+    UIButton* _subdivide;
 }
 
 @property (nonatomic, weak) id<SettingsViewControllerDelegate> delegate;

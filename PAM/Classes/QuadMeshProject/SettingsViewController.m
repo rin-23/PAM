@@ -83,6 +83,14 @@
     [_loadArmadillo setFrame:CGRectMake(15, nextY + 10, 200, 30)];
     [self.view addSubview:_loadArmadillo];
     
+    nextY = CGRectGetMaxY(_loadArmadillo.frame);
+    _subdivide = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+    [_subdivide setContentHorizontalAlignment:UIControlContentHorizontalAlignmentLeft];
+    [_subdivide setTitle:@"Subdivide" forState:UIControlStateNormal];
+    [_subdivide addTarget:self action:@selector(subdivide:) forControlEvents:UIControlEventTouchUpInside];
+    [_subdivide setFrame:CGRectMake(15, nextY + 10, 200, 30)];
+    [self.view addSubview:_subdivide];
+    
     if ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPhone) {
         UIButton* dismissButton = [UIButton buttonWithType:UIButtonTypeRoundedRect];
         [dismissButton setBackgroundColor:[UIColor lightGrayColor]];
@@ -130,6 +138,9 @@
     [self.delegate loadArmadillo];
 }
 
+-(void)subdivide:(UIControl*)sender {
+    [self.delegate subdivide];
+}
 -(void)dismissButtonClicked:(UIControl*)sender {
     [self.delegate dismiss];
 }

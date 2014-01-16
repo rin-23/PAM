@@ -422,27 +422,37 @@ typedef enum {
             }
             else if (sender.state == UIGestureRecognizerStateEnded)
             {
-                CGPoint touchPoint = [self touchPointFromGesture:sender];
+                CGPoint velocity = [oneFingerPAMGesture velocityInView:self.view];
+                float cur_speed = sqrtf(powf(velocity.x, 2) + powf(velocity.y, 2));
+
                 GLKVector3 modelCoord;
+                GLKVector3 rayOrigin, rayDirection;
+                
+                BOOL touchedModelStart = _drawingState == TOUCHED_MODEL;
+                BOOL touchedModelEnd = [self modelCoordinates:&modelCoord forGesture:sender];
+//                BOOL shouldStick = cur_speed < 10;
+                BOOL shouldStick = YES;
+                [self rayOrigin:&rayOrigin rayDirection:&rayDirection forGesture:sender];
+                rayOrigin = GLKVector3Add(rayOrigin, rayDirection);
+                
+                GLKVector3 lastPoint;
+                if (shouldStick) {
+                    lastPoint = touchedModelEnd ? modelCoord : rayOrigin;
+                } else {
+                    lastPoint = rayOrigin;
+                }
+                
                 float averageSpeed = _speedSum/_touchCount;
                 NSLog(@"Average Speed: %f", averageSpeed);
-                
                 std::vector<std::vector<GLKVector3>> allRibs;
-                if (_drawingState == TOUCHED_MODEL) {
-                    BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, _gaussianDepth)];
-                    if (!result) {
-                        NSLog(@"[WARNING] Couldn determine touch area");
-                        return;
-                    }
-                    allRibs = [_pMesh endCreateBranchBended:modelCoord touchedModel:YES  touchSize:_touchSize averageTouchSpeed:averageSpeed];
-                } else if (_drawingState == TOUCHED_BACKGROUND){
-                    BOOL result = [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, 0)];
-                    if (!result) {
-                        NSLog(@"[WARNING] Couldn't determine touch area");
-                        return;
-                    }
-                    allRibs = [_pMesh endCreateBranchBended:modelCoord touchedModel:NO touchSize:_touchSize averageTouchSpeed:averageSpeed];
-                }
+                
+                allRibs = [_pMesh endCreateBranchBended:lastPoint
+                                      touchedModelStart:touchedModelStart
+                                        touchedModelEnd:touchedModelEnd
+                                            shouldStick:shouldStick
+                                              touchSize:_touchSize
+                                      averageTouchSpeed:averageSpeed];
+
                 _drawingState = TOUCHED_NONE;
                 _selectionLine = nil;
                 
@@ -493,7 +503,7 @@ typedef enum {
             GLfloat y_ndc = -1*(point.y/pan.view.frame.size.height)*ratio;
 
             GLKVector3 translation = GLKMatrix4MultiplyVector3(GLKMatrix4Invert(viewMatrix, NULL),
-                                                               GLKVector3Make(x_ndc, y_ndc, 0));
+                                                               GLKVector3Make(_translationManager.scaleFactor*x_ndc, _translationManager.scaleFactor*y_ndc, 0));
             
             if (sender.state == UIGestureRecognizerStateBegan) {
                 GLKVector3 modelCoord;
@@ -929,6 +939,10 @@ typedef enum {
 }
 
 #pragma mark - SettingsViewControllerDelegate
+
+-(void)subdivide {
+    [_pMesh subdivide];
+}
 
 -(void)loadArmadillo {
     [self loadMeshData];

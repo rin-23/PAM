@@ -173,24 +173,20 @@
         tangents.push_back(GLKVector3Normalize(t));
     }
 
-    CGLA::Vec3d firstTangent = CGLA::Vec3d(tangents[0].x, tangents[0].y, tangents[0].z);
+    CGLA::Vec3d lastTangent = CGLA::Vec3d(tangents[0].x, tangents[0].y, tangents[0].z);
     GLKVector3 normGLK = [Utilities orthogonalVectorTo:tangents[0]];
-//    float dotProduct = GLKVector3DotProduct(tangents[0], normGLK);
-    CGLA::Vec3d norm = CGLA::Vec3d(normGLK.x, normGLK.y, normGLK.z);
+    CGLA::Vec3d lastNorm = CGLA::Vec3d(normGLK.x, normGLK.y, normGLK.z);
 
     for (int i = 0; i < skeleton.size(); i++) {
-        CGLA::Vec3d curTangent = CGLA::Vec3d(tangents[i].x, tangents[i].y, tangents[i].z);
+        CGLA::Vec3d tangent = CGLA::Vec3d(tangents[i].x, tangents[i].y, tangents[i].z);
         CGLA::Quatd q;
-        q.make_rot(firstTangent, curTangent);
-        CGLA::Vec3d curNorm = q.apply(norm);
+        q.make_rot(lastTangent, tangent);
+        CGLA::Vec3d curNorm = q.apply(lastNorm);
         GLKVector3 curNormGLK = GLKVector3Normalize(GLKVector3Make(curNorm[0], curNorm[1], curNorm[2]));
         normals.push_back(curNormGLK);
+        lastTangent = tangent;
+        lastNorm = curNorm;
     }
-    
-//    GLKMatrix4 rotMat = GLKMatrix4MakeRotation(GLKMathDegreesToRadians(90), 0, 0, 1);
-//    GLKVector3 n = [Utilities matrix4:rotMat multiplyVector3:t];
-//    normals.push_back(GLKVector3Normalize(n));
-    
 }
 
 +(std::vector<GLKVector2>)laplacianSmoothing:(std::vector<GLKVector2>)points

@@ -802,29 +802,33 @@ using namespace HMesh;
     laplacian_spine_smooth_verticies(_manifold, allVert, _edgeInfo, iter);
 }
 
-//Smooth verticies along the rib
+//Smooth verticies along the rib. If isSpine is YES, edge_info must be valid
 -(set<VertexID>)smoothAlongRib:(HalfEdgeID)rib
-                 iter:(int)iter
-              isSpine:(bool)isSpine
-            brushSize:(float)brushSize
-             edgeInfo:(HMesh::HalfEdgeAttributeVector<EdgeInfo>&)edge_info
+                             iter:(int)iter
+                          isSpine:(bool)isSpine
+                        brushSize:(float)brushSize
+                         edgeInfo:(HMesh::HalfEdgeAttributeVector<EdgeInfo>&)edge_info
 {
-    assert(edge_info[rib].is_rib());
     vector<VertexID> vIDs;
     for (Walker w = _manifold.walker(rib); !w.full_circle(); w = w.next().opp().next()) {
         vIDs.push_back(w.vertex());
     }
-    set<VertexID> affectedVerticies = [self smoothVerticies:vIDs iter:iter isSpine:isSpine brushSize:brushSize];
+    set<VertexID> affectedVerticies = [self smoothVerticies:vIDs iter:iter isSpine:isSpine brushSize:brushSize edgeInfo:edge_info];
     return affectedVerticies;
 }
 
 //Smooth at multiple verticies
--(set<VertexID>)smoothVerticies:(vector<VertexID>)vIDs iter:(int)iter isSpine:(bool)isSpine brushSize:(float)brushSize{
+-(set<VertexID>)smoothVerticies:(vector<VertexID>)vIDs
+                           iter:(int)iter
+                        isSpine:(bool)isSpine 
+                      brushSize:(float)brushSize
+                      edgeInfo:(HMesh::HalfEdgeAttributeVector<EdgeInfo>&)edge_info
+{
     set<VertexID> allVerticiesSet;
     [self neighbours:allVerticiesSet forVerticies:vIDs brushSize:brushSize];
     
     if (isSpine) {
-        laplacian_spine_smooth_verticies(_manifold, allVerticiesSet, _edgeInfo, iter);
+        laplacian_spine_smooth_verticies(_manifold, allVerticiesSet, edge_info, iter);
     } else {
         laplacian_smooth_verticies(_manifold, allVerticiesSet, iter);
     }
@@ -836,7 +840,7 @@ using namespace HMesh;
     VertexID closestPoint = [self closestVertexID_3D:touchPoint];
     vector<VertexID> oneVID;
     oneVID.push_back(closestPoint);
-    set<VertexID> affectedVerticies = [self smoothVerticies:oneVID iter:1 isSpine:NO brushSize:0.1];
+    set<VertexID> affectedVerticies = [self smoothVerticies:oneVID iter:1 isSpine:NO brushSize:0.1 edgeInfo:_edgeInfo];
     [self updateVertexPositionOnGPU_Set:affectedVerticies];
     [self updateVertexNormOnGPU_Set:affectedVerticies];
 }
@@ -1073,25 +1077,18 @@ using namespace HMesh;
 }
 
 -(void)continueCreateBranch:(GLKVector3)touchPoint {
-    if (![self isLoaded])
-        return;
-    
     _touchPoints.push_back(touchPoint);
 }
 
-
 -(void)endCreateBranchBended:(GLKVector3)touchPoint
-                                 touchedModelStart:(BOOL)touchedModelStart
-                                   touchedModelEnd:(BOOL)touchedModelEnd
-                                       shouldStick:(BOOL)shouldStick
-                                         touchSize:(float)touchSize
-                                 averageTouchSpeed:(float)touchSpeed
+           touchedModelStart:(BOOL)touchedModelStart
+             touchedModelEnd:(BOOL)touchedModelEnd
+                 shouldStick:(BOOL)shouldStick
+                   touchSize:(float)touchSize
+           averageTouchSpeed:(float)touchSpeed
 {
-//    vector<vector<GLKVector3>> empty;
-    
     if (![self isLoaded]) {
         return;
-//        return empty;
     }
     
     VertexID touchedVID;
@@ -1102,21 +1099,18 @@ using namespace HMesh;
     }
     
     if (is_pole(_manifold, touchedVID)) {
+        //TODO create longer branches
         return;
-//        return empty;
     }
     
-    if ( _touchPoints.size() < 8) {
+    if (_touchPoints.size() < 8) {
         if (_touchPoints.size() >= 2) {
             [self createBumpAtPoint:_touchPoints touchedModel:touchedModelStart touchSpeed:touchSpeed touchSize:touchSize];
         } else {
             NSLog(@"[PolarAnnularMesh][WARNING] Garbage point data");
         }
-//        return empty;
         return;
     }
-    
-    [self saveState];
     
     //convert touch points to world space
     vector<GLKVector3> touchPointsWorld(_touchPoints.size());
@@ -1132,7 +1126,6 @@ using namespace HMesh;
     if (rawSkeleton.size() < 8) {
         NSLog(@"[PolarAnnularMesh][WARNING] Not enough controids");
         [self createBumpAtPoint:_touchPoints touchedModel:touchedModelStart touchSpeed:touchSpeed touchSize:touchSize];
-//        return empty;
         return;
     }
     
@@ -1144,12 +1137,12 @@ using namespace HMesh;
 
     int limbWidth = [self branchWidthForTouchSpeed:touchSpeed touchPoint:touchedVID];
     if (limbWidth <= 1 ) {
-//        return empty;
         return;
     }
 
     NSLog(@"Limb Width: %i", limbWidth);
     
+    [self saveState];
     BOOL result = [self createHoleAtVertex:touchedVID
                                numOfSpines:limbWidth
                                   vertexID:&newPoleID
@@ -1160,7 +1153,6 @@ using namespace HMesh;
     
     if (!result) {
         [self undo];
-//        return empty;
         return;
     }
 
@@ -1176,18 +1168,13 @@ using namespace HMesh;
         }
         if (is_pole(_manifold, END_touchedVID)) {
             [self undo];
-//            return empty;
             return;
         }
         
         //Create new pole
         VertexID END_newPoleID;
         float END_bWidth;
-
-//        HalfEdgeID END_boundaryHalfEdge;
-        
         NSLog(@"Limb Width: %i", limbWidth);
-        
         BOOL result = [self createHoleAtVertex:END_touchedVID
                                    numOfSpines:limbWidth
                                       vertexID:&END_newPoleID
@@ -1198,7 +1185,6 @@ using namespace HMesh;
         
         if (!result) {
             [self undo];
-//            return empty;
             return;
         }
         
@@ -1273,7 +1259,6 @@ using namespace HMesh;
             }
         }
     }
-    skeleton = [PAMUtilities laplacianSmoothing3D:skeleton iterations:1];
     
     //Get norm vectors for skeleton joints
     vector<GLKVector3> skeletonTangents;
@@ -1346,50 +1331,74 @@ using namespace HMesh;
 //    [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
 //    return allRibs;
 
+    vector<Vecf> newLimbVerticies;
+    vector<int>  newLimbFaces;
+    vector<int> newLimbIndices;
+    [self populateNewLimb:allRibs verticies:newLimbVerticies faces:newLimbFaces indicies:newLimbIndices];
     
-    VertexID limbPole = [self populateNewLimb:allRibs];
+    assert(newLimbVerticies.size() != 0);
+    assert(newLimbFaces.size() != 0);
+    assert(newLimbIndices.size() != 0);
+    
+    FaceIDIterator lastFace = _manifold.faces_end();
+    _manifold.build(newLimbVerticies.size(),
+                    reinterpret_cast<float*>(&newLimbVerticies[0]),
+                    newLimbFaces.size(),
+                    &newLimbFaces[0],
+                    &newLimbIndices[0]);
+    
+    lastFace++;
+    Walker w = _manifold.walker(*lastFace);
+    
+    vector<HalfEdgeID> newEdges;
+    vector<VertexID> newVerticies;
+    [self allVerticies:newVerticies halfEdges:newEdges fromVertex:w.vertex()];
+    
+    HalfEdgeID newBranchLowerRibEdge;
+    if (![self boundaryHalfEdgeForClonedMesh:newBranchLowerRibEdge edges:newEdges]) {
+        [self undo];
+        return;
+    }
 
-    assert(is_pole(_manifold, limbPole));
+    Walker lowerBoundaryWalker = _manifold.walker(newBranchLowerRibEdge);
+    HalfEdgeID newBranchUpperRibEdge = lowerBoundaryWalker.opp().halfedge();
     
-    Walker wBase1 = _manifold.walker(limbPole);
-    for (; valency(_manifold, wBase1.vertex()) != 3; wBase1 = wBase1.next().opp().next());
-
-    HalfEdgeID limbOuterHalfEdge = wBase1.next().halfedge();
-    HalfEdgeID limbBoundaryHalfEdge = wBase1.next().opp().halfedge();
-    
-    [self stitchBranch:boundaryHalfEdge toBody:limbBoundaryHalfEdge];
+    [self stitchBranch:boundaryHalfEdge toBody:newBranchLowerRibEdge];
     
     HalfEdgeID endLimbOuterHaldEdge;
     if (shouldStick) {
-        Walker wBaseEnd = _manifold.walker(limbPole);
-        HalfEdgeID endLimbBoundaryHaldEdge = wBaseEnd.next().halfedge();
-        endLimbOuterHaldEdge = wBaseEnd.next().opp().halfedge();
-        _manifold.remove_vertex(limbPole);
-        [self stitchBranch:END_boundaryHalfEdge toBody:endLimbBoundaryHaldEdge];
-    }
-    
-//    [self rebufferWithCleanup:YES bufferData:NO edgeTrace:YES];
-    [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
-    number_rib_edges(_manifold, _edgeInfo);
-
-    float smoothingBrushSize = [SettingsManager sharedInstance].smoothingBrushSize;
-    int iterations = [SettingsManager sharedInstance].baseSmoothingIterations;
-    if (![SettingsManager sharedInstance].spineSmoothing) {
-        [self smoothAlongRib:limbOuterHalfEdge iter:5 isSpine:NO brushSize:smoothingBrushSize edgeInfo:_edgeInfo];
-    } else {
-        [self smoothAlongRib:limbOuterHalfEdge iter:iterations isSpine:YES brushSize:smoothingBrushSize edgeInfo:_edgeInfo];
-//        [self smoothAlongRibg:limbOuterHalfEdge iter:1 isSpine:NO brushSize:0.1];
-    }
-    
-    if (shouldStick) {
-        if (![SettingsManager sharedInstance].spineSmoothing) {
-            [self smoothAlongRib:endLimbOuterHaldEdge iter:5 isSpine:NO brushSize:smoothingBrushSize edgeInfo:_edgeInfo];
-        } else {
-            [self smoothAlongRib:endLimbOuterHaldEdge iter:iterations isSpine:YES brushSize:smoothingBrushSize edgeInfo:_edgeInfo];
-//            [self smoothAlongRibg:endLimbOuterHaldEdge iter:1 isSpine:NO brushSize:0.1];
+        for (VertexID vID: newVerticies) {
+            if (is_pole(_manifold, vID)) {
+                Walker wBaseEnd = _manifold.walker(vID);
+                HalfEdgeID endLimbBoundaryHaldEdge = wBaseEnd.next().halfedge();
+                endLimbOuterHaldEdge = wBaseEnd.next().opp().halfedge();
+                _manifold.remove_vertex(vID);
+                [self stitchBranch:END_boundaryHalfEdge toBody:endLimbBoundaryHaldEdge];
+                break;
+            }
         }
     }
+    
+    float smoothingBrushSize = [SettingsManager sharedInstance].smoothingBrushSize;
+    int iterations = [SettingsManager sharedInstance].baseSmoothingIterations;
+    
+    set<VertexID> affectedVerticies;
+    if (![SettingsManager sharedInstance].spineSmoothing) {
+        affectedVerticies = [self smoothAlongRib:newBranchUpperRibEdge iter:5 isSpine:NO brushSize:smoothingBrushSize edgeInfo:_edgeInfo];
+    } else {
+       [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
+       affectedVerticies = [self smoothAlongRib:newBranchUpperRibEdge iter:iterations isSpine:YES brushSize:smoothingBrushSize edgeInfo:_edgeInfo];
+    }
 
+    if (shouldStick) {
+        if (![SettingsManager sharedInstance].spineSmoothing) {
+           affectedVerticies = [self smoothAlongRib:endLimbOuterHaldEdge iter:5 isSpine:NO brushSize:smoothingBrushSize edgeInfo:_edgeInfo];
+        } else {
+           [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
+            affectedVerticies = [self smoothAlongRib:endLimbOuterHaldEdge iter:iterations isSpine:YES brushSize:smoothingBrushSize edgeInfo:_edgeInfo];
+        }
+    }
+    
     [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
 //    return allRibs;
 }
@@ -1541,10 +1550,10 @@ using namespace HMesh;
 
 #pragma mark - CREATE BRANCH FROM MESH
 
--(VertexID)populateNewLimb:(std::vector<vector<GLKVector3>>)allRibs {
-    vector<Vecf> vertices;
-    vector<int> faces;
-    vector<int> indices;
+-(void)populateNewLimb:(std::vector<vector<GLKVector3>>&)allRibs
+             verticies:(vector<Vecf>&)vertices
+                 faces:(vector<int>&)faces
+              indicies:(vector<int>&) indices {
     
     GLKVector3 poleVec;
     
@@ -1608,17 +1617,6 @@ using namespace HMesh;
             }
         }
     }
-    
-    _manifold.build(vertices.size(),
-                    reinterpret_cast<float*>(&vertices[0]),
-                    faces.size(),
-                    &faces[0],
-                    &indices[0]);
-    
-    VertexID pole = [self closestVertexID_3D:[Utilities matrix4:self.modelMatrix multiplyVector3:poleVec]];
-    assert(is_pole(_manifold, pole));
-    
-    return pole;
 }
 
 
@@ -2483,10 +2481,10 @@ using namespace HMesh;
     }
     
     if (![SettingsManager sharedInstance].spineSmoothing) {
-        [self smoothVerticies:verteciesToSmooth iter:2 isSpine:NO brushSize:0.1];
+        [self smoothVerticies:verteciesToSmooth iter:2 isSpine:NO brushSize:0.1 edgeInfo:_edgeInfo];
     } else {
         [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
-        [self smoothVerticies:verteciesToSmooth iter:10 isSpine:YES brushSize:0.1];
+        [self smoothVerticies:verteciesToSmooth iter:10 isSpine:YES brushSize:0.1 edgeInfo:_edgeInfo];
     }
     
     [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
@@ -2844,8 +2842,8 @@ using namespace HMesh;
         
         [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
         
-        [self smoothVerticies:vertexToSmooth iter:20 isSpine:YES brushSize:boundaryRadius];
-        [self smoothVerticies:vertexToSmooth iter:2 isSpine:NO brushSize:boundaryRadius/2];
+        [self smoothVerticies:vertexToSmooth iter:20 isSpine:YES brushSize:boundaryRadius edgeInfo:_edgeInfo];
+        [self smoothVerticies:vertexToSmooth iter:2 isSpine:NO brushSize:boundaryRadius/2 edgeInfo:_edgeInfo];
     } else {
         VertexID poleVID = pole_from_hole(_manifold, boundaryW.halfedge());
         [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
@@ -2887,8 +2885,8 @@ using namespace HMesh;
             
             [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
             
-            [self smoothVerticies:vertexToSmooth iter:20 isSpine:YES brushSize:boundaryRadius];
-            [self smoothVerticies:vertexToSmooth iter:2 isSpine:NO brushSize:boundaryRadius/2];
+            [self smoothVerticies:vertexToSmooth iter:20 isSpine:YES brushSize:boundaryRadius edgeInfo:_edgeInfo];
+            [self smoothVerticies:vertexToSmooth iter:2 isSpine:NO brushSize:boundaryRadius/2 edgeInfo:_edgeInfo];
         } else {
             VertexID poleVID = pole_from_hole(_manifold, boundaryW.halfedge());
             numOfEdges = valency(_manifold, poleVID)/2;
@@ -2919,7 +2917,7 @@ using namespace HMesh;
             verteciesToSmooth.push_back(w.vertex());
         }
         //        verteciesToSmooth = verticies_along_the_rib(_manifold, deleteBranchUpperOppRibEdge, _edgeInfo);
-        [self smoothVerticies:verteciesToSmooth iter:10 isSpine:YES brushSize:0.1];
+        [self smoothVerticies:verteciesToSmooth iter:10 isSpine:YES brushSize:0.1 edgeInfo:_edgeInfo];
         
         [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
     }

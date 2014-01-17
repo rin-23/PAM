@@ -367,7 +367,7 @@ using namespace HMesh;
     }
 }
 
--(void)updateVerticiesOnGPU:(vector<VertexID>)verticies {
+-(void)updateVertexPositionOnGPU_Vector:(vector<VertexID>&)verticies {
     [self.vertexDataBuffer bind];
     unsigned char* tempVerticies = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
     for (VertexID vid: verticies) {
@@ -376,29 +376,10 @@ using namespace HMesh;
         memcpy(tempVerticies + index*VERTEX_SIZE, posf.get(), VERTEX_SIZE);
     }
     glUnmapBufferOES(GL_ARRAY_BUFFER);
-    
-    [self.normalDataBuffer bind];
-    unsigned char* tempNormal = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
-    for (VertexID vid: verticies) {
-        Vecf normalf = HMesh::normalf(_manifold, vid);
-        int index = vid.index;
-        memcpy(tempNormal + index*VERTEX_SIZE, normalf.get(), VERTEX_SIZE);
-    }
-    glUnmapBufferOES(GL_ARRAY_BUFFER);
-
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
--(void)updateVerticiesSetonGPU:(set<VertexID>)verticies {
-    [self.vertexDataBuffer bind];
-    unsigned char* tempVerticies = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
-    for (VertexID vid: verticies) {
-        Vecf posf = _manifold.posf(vid);
-        int index = vid.index;
-        memcpy(tempVerticies + index*VERTEX_SIZE, posf.get(), VERTEX_SIZE);
-    }
-    glUnmapBufferOES(GL_ARRAY_BUFFER);
-    
+-(void)updateVertexNormOnGPU_Vector:(vector<VertexID>&)verticies {
     [self.normalDataBuffer bind];
     unsigned char* tempNormal = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
     for (VertexID vid: verticies) {
@@ -407,7 +388,30 @@ using namespace HMesh;
         memcpy(tempNormal + index*VERTEX_SIZE, normalf.get(), VERTEX_SIZE);
     }
     glUnmapBufferOES(GL_ARRAY_BUFFER);
-    
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+-(void)updateVertexPositionOnGPU_Set:(set<VertexID>)verticies {
+    [self.vertexDataBuffer bind];
+    unsigned char* tempVerticies = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
+    for (VertexID vid: verticies) {
+        Vecf posf = _manifold.posf(vid);
+        int index = vid.index;
+        memcpy(tempVerticies + index*VERTEX_SIZE, posf.get(), VERTEX_SIZE);
+    }
+    glUnmapBufferOES(GL_ARRAY_BUFFER);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+-(void)updateVertexNormOnGPU_Set:(set<VertexID>&)verticies {
+    [self.normalDataBuffer bind];
+    unsigned char* tempNormal = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
+    for (VertexID vid: verticies) {
+        Vecf normalf = HMesh::normalf(_manifold, vid);
+        int index = vid.index;
+        memcpy(tempNormal + index*VERTEX_SIZE, normalf.get(), VERTEX_SIZE);
+    }
+    glUnmapBufferOES(GL_ARRAY_BUFFER);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
@@ -833,7 +837,8 @@ using namespace HMesh;
     vector<VertexID> oneVID;
     oneVID.push_back(closestPoint);
     set<VertexID> affectedVerticies = [self smoothVerticies:oneVID iter:1 isSpine:NO brushSize:0.1];
-    [self updateVerticiesSetonGPU:affectedVerticies];
+    [self updateVertexPositionOnGPU_Set:affectedVerticies];
+    [self updateVertexNormOnGPU_Set:affectedVerticies];
 }
 
 #pragma mark - SCULPTING BUMPS AND RINGS
@@ -896,7 +901,8 @@ using namespace HMesh;
             _manifold.pos(vid) = _manifold.pos(vid) + displace * weight;
         }
     }    
-    [self updateVerticiesSetonGPU:neighbours];
+    [self updateVertexPositionOnGPU_Set:neighbours];
+    [self updateVertexNormOnGPU_Set:neighbours];
 }
 
 //middlePoint - centroid between tow fingers of a pinch gesture
@@ -920,8 +926,6 @@ using namespace HMesh;
         ribWalker = ribWalker.opp().next();
     }
     assert(_edgeInfo[ribWalker.halfedge()].is_rib());
-    
-    [self saveState];
     
     _edges_to_scale.clear();
     _all_vector_vid.clear();
@@ -993,13 +997,10 @@ using namespace HMesh;
         }
     }
     
-    _modState = MODIFICATION_SCULPTING_SCALING;
+    [self setModState:MODIFICATION_SCULPTING_SCALING];
 }
 
 -(void)changeScalingSingleRibWithScaleFactor:(float)scale {
-    if (![self isLoaded])
-        return;
-    
     _scaleFactor = scale;
 }
 
@@ -1007,18 +1008,22 @@ using namespace HMesh;
     
     if (![self isLoaded])
         return;
+
+    [self saveState];
     
+    vector<VertexID> allAffectedVerticies;
     for (int i = 0; i < _edges_to_scale.size(); i++) {
-        change_rib_radius(_manifold, _edges_to_scale[i], _centroids[i], _edgeInfo, 1 + (_scaleFactor - 1)*_scale_weight_vector[i]); //update _manifold
+        vector<VertexID> affected = change_rib_radius(_manifold, _edges_to_scale[i], _centroids[i], _edgeInfo, 1 + (_scaleFactor - 1)*_scale_weight_vector[i]); //update _manifold
+        allAffectedVerticies.insert(allAffectedVerticies.end(), affected.begin(), affected.end());
     }
     
-    _modState = MODIFICATION_NONE;
-    [self.delegate modStateChangedTo:_modState];
+    [self setModState:MODIFICATION_NONE];
     
+    _scale_weight_vector.clear();
     _edges_to_scale.clear();
     _all_vector_vid.clear();
-    
-    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
+    [self updateVertexPositionOnGPU_Vector:allAffectedVerticies];
+    [self updateVertexNormOnGPU_Vector:allAffectedVerticies];
 }
 
 #pragma mark - UTILITIES BRANCH CREATION
@@ -3225,7 +3230,6 @@ using namespace HMesh;
         }
         
         [self.vertexDataBuffer bind];
-//        glBufferData(GL_ARRAY_BUFFER, self.numVertices*VERTEX_SIZE, NULL, GL_DYNAMIC_DRAW);
         unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
         for (VertexID vid: _all_vector_vid) {
             Vecf pos = _current_scale_position[vid];

@@ -50,7 +50,6 @@
     [settingsIcon addTarget:self action:@selector(settingsButtonClicked:) forControlEvents:UIControlEventTouchUpInside];
     [view addSubview:settingsIcon];
     
-    
     SettingsViewController* contentViewContoller = [[SettingsViewController alloc] init];
     contentViewContoller.delegate = self;
     

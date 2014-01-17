@@ -19,7 +19,8 @@ static SettingsManager* instance = nil;
         _showSkeleton = NO;
         _smoothingBrushSize = 0.1;
         _baseSmoothingIterations = 15;
-        _thinBranchWidth = 20;        
+        _thinBranchWidth = 20;
+        _spineSmoothing = YES;
     }
     return self;
 }

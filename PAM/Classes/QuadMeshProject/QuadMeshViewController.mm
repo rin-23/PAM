@@ -62,6 +62,12 @@ typedef enum {
     UISwipeGestureRecognizer* _twoFingerSwipeUpGesture;
     UISwipeGestureRecognizer* _twoFingerSwipeDownGesture;
     UIPanGestureRecognizer* _twoFingerTranslation;
+    
+    
+    //Auto backup
+    NSTimer* _autoSave;
+    UIAlertView* _restorSessionAlert;
+    
 }
 @end
 
@@ -85,6 +91,10 @@ typedef enum {
 
 #pragma mark - View cycle and OpenGL setup
 
+-(void)dealloc {
+    [self stopBackupTimer];
+}
+
 - (void)viewDidLoad
 {
     [super viewDidLoad];
@@ -94,6 +104,21 @@ typedef enum {
     
     [self setupGL];
     [self addGestureRecognizersToView:self.view];
+    
+    if ([self backupExist]) {
+        _restorSessionAlert = [[UIAlertView alloc] initWithTitle:nil message:@"Restore last session" delegate:self cancelButtonTitle:nil otherButtonTitles:@"Yes", @"No", nil];
+        [_restorSessionAlert show];
+    } else {
+        [self startBackupTimer];
+    }
+    
+    
+    UIButton* undoBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    [undoBtn setFrame:CGRectMake(0, self.view.frame.size.height-100, 100, 100)];
+    [undoBtn addTarget:self action:@selector(undoButtonClicked:) forControlEvents:UIControlEventTouchUpInside];
+    undoBtn.autoresizingMask = UIViewAutoresizingFlexibleTopMargin;
+    [self.view addSubview:undoBtn];
+
 }
 
 - (void)viewDidUnload {
@@ -118,6 +143,7 @@ typedef enum {
 {
     [super didReceiveMemoryWarning];
     // Dispose of any resources that can be recreated.
+    [_pMesh clearMemmory];
 }
 
 -(void) createOffScreenBuffer {
@@ -182,6 +208,7 @@ typedef enum {
     [_twoFingerTranslation requireGestureRecognizerToFail:_twoFingerSwipeDownGesture];
     [_twoFingerTranslation requireGestureRecognizerToFail:_twoFingerSwipeUpGesture];
     [view addGestureRecognizer:_twoFingerTranslation];
+
     
     //Rotate along Z-axis
     UIRotationGestureRecognizer* rotationInPlaneOfScreen = [[UIRotationGestureRecognizer alloc] initWithTarget:self action:@selector(handleRotationGesture:)];
@@ -208,11 +235,27 @@ typedef enum {
     UILongPressGestureRecognizer* longPress = [[ UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGesture:)];
     longPress.numberOfTouchesRequired = 1;
     [view addGestureRecognizer:longPress];
-    
-
 }
 
-//#pragma mark - UIGestureRecognizerDelegate
+-(void)undoButtonClicked:(UIButton*)btn {
+    [_pMesh undo];
+}
+
+#pragma mark - UIGestureRecognizerDelegate
+
+-(void)startBackupTimer {
+    _autoSave = [NSTimer timerWithTimeInterval:30
+                                        target:self
+                                      selector:@selector(backupSession)
+                                      userInfo:nil
+                                       repeats:YES];
+    [[NSRunLoop mainRunLoop] addTimer:_autoSave forMode:NSDefaultRunLoopMode];
+}
+
+-(void)stopBackupTimer {
+    [_autoSave invalidate];
+}
+
 -(BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
 {
     if ([SettingsManager sharedInstance].transform) {
@@ -229,6 +272,76 @@ typedef enum {
     }
     return NO;
 }
+
+#pragma mark - Save/Restore modeling session
+-(void)backupSession {
+    if (_pMesh == nil || ![_pMesh isLoaded]) {
+        return;
+    }
+    
+    dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0ul);
+    dispatch_async(queue, ^{
+        NSArray* paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+        NSString* cacheFolder = [NSString stringWithFormat:@"%@/Backups", [paths objectAtIndex:0]];
+        if (![[NSFileManager defaultManager] fileExistsAtPath:cacheFolder]) {
+            [[NSFileManager defaultManager] createDirectoryAtPath:cacheFolder withIntermediateDirectories:YES attributes:nil error:nil];
+        }
+//        NSString *timeStampValue = [NSString stringWithFormat:@"%ld", (long)[[NSDate date] timeIntervalSince1970]];
+        NSString* filePath = [NSString stringWithFormat:@"%@/backup.obj", cacheFolder];
+        
+        BOOL saved = [_pMesh backup:filePath];
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            if (saved) {
+                NSLog(@"[INFO]Session saved");
+            } else {
+                NSLog(@"[Info]Failed to save session");
+//                [[[UIAlertView alloc] initWithTitle:@"Error" message:@"Coudln't backup session" delegate:nil cancelButtonTitle:@"OK" otherButtonTitles:nil] show];
+            }
+        });
+    });
+}
+
+-(void)restoreLastSession {
+    NSArray* paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    NSString* cacheFolder = [NSString stringWithFormat:@"%@/Backups", [paths objectAtIndex:0]];
+    if ([[NSFileManager defaultManager] fileExistsAtPath:cacheFolder]) {
+
+        [self setPaused:YES]; //pause rendering
+        
+        NSFileManager* fileManager = [NSFileManager defaultManager];
+        NSArray* allBackups = [fileManager contentsOfDirectoryAtPath:cacheFolder error:nil];
+        NSArray* sortedBackups = [allBackups sortedArrayUsingSelector:@selector(localizedCaseInsensitiveCompare:)];
+        NSString* lastPath = [NSString stringWithFormat:@"%@/%@",cacheFolder, [sortedBackups lastObject]];
+        
+        //Reset all transformations. Remove all previous screws and plates
+        [_pMesh clear];
+        _pMesh = nil;
+        [self resetTransformations];
+        
+        if (_pMesh == nil) {
+            _pMesh = [[PolarAnnularMesh alloc] init];
+            _pMesh.delegate = self;
+        }
+        
+        //Load obj file
+        [_pMesh restoreMeshFromObjFile:lastPath];
+        _bbox = _pMesh.boundingBox;
+        _translationManager.scaleFactor = _bbox.radius;
+
+        [self setPaused:NO];
+    }
+}
+
+-(BOOL)backupExist {
+    NSArray* paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    NSString* cacheFolder = [NSString stringWithFormat:@"%@/Backups", [paths objectAtIndex:0]];
+    if (![[NSFileManager defaultManager] fileExistsAtPath:cacheFolder]) {
+        return NO;
+    } else {
+        return YES;
+    }
+}
+
 
 #pragma mark - Gesture recognizer selectors
 -(void)handleLongPressGesture:(UIGestureRecognizer*)sender {
@@ -847,10 +960,9 @@ typedef enum {
     //Load obj file
     NSString* objPath = [[NSBundle mainBundle] pathForResource:@"polarized_from_075_100_refit_simpl_600" ofType:@"obj"];
     [_pMesh setMeshFromObjFile:objPath];
+
     _bbox = _pMesh.boundingBox;
     _translationManager.scaleFactor = _bbox.radius;
-    
-    //Read vertex data from the file
     [self hideLoadingIndicator];
     [self setPaused:NO];
 }
@@ -866,21 +978,9 @@ typedef enum {
         _pMesh = [[PolarAnnularMesh alloc] init];
         _pMesh.delegate = self;
     }
-    
-    //Load obj file
-    _bbox.minBound = GLKVector3Make(-1, -1, -1);
-    _bbox.maxBound = GLKVector3Make(1, 1, 1);
-    _bbox.center =  GLKVector3MultiplyScalar(GLKVector3Add(_bbox.minBound, _bbox.maxBound), 0.5f);
-    
-    GLKVector3 mid = GLKVector3MultiplyScalar(GLKVector3Subtract(_bbox.maxBound, _bbox.minBound), 0.5f);
-    _bbox.radius = GLKVector3Length(mid);
-    _bbox.width = fabsf(_bbox.maxBound.x - _bbox.minBound.x);
-    _bbox.height = fabsf(_bbox.maxBound.y - _bbox.minBound.y);
-    _bbox.depth = fabsf(_bbox.maxBound.z - _bbox.minBound.z);
-    
+       
+    _bbox = _pMesh.boundingBox;
     _translationManager.scaleFactor = _bbox.radius;
-    
-    //Read vertex data from the file
     [self hideLoadingIndicator];
     [self setPaused:NO];
 
@@ -1025,8 +1125,15 @@ typedef enum {
         if (buttonIndex == 0) {
             [_pMesh undo];
         }
-        [alertView dismissWithClickedButtonIndex:buttonIndex animated:YES];
     }
+    
+    if (_restorSessionAlert == alertView) {
+        if (buttonIndex == 0) {
+            [self restoreLastSession];
+            [self startBackupTimer];
+        }
+    }
+    [alertView dismissWithClickedButtonIndex:buttonIndex animated:YES];
 }
 
 - (void)mailComposeController:(MFMailComposeViewController*)controller
@@ -1122,6 +1229,10 @@ typedef enum {
     [SettingsManager sharedInstance].thinBranchWidth = width;
 }
 
+-(void)spineSmoothing:(BOOL)spineSmoothin {
+    [SettingsManager sharedInstance].spineSmoothing = spineSmoothin;
+}
+
 -(void)resetTransformations {
     //overwrite
     [_rotationManager reset];
@@ -1133,10 +1244,11 @@ typedef enum {
 
 #pragma mark - PolarAnnularMeshDelegate
 -(void)modStateChangedTo:(CurrentModification)modState {
-    if (modState == MODIFICATION_NONE) {
+    if (modState == MODIFICATION_NONE) {        
         _twoFingerSwipeUpGesture.enabled = NO;
         _twoFingerSwipeDownGesture.enabled = NO;
     }
 }
+
 
 @end

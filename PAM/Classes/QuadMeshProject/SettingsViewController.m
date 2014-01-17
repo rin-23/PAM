@@ -110,6 +110,10 @@
     [_saveObjFile setFrame:CGRectMake(15, nextY + 10, 200, 30)];
     [contentView addSubview:_saveObjFile];
     
+    /*
+     * BRANCH CREATION
+     */
+    
     nextY = CGRectGetMaxY(_saveObjFile.frame);
     UILabel* branchCreationHeader = [[UILabel alloc] initWithFrame:CGRectMake(15, nextY + 10, 300, 30)];
     [branchCreationHeader setText:@"BRANCH CREATION"];
@@ -117,8 +121,18 @@
     branchCreationHeader.adjustsFontSizeToFitWidth = YES;
     branchCreationHeader.textAlignment = NSTextAlignmentCenter;
     [contentView addSubview:branchCreationHeader];
+
+    nextY = CGRectGetMaxY(branchCreationHeader.frame);
+    UILabel* spineSmoothinLabel = [[UILabel alloc] initWithFrame:CGRectMake(15, nextY, 200, 30)];
+    [spineSmoothinLabel setText:@"Spine smoothing"];
+    [contentView addSubview:spineSmoothinLabel];
     
     nextY = CGRectGetMaxY(branchCreationHeader.frame);
+    _spineSmoothing = [[UISwitch alloc] initWithFrame:CGRectMake(200, nextY, 30, 20)];
+    [_spineSmoothing addTarget:self action:@selector(spineSmoothing:) forControlEvents:UIControlEventValueChanged];
+    [contentView addSubview:_spineSmoothing];
+    
+    nextY = CGRectGetMaxY(_spineSmoothing.frame);
     UILabel* smoothingBrushSize = [[UILabel alloc] initWithFrame:CGRectMake(15, nextY + 10, 300, 30)];
     [smoothingBrushSize setText:@"Base smoothing brush size"];
     smoothingBrushSize.adjustsFontSizeToFitWidth = YES;
@@ -180,6 +194,7 @@
     _smoothingSlider.value = [SettingsManager sharedInstance].smoothingBrushSize;
     _thinBranchWidth.value = [SettingsManager sharedInstance].thinBranchWidth;
     _baseSmoothingIterationsSlider.value = [SettingsManager sharedInstance].baseSmoothingIterations;
+    [_spineSmoothing setOn:[SettingsManager sharedInstance].spineSmoothing];
 }
 
 -(void)didReceiveMemoryWarning
@@ -218,6 +233,11 @@
 
 -(void)emailObj:(UIControl*)sender {
     [self.delegate emailObj];
+}
+
+#pragma mark - BRANCH CREATION
+-(void)spineSmoothing:(UISwitch*)sender {
+    [self.delegate spineSmoothing:sender.isOn];
 }
 
 -(void)smoothingBrushSize:(UIControl*)sender {

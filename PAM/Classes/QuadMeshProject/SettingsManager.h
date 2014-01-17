@@ -17,5 +17,5 @@
 @property (nonatomic, assign) float smoothingBrushSize;
 @property (nonatomic, assign) float thinBranchWidth;
 @property (nonatomic, assign) int baseSmoothingIterations;
-
+@property (nonatomic, assign) BOOL spineSmoothing;
 @end

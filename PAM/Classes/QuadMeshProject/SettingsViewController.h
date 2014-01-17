@@ -18,6 +18,9 @@
 -(void)dismiss;
 -(void)subdivide;
 -(void)emailObj;
+
+//BRANCH CREATION
+-(void)spineSmoothing:(BOOL)spineSmoothin;
 -(void)smoothingBrushSize:(float)brushSize;
 -(void)thinBranchWidth:(float)width;
 -(void)baseSmoothingIterations:(float)iter;
@@ -33,12 +36,14 @@
     UIButton* _loadArmadillo;
     UIButton* _subdivide;
     UIButton* _saveObjFile;
+    
+    //Branch creation
+    UISwitch* _spineSmoothing;
     UISlider* _smoothingSlider;
     UISlider* _baseSmoothingIterationsSlider;
     UISlider* _thinBranchWidth;
     UISlider* _mediumBranchWidthSize;
     UISlider* _thickBranchWidthSize;
-    
 }
 
 @property (nonatomic, weak) id<SettingsViewControllerDelegate> delegate;

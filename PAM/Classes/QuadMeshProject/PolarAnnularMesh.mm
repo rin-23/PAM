@@ -24,6 +24,8 @@
 #include "smooth.h"
 #include "obj_save.h"
 #import "Line.h"
+#include <stack>
+#include <deque>
 #include <queue>
 #import "Vec4uc.h"
 #import <OpenGLES/ES2/gl.h>
@@ -32,7 +34,6 @@
 #include "Quatd.h"
 #include "eigensolution.h"
 #import "SettingsManager.h"
-
 
 #define kCENTROID_STEP 0.025f
 
@@ -48,7 +49,6 @@ using namespace HMesh;
 @interface PolarAnnularMesh() {
     HMesh::Manifold _manifold;
     HMesh::Manifold _skeletonMani;
-    HMesh::Manifold _undoMani;
     HMesh::HalfEdgeAttributeVector<EdgeInfo> _edgeInfo;
     BoundingBox _boundingBox;
     
@@ -106,11 +106,8 @@ using namespace HMesh;
     vector<VertexID> _cloned_verticies;
     vector<VertexID> _original_verticies_copied;
     
-    
+    deque<Manifold> _undoQueue;
     CurrentModification _prevMod;
-    
-    BOOL _objLoaded;
-
 }
 
 @property (nonatomic) AGLKVertexAttribArrayBuffer* normalDataBuffer;
@@ -138,20 +135,31 @@ using namespace HMesh;
         
         uniforms[UNIFORM_MODELVIEWPROJECTION_MATRIX] = [self.drawShaderProgram uniformLocation:"modelViewProjectionMatrix"];
         uniforms[UNIFORM_NORMAL_MATRIX] = [self.drawShaderProgram uniformLocation:"normalMatrix"];
+
         _manifold = HMesh::Manifold();
         
-          _objLoaded = NO;
-        
         _modState = MODIFICATION_NONE;
+        
+        //Load obj file
+        _boundingBox.minBound = GLKVector3Make(-1, -1, -1);
+        _boundingBox.maxBound = GLKVector3Make(1, 1, 1);
+        _boundingBox.center =  GLKVector3MultiplyScalar(GLKVector3Add(_boundingBox.minBound, _boundingBox.maxBound), 0.5f);
+        
+        GLKVector3 mid = GLKVector3MultiplyScalar(GLKVector3Subtract(_boundingBox.maxBound, _boundingBox.minBound), 0.5f);
+        _boundingBox.radius = GLKVector3Length(mid);
+        _boundingBox.width = fabsf(_boundingBox.maxBound.x - _boundingBox.minBound.x);
+        _boundingBox.height = fabsf(_boundingBox.maxBound.y - _boundingBox.minBound.y);
+        _boundingBox.depth = fabsf(_boundingBox.maxBound.z - _boundingBox.minBound.z);
+
     }
     return self;
 }
 
+#pragma mark - LOADING FROM OBJ FILES
+
 -(void)setMeshFromObjFile:(NSString*)objFilePath {
 
-    _modState = MODIFICATION_NONE;
-    [self.delegate modStateChangedTo:_modState];
-    _objLoaded = YES;
+    [self setModState:MODIFICATION_NONE];
     
     //Load manifold
     _manifold = HMesh::Manifold();
@@ -186,7 +194,30 @@ using namespace HMesh;
     [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
 }
 
--(void)rebufferNoEdgetrace {
+-(void)restoreMeshFromObjFile:(NSString*)objFilePath {
+    [self setModState:MODIFICATION_NONE];
+    
+    //Load manifold
+    _manifold = HMesh::Manifold();
+    HMesh::obj_load(objFilePath.UTF8String, _manifold);
+
+    //Load obj file
+    _boundingBox.minBound = GLKVector3Make(-1, -1, -1);
+    _boundingBox.maxBound = GLKVector3Make(1, 1, 1);
+    _boundingBox.center =  GLKVector3MultiplyScalar(GLKVector3Add(_boundingBox.minBound, _boundingBox.maxBound), 0.5f);
+    
+    GLKVector3 mid = GLKVector3MultiplyScalar(GLKVector3Subtract(_boundingBox.maxBound, _boundingBox.minBound), 0.5f);
+    _boundingBox.radius = GLKVector3Length(mid);
+    _boundingBox.width = fabsf(_boundingBox.maxBound.x - _boundingBox.minBound.x);
+    _boundingBox.height = fabsf(_boundingBox.maxBound.y - _boundingBox.minBound.y);
+    _boundingBox.depth = fabsf(_boundingBox.maxBound.z - _boundingBox.minBound.z);
+    
+    [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
+}
+
+#pragma mark - BUFFERING TO GPU
+
+-(void)bufferDataToGPU {
     //Load data
     NSMutableData* positionData = [[NSMutableData alloc] init];
     NSMutableData* normalData = [[NSMutableData alloc] init];
@@ -257,7 +288,7 @@ using namespace HMesh;
         _manifold.cleanup();
     }
     if (bufferData) {
-        [self rebufferNoEdgetrace];
+        [self bufferDataToGPU];
     }
     if (shouldEdgeTrace) {
         _edgeInfo = trace_spine_edges(_manifold);
@@ -336,17 +367,32 @@ using namespace HMesh;
     }
 }
 
+#pragma mark - UTILITIES
+
+-(void)setModState:(CurrentModification)modState {
+    _modState = modState;
+    [self.delegate modStateChangedTo:modState];
+}
+
 -(BoundingBox)boundingBox {
     return _boundingBox;
 }
 
 -(void)saveState {
-    _undoMani = _manifold;
+    if (_undoQueue.size() == 5) {
+        _undoQueue.pop_front();
+    }
+    Manifold undoMani = _manifold;
+    _undoQueue.push_back(undoMani);
 }
 
 -(void)undo {
-    _manifold = _undoMani;
-    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:YES];
+    if (!_undoQueue.empty()) {
+    	_manifold = _undoQueue.back();
+        _undoQueue.pop_back();
+        [self deleteCurrentPinPoint];
+        [self rebufferWithCleanup:NO bufferData:YES edgeTrace:YES];
+    }
 }
 
 -(void)showSkeleton:(BOOL)show {
@@ -390,6 +436,25 @@ using namespace HMesh;
 -(BOOL)saveAsObj:(NSString*)path {
     bool saved = obj_save(path.UTF8String, _manifold);
     return saved;
+}
+
+-(BOOL)backup:(NSString*)path {
+    if (_modState == MODIFICATION_BRANCH_DETACHED ||
+        _modState == MODIFICATION_BRANCH_DETACHED_AN_MOVED ||
+        _modState == MODIFICATION_BRANCH_DETACHED_ROTATE ||
+        _modState == MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE ||
+        _modState == MODIFICATION_BRANCH_CLONE_ROTATION)
+    {
+        return NO;
+    }
+            
+    Manifold copy = _manifold;
+    bool saved = obj_save(path.UTF8String, copy);
+    return saved;
+}
+
+-(void)clearMemmory {
+    _undoQueue.clear();
 }
 
 #pragma mark - FIND VERTEX/FACE NEAR TOUCH POINT
@@ -518,6 +583,8 @@ using namespace HMesh;
     }
 }
 
+#pragma mark - BRANCH CREATION HELPERS
+
 //Create branch at a given vertex. Return VertexID of newly created pole.
 -(BOOL)createHoleAtVertex:(VertexID)vID
               numOfSpines:(int)width
@@ -622,98 +689,6 @@ using namespace HMesh;
     
     return YES;
 }
-
-
--(BOOL)createHoleAtVertex:(VertexID)vID
-                    width:(float)width
-                 vertexID:(VertexID*)newPoleID
-              branchWidth:(float*)bWidth
-               holeCenter:(GLKVector3*)holeCenter
-                 holeNorm:(GLKVector3*)holeNorm
-         boundaryHalfEdge:(HalfEdgeID*)boundayHalfEdge
-              numOfSpines:(int*)numOfSpines
-{
-    BOOL result = [self createBranchAtVertex:vID width:width vertexID:newPoleID branchWidth:bWidth numOfSpines:numOfSpines];
-    if (result) {
-        Vecf vf = _manifold.posf(*newPoleID);
-        Vec n = HMesh::normal(_manifold, *newPoleID);
-        *holeCenter = GLKVector3Make(vf[0], vf[1], vf[2]);
-        *holeNorm = GLKVector3Make(n[0], n[1], n[2]);
-        
-        Walker w = _manifold.walker(*newPoleID);
-        w = w.next();
-        *boundayHalfEdge = w.halfedge();
-        
-        NSLog(@"%i", valency(_manifold, w.vertex()));
-        _manifold.remove_vertex(*newPoleID);
-        
-        return YES;
-    }
-    return NO;
-}
-
-//Create branch at a given vertex with width being distance between two fingers.
-//Return VertexID of newly created pole and actual width if the branch.
--(BOOL)createBranchAtVertex:(VertexID)vID
-                      width:(float)width
-                   vertexID:(VertexID*)newPoleID
-                branchWidth:(float*)bWidth
-                numOfSpines:(int*)numOfSpines
-
-{
-    //Do not add branhes at poles
-    if (is_pole(_manifold, vID)) {
-        NSLog(@"[WARNING]Tried to create a branch at a pole");
-        return NO;
-    }
-    
-    //Find rib halfedge that points to a given vertex
-    Walker walker = _manifold.walker(vID);
-    if (_edgeInfo[walker.halfedge()].edge_type == SPINE) {
-        walker = walker.prev();
-    }
-    assert(_edgeInfo[walker.halfedge()].is_rib()); //its a rib
-    assert(walker.vertex() == vID); //points to a given vertex
-    
-    VertexAttributeVector<int> vs(_manifold.no_vertices(), 0);
-    vs[vID] = 1;
-    
-    vector<VertexID> ribs;
-    
-    Walker ribWalkerRight = walker.next().opp().next();
-    Walker ribWalkerLeft = walker.opp();
-    
-    while (true) {
-        if (ribWalkerRight.vertex() == ribWalkerLeft.vertex()) {
-            NSLog(@"[WARNING][PolarAnnularMesh] Width is too large");
-            return NO;
-        }
-        Vec right_vertex = _manifold.pos(ribWalkerRight.vertex());
-        Vec left_vertex = _manifold.pos(ribWalkerLeft.vertex());
-
-        float walked_distance = (right_vertex - left_vertex).length();
-        if (walked_distance > width) {
-            break;
-        }
-        ribs.push_back(ribWalkerRight.vertex());
-        ribs.push_back(ribWalkerLeft.vertex());
-        ribWalkerRight = ribWalkerRight.next().opp().next();
-        ribWalkerLeft = ribWalkerLeft.next().opp().next();
-    }
-    
-    //Set all verticies to be branched out
-    for (int i = 0; i < ribs.size(); i++) {
-        VertexID cur_vID = ribs[i];
-        vs[cur_vID] = 1;
-    }
-    *numOfSpines = ribs.size()/2;
-    
-    *newPoleID = polar_add_branch(_manifold, vs);
-    refine_branch(_manifold, *newPoleID, *bWidth);
-    
-    return YES;
-}
-
 
 #pragma mark - SMOOTH
 -(void)neighbours:(vector<VertexID>&)neighbours
@@ -1395,7 +1370,7 @@ using namespace HMesh;
 
     float smoothingBrushSize = [SettingsManager sharedInstance].smoothingBrushSize;
     int iterations = [SettingsManager sharedInstance].baseSmoothingIterations;
-    if (_objLoaded) {
+    if (![SettingsManager sharedInstance].spineSmoothing) {
         [self smoothAlongRibg:limbOuterHalfEdge iter:5 isSpine:NO brushSize:smoothingBrushSize];
     } else {
         [self smoothAlongRibg:limbOuterHalfEdge iter:iterations isSpine:YES brushSize:smoothingBrushSize];
@@ -1403,7 +1378,7 @@ using namespace HMesh;
     }
     
     if (shouldStick) {
-        if (_objLoaded) {
+        if (![SettingsManager sharedInstance].spineSmoothing) {
             [self smoothAlongRibg:endLimbOuterHaldEdge iter:5 isSpine:NO brushSize:smoothingBrushSize];
         } else {
             [self smoothAlongRibg:endLimbOuterHaldEdge iter:iterations isSpine:YES brushSize:smoothingBrushSize];
@@ -1779,7 +1754,6 @@ using namespace HMesh;
         return 1 + (centeroid - 1)*totalRib + rib;
     }
 }
-
 
 #pragma mark - UTILITIES: COMMON BENDING FUCNTIONS
 -(void)createPinPoint:(GLKVector3)touchPoint
@@ -2504,7 +2478,7 @@ using namespace HMesh;
         verteciesToSmooth.push_back(w.vertex());
     }
     
-    if (_objLoaded) {
+    if (![SettingsManager sharedInstance].spineSmoothing) {
         [self smoothVerticies:verteciesToSmooth iter:2 isSpine:NO brushSize:0.1];
     } else {
         [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];

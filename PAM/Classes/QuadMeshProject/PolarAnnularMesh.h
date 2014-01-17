@@ -35,7 +35,16 @@ typedef enum {
 @property (nonatomic, assign) CurrentModification modState;
 @property (nonatomic, weak) id<PolarAnnularMeshDelegate> delegate;
 
--(void)setMeshFromObjFile:(NSString*)objFile;
+#pragma mark - Loading Form OBJ files
+/*
+ * Load 3d party obj file
+ */
+-(void)setMeshFromObjFile:(NSString*)objFilePath;
+
+/*
+ * Restore session with previously saved obj file
+ */
+-(void)restoreMeshFromObjFile:(NSString*)objFilePath;
 
 #pragma mark - BRANCH/BUMPS CREATION ONE FINGER
 -(void)startCreateBranch:(GLKVector3)touchPoint closestPoint:(GLKVector3)closestPoint;
@@ -134,5 +143,6 @@ typedef enum {
 -(BOOL)isLoaded;
 -(void)subdivide;
 -(BOOL)saveAsObj:(NSString*)filePath;
-
+-(BOOL)backup:(NSString*)path;
+-(void)clearMemmory;
 @end

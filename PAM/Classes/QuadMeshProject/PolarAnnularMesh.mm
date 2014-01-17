@@ -53,14 +53,19 @@ using namespace HMesh;
     BoundingBox _boundingBox;
     
     //Scaling of Rings
+    vector<VertexID> _sculpt_verticies_to_scale;
     float _scaleFactor;
     vector<float> _scale_weight_vector;
     HMesh::VertexAttributeVector<Vecf> _current_scale_position;
     
-    //Rotation
+    //BRANCH TRANSFORMATION
+    //Common
     VertexID _pinVertexID;
     HalfEdgeID _pinHalfEdgeID;
     HalfEdgeID _pivotHalfEdgeID;
+    set<HMesh::VertexID> _transformed_verticies;
+
+    //Rotation
     float _rotAngle;
     HMesh::VertexAttributeVector<Vecf> _current_rot_position;
     GLKVector3 _centerOfRotation;
@@ -72,14 +77,15 @@ using namespace HMesh;
     //Translation
     GLKVector3 _translation;
     
-    //Selection
+    //Scaling
     vector<HMesh::HalfEdgeID> _edges_to_scale;
-    vector<HMesh::VertexID> _all_vector_vid;
+//    vector<HMesh::VertexID> _all_vector_vid;
     vector<CGLA::Vec3f> _centroids;
     vector<GLKVector3> _touchPoints;
     GLKVector3 _startPoint;
     
     //DELETING AND REPOSITIONING OF THE BRANCH
+    set<VertexID> _detached_verticies;
     BOOL _deletingBranchFromBody;
     HalfEdgeID _deleteBodyUpperRibEdge;
     HalfEdgeID _deleteBranchLowerRibEdge;
@@ -104,9 +110,12 @@ using namespace HMesh;
     vector<int> _copyFaces;
     vector<int> _copyIndices;
     vector<VertexID> _cloned_verticies;
-    vector<VertexID> _original_verticies_copied;
+    set<VertexID> _original_verticies_copied;
     
+    //Undo
     deque<Manifold> _undoQueue;
+    
+    //Modification mode
     CurrentModification _prevMod;
 }
 
@@ -714,7 +723,7 @@ using namespace HMesh;
                            iter:(int)iter
                         isSpine:(bool)isSpine 
                       brushSize:(float)brushSize
-                      edgeInfo:(HMesh::HalfEdgeAttributeVector<EdgeInfo>&)edge_info
+                       edgeInfo:(HMesh::HalfEdgeAttributeVector<EdgeInfo>&)edge_info
 {
     set<VertexID> allVerticiesSet;
     [self neighbours:allVerticiesSet forVerticies:vIDs brushSize:brushSize];
@@ -824,7 +833,7 @@ using namespace HMesh;
     assert(_edgeInfo[ribWalker.halfedge()].is_rib());
     
     _edges_to_scale.clear();
-    _all_vector_vid.clear();
+    _sculpt_verticies_to_scale.clear();
     
     Walker upWalker = _manifold.walker(ribWalker.next().halfedge());
     Walker downWalker = _manifold.walker(ribWalker.opp().next().halfedge());
@@ -841,7 +850,7 @@ using namespace HMesh;
         }
         _edges_to_scale.push_back(upWalker.next().halfedge());
         vector_vid = verticies_along_the_rib(_manifold, upWalker.next().halfedge(), _edgeInfo);
-        _all_vector_vid.insert(_all_vector_vid.end(), vector_vid.begin(), vector_vid.end());
+        _sculpt_verticies_to_scale.insert(_sculpt_verticies_to_scale.end(), vector_vid.begin(), vector_vid.end());
         allDistances.push_back(distance);
         upWalker = upWalker.next().opp().next();
         distance = (origin - _manifold.pos(upWalker.vertex())).length();
@@ -851,7 +860,7 @@ using namespace HMesh;
     allDistances.push_back(distance);
     _edges_to_scale.push_back(ribWalker.halfedge());
     vector_vid = verticies_along_the_rib(_manifold, ribWalker.halfedge(), _edgeInfo);
-    _all_vector_vid.insert(_all_vector_vid.end(), vector_vid.begin(), vector_vid.end());
+    _sculpt_verticies_to_scale.insert(_sculpt_verticies_to_scale.end(), vector_vid.begin(), vector_vid.end());
     
     distance = (origin - _manifold.pos(downWalker.vertex())).length();
     while (distance <= brushSize) {
@@ -860,7 +869,7 @@ using namespace HMesh;
         }
         _edges_to_scale.push_back(downWalker.next().halfedge());
         vector_vid = verticies_along_the_rib(_manifold, downWalker.next().halfedge(), _edgeInfo);
-        _all_vector_vid.insert(_all_vector_vid.end(), vector_vid.begin(), vector_vid.end());
+        _sculpt_verticies_to_scale.insert(_sculpt_verticies_to_scale.end(), vector_vid.begin(), vector_vid.end());
         allDistances.push_back(distance);
         downWalker = downWalker.next().opp().next();
         distance = (origin - _manifold.pos(downWalker.vertex())).length();
@@ -917,7 +926,7 @@ using namespace HMesh;
     
     _scale_weight_vector.clear();
     _edges_to_scale.clear();
-    _all_vector_vid.clear();
+    _sculpt_verticies_to_scale.clear();
     [self updateVertexPositionOnGPU_Vector:allAffectedVerticies];
     [self updateVertexNormOnGPU_Vector:allAffectedVerticies];
 }
@@ -1733,23 +1742,22 @@ using namespace HMesh;
 }
 
 
-
 #pragma mark - UTILITIES: COMMON BENDING FUCNTIONS
 -(void)createPinPoint:(GLKVector3)touchPoint
 {
     if (_modState == MODIFICATION_NONE) {
         VertexID vID = [self closestVertexID_3D:touchPoint];
         _pinVertexID = vID;
-        _modState = MODIFICATION_PIN_POINT_SET;
         
+        //find rib
         Walker walker = _manifold.walker(vID).opp();
         if (_edgeInfo[walker.halfedge()].is_spine()) {
             walker = walker.next();
         }
-        assert(!_edgeInfo[walker.halfedge()].is_spine());
+        assert(_edgeInfo[walker.halfedge()].is_rib());
         _pinHalfEdgeID = walker.halfedge();
         
-
+        //draw pin line
         NSMutableData* lineData = [[NSMutableData alloc] init];
         for (Walker ringWalker = _manifold.walker(walker.halfedge());
              !ringWalker.full_circle();
@@ -1759,82 +1767,103 @@ using namespace HMesh;
             VertexRGBA vertex = {{pos[0], pos[1], pos[2]}, {255,0,0,255}};
             [lineData appendBytes:&vertex length:sizeof(VertexRGBA)];
         }
-        
         _pinPointLine = [[Line alloc] initWithVertexData:lineData];
         _pinPointLine.lineDrawingMode = GL_LINE_LOOP;
-
+        
+        [self setModState:MODIFICATION_PIN_POINT_SET];
     }
 }
 
 -(void)deleteCurrentPinPoint {
-    _modState = MODIFICATION_NONE;
+    [self setModState:MODIFICATION_NONE];
     _pinPointLine = nil;
-    [self.delegate modStateChangedTo:_modState];
 }
 
--(void)createPivotPoint:(GLKVector3)touchPoint
+-(BOOL)createPivotPoint:(GLKVector3)touchPoint
 {
     VertexID vID = [self closestVertexID_3D:touchPoint];
     
+    //find rib edge
     Walker walker = _manifold.walker(vID).opp();
     if (_edgeInfo[walker.halfedge()].is_spine()) {
         walker = walker.next();
     }
-    assert(!_edgeInfo[walker.halfedge()].is_spine());
-    
+    assert(_edgeInfo[walker.halfedge()].is_rib());
     _pivotHalfEdgeID = walker.halfedge();
     
-    vector<VertexID> verticies;
-    for (Walker ringWalker = _manifold.walker(walker.halfedge());
-         !ringWalker.full_circle();
-         ringWalker = ringWalker.next().opp().next())
-    {
-        verticies.push_back(ringWalker.vertex());
-    }
-    [self changeVerticiesColor:verticies toSelected:YES];
+    return YES;
 }
 
--(Walker)pivotDirection
+-(BOOL)toPivotFromPinDirection:(HalfEdgeID&)toPivothID edgeInfo:(HMesh::HalfEdgeAttributeVector<EdgeInfo>&)edge_info
 {
-    //    int pin_loop_id = _edgeInfo[_pinHalfEdgeID].id;
+    number_rib_edges(_manifold, edge_info); // number rings
+
     int pivot_loop_id = _edgeInfo[_pivotHalfEdgeID].id;
+    int pin_loop_id = _edgeInfo[_pinHalfEdgeID].id;
+    
+    if (pivot_loop_id == pin_loop_id) {
+        NSLog(@"[WARNING] Pin is same as pivot rib");
+        return NO;
+    }
     
     //find which way is the pivot
     Walker w1 = _manifold.walker(_pinHalfEdgeID).next();
     Walker w2 = w1.opp().next().opp().next();
-    Walker sW = w1;
     Walker sW1 = w1;
     Walker sW2 = w2;
     
+    BOOL w1ReachedRibJunction = NO;
+    BOOL w2ReachedRibJunction = YES;
+    int iterations = 0;
     while (true) {
         HalfEdgeID hID = w1.next().halfedge();
         HalfEdgeID hID2 = w2.next().halfedge();
         
         if (_edgeInfo[hID].id == pivot_loop_id) {
-            sW = sW1;
-            break;
+            toPivothID = sW1.halfedge();
+            return YES;
         } else if (_edgeInfo[hID2].id == pivot_loop_id) {
-            sW = sW2;
-            break;
+            toPivothID = sW2.halfedge();
+            return YES;
         }
         
         if (_edgeInfo[hID].edge_type != RIB_JUNCTION) {
             w1 = w1.next().opp().next();
+        } else {
+            w1ReachedRibJunction = YES;
         }
         
         if (_edgeInfo[hID2].edge_type != RIB_JUNCTION) {
             w2 = w2.next().opp().next();
+        } else {
+            w2ReachedRibJunction = YES;
+        }
+        
+        if (w1ReachedRibJunction && w2ReachedRibJunction) {
+            NSLog(@"[WARNING] Pin point is traped betwen to ribJunction");
+            return NO;
+        }
+        
+        //just in case smth goes wrong
+        iterations++;
+        if (iterations>1000) {
+            return NO;
         }
     }
     
-    return sW;
+    return YES;
 }
 
--(void)setDeformableAreas {
-    number_rib_edges(_manifold, _edgeInfo); // number rings
-    Walker pivotDir = [self pivotDirection]; //spine towards the pivot
-    _deformDirHalfEdge = pivotDir.halfedge();
-    assert(_edgeInfo[pivotDir.halfedge()].is_spine());
+-(BOOL)setTransformedArea {
+    HalfEdgeID toPivotEdge;
+    BOOL foundPivotDir = [self toPivotFromPinDirection:toPivotEdge edgeInfo:_edgeInfo]; //spine towards the pivot
+    if (!foundPivotDir) {
+        NSLog(@"[WARNING] Didnt fine direction to pivot");
+        return NO;
+    }
+    _deformDirHalfEdge = toPivotEdge;
+    assert(_edgeInfo[toPivotEdge].is_spine());
+    Walker pivotDir = _manifold.walker(toPivotEdge);
     
     //    int pin_loop_id = _edgeInfo[_pinHalfEdgeID].id;
     int pivot_loop_id = _edgeInfo[_pivotHalfEdgeID].id;
@@ -1864,70 +1893,21 @@ using namespace HMesh;
     
     //Assign weight deformation for angle to the loops
     for (int i = 0; i < loopsToDeform.size(); i++) {
-        
         int lID = loopsToDeform[i];
-        
-        //linear interpolation
-        //        float weight = (float)i/loopsToDeform.size();
-        //        ringToDeformValue[lID] = weight;
-        
-        //gaussian
-//        float r = loopsToDeform.size();
-//        float l = i*i;
-//        float weight = exp(-l/(0.5*r*r));
-//        ringToDeformValue[lID] = 1-weight;
-        
-        //karan's
         float r = loopsToDeform.size();
         float x = (i+1)/r;
         float weight = pow(pow(x, 2)-1, 2);
         ringToDeformValue[lID] = 1-weight;
-
     }
     
     _vertexToLoop = vertexToLoop;
     _loopsToDeform = loopsToDeform;
     _ringToDeformValue = ringToDeformValue;
-    
-    //Flood rotational area
-    HalfEdgeAttributeVector<EdgeInfo> sEdgeInfo(_manifold.allocated_halfedges());
-    Walker bWalker = _manifold.walker(pivotDir.next().halfedge()); //Walk along pivot boundary loop
-    queue<HalfEdgeID> hq;
-    
-    for (;!bWalker.full_circle(); bWalker = bWalker.next().opp().next()) {
-        HalfEdgeID hID = bWalker.next().halfedge();
-        HalfEdgeID opp_hID = bWalker.next().opp().halfedge();
-        sEdgeInfo[hID] = EdgeInfo(SPINE, 0);
-        sEdgeInfo[opp_hID] = EdgeInfo(SPINE, 0);
-        hq.push(hID);
-    }
-    
-    set<VertexID> floodVerticiesSet;
-    while(!hq.empty())
-    {
-        HalfEdgeID h = hq.front();
-        Walker w = _manifold.walker(h);
-        hq.pop();
-        bool is_spine = _edgeInfo[h].edge_type == SPINE;
-        for (;!w.full_circle(); w=w.circulate_vertex_ccw(),is_spine = !is_spine) {
-            if(sEdgeInfo[w.halfedge()].edge_type == UNKNOWN)
-            {
-                EdgeInfo ei = is_spine ? EdgeInfo(SPINE,0) : EdgeInfo(RIB,0);
-                
-                floodVerticiesSet.insert(w.vertex());
-                floodVerticiesSet.insert(w.opp().vertex());
-                
-                sEdgeInfo[w.halfedge()] = ei;
-                sEdgeInfo[w.opp().halfedge()] = ei;
-                hq.push(w.opp().halfedge());
-            }
-        }
-    }
-    
-    vector<VertexID> floodVerticiesVector(floodVerticiesSet.begin(), floodVerticiesSet.end());
-    _all_vector_vid = floodVerticiesVector;
-    [self changeVerticiesColor:floodVerticiesVector toSelected:YES];
+    _transformed_verticies = [self allVerticiesInDirection:pivotDir];
+    [self changeVerticiesColor_Set:_transformed_verticies toSelected:YES];
+    return YES;
 }
+
 #pragma mark - TRANSLATION OF THE BRANCH TREE
 
 -(void)startTranslatingBranchTreeWithTouchPoint:(GLKVector3)touchPoint
@@ -1937,20 +1917,17 @@ using namespace HMesh;
         return;
     }
     
-    [self createPivotPoint:touchPoint];
-    [self setDeformableAreas];
-    
-    _translation = translation;
-    _modState = MODIFICATION_BRANCH_TRANSLATION;
-    _current_rot_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
-    
+    if ([self createPivotPoint:touchPoint]) {
+        if ([self setTransformedArea]) {
+            _translation = translation;
+            [self setModState:MODIFICATION_BRANCH_TRANSLATION];
+            _current_rot_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
+        }
+    }
 }
 
 -(void)continueTranslatingBranchTree:(GLKVector3)translation
 {
-    if (![self isLoaded])
-        return;
-    
     _translation = translation;
 }
 
@@ -1959,11 +1936,15 @@ using namespace HMesh;
     if (![self isLoaded])
         return;
     
+    if (_modState != MODIFICATION_BRANCH_TRANSLATION) {
+        return;
+    }
+    
     _translation = translation;
     
     GLKMatrix4 translationMatrix = GLKMatrix4MakeTranslation(_translation.x, _translation.y, _translation.z);
     
-    for (VertexID vID: _all_vector_vid) {
+    for (VertexID vID: _transformed_verticies) {
         Vec pos = _manifold.pos(vID);
         GLKVector3 posGLK = GLKVector3Make(pos[0], pos[1], pos[2]);
         GLKVector3 newPosGLK = [Utilities matrix4:translationMatrix multiplyVector3:posGLK];
@@ -1994,10 +1975,10 @@ using namespace HMesh;
         _manifold.pos(vid) = newPos;
     }
     
-    _modState = MODIFICATION_PIN_POINT_SET;
-    _all_vector_vid.clear();
-    
     [self rotateRingsFrom:_deformDirHalfEdge toRingID:_pivotHalfEdgeID];
+    
+    _transformed_verticies.clear();
+    [self setModState:MODIFICATION_PIN_POINT_SET];
     
     [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
 
@@ -2010,24 +1991,26 @@ using namespace HMesh;
         return;
     }
     
-    [self createPivotPoint:touchPoint];
-    [self setDeformableAreas];
-    
-    _scaleFactor = scale;
-    _modState = MODIFICATION_BRANCH_SCALING;
-    _current_rot_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
+    if ([self createPivotPoint:touchPoint]) {
+        if ([self setTransformedArea]) {
+            _scaleFactor = scale;
+            [self setModState:MODIFICATION_BRANCH_SCALING];
+            _current_rot_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
+        }
+    }
 }
 
 -(void)continueScalingBranchTreeWithScale:(float)scale {
-    if (![self isLoaded])
-        return;
-    
     _scaleFactor = scale;
 }
 
 -(void)endScalingBranchTreeWithScale:(float)scale {
     if (![self isLoaded])
         return;
+    
+    if (_modState != MODIFICATION_BRANCH_SCALING) {
+        return;
+    }
     
     _scaleFactor = scale;
     
@@ -2036,7 +2019,7 @@ using namespace HMesh;
     GLKMatrix4 scaleMatrix = GLKMatrix4MakeScale(_scaleFactor, _scaleFactor, _scaleFactor);
     GLKMatrix4 tMatrix = GLKMatrix4Multiply(GLKMatrix4Multiply(fromOrigin, scaleMatrix), toOrigin);
     
-    for (VertexID vID: _all_vector_vid) {
+    for (VertexID vID: _transformed_verticies) {
         Vec pos = _manifold.pos(vID);
         GLKVector3 posGLK = GLKVector3Make(pos[0], pos[1], pos[2]);
         GLKVector3 newPosGLK = [Utilities matrix4:tMatrix multiplyVector3:posGLK];
@@ -2067,8 +2050,8 @@ using namespace HMesh;
         _manifold.pos(vid) = newPos;
     }
     
-    _modState = MODIFICATION_PIN_POINT_SET;
-    _all_vector_vid.clear();
+    _transformed_verticies.clear();
+    [self setModState:MODIFICATION_PIN_POINT_SET];
     
     [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
 }
@@ -2080,18 +2063,16 @@ using namespace HMesh;
         return;
     }
     
-    [self createPivotPoint:touchPoint];
-    [self setDeformableAreas];
-    
-    _rotAngle = angle;
-    _modState = MODIFICATION_BRANCH_ROTATION;
-    _current_rot_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
+    if ([self createPivotPoint:touchPoint]) {
+        if ([self setTransformedArea]) {
+            _rotAngle = angle;
+            [self setModState:MODIFICATION_BRANCH_ROTATION];
+            _current_rot_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
+        }
+    }
 }
 
 -(void)continueBendingWithWithAngle:(float)angle {
-    if (![self isLoaded])
-        return;
-    
     _rotAngle = angle;
 }
 
@@ -2099,13 +2080,17 @@ using namespace HMesh;
     if (![self isLoaded])
         return;
     
+    if (_modState != MODIFICATION_BRANCH_ROTATION) {
+        return;
+    }
+    
     GLKVector3 zAxis = GLKMatrix4MultiplyVector3(GLKMatrix4Invert(self.viewMatrix, NULL), GLKVector3Make(0, 0, -1));
     GLKMatrix4 toOrigin = GLKMatrix4MakeTranslation(-_centerOfRotation.x, -_centerOfRotation.y, -_centerOfRotation.z);
     GLKMatrix4 rotMatrix = GLKMatrix4MakeRotation(angle, zAxis.x, zAxis.y, zAxis.z);
     GLKMatrix4 fromOrigin = GLKMatrix4MakeTranslation(_centerOfRotation.x, _centerOfRotation.y, _centerOfRotation.z);
     GLKMatrix4 tMatrix = GLKMatrix4Multiply(GLKMatrix4Multiply(fromOrigin, rotMatrix), toOrigin);
     
-    for (VertexID vID: _all_vector_vid) {
+    for (VertexID vID: _transformed_verticies) {
         Vec pos = _manifold.pos(vID);
         GLKVector3 posGLK = GLKVector3Make(pos[0], pos[1], pos[2]);
         GLKVector3 newPosGLK = [Utilities matrix4:tMatrix multiplyVector3:posGLK];
@@ -2135,8 +2120,9 @@ using namespace HMesh;
         _manifold.pos(vid) = newPos;
     }
 
-    _modState = MODIFICATION_PIN_POINT_SET;
-    _all_vector_vid.clear();
+
+    _transformed_verticies.clear();
+    [self setModState:MODIFICATION_PIN_POINT_SET];
     
     [self rotateRingsFrom:_deformDirHalfEdge toRingID:_pivotHalfEdgeID];
     
@@ -2313,7 +2299,7 @@ using namespace HMesh;
 
     //find all verticies that we need to delete
     _original_verticies_copied =  [self allVerticiesInDirection:toWalker];
-    vector<VertexID> all_verticies_to_delete =  [self allVerticiesInDirection:toWalker.opp()];
+    set<VertexID> all_verticies_to_delete =  [self allVerticiesInDirection:toWalker.opp()];
 //        [self changeVerticiesColor:all_verticies_to_delete toSelected:YES];
 
     //remove verticies from duplicate manifold, so that only copy part is left
@@ -2329,7 +2315,7 @@ using namespace HMesh;
     _copyVerticies.clear();
     [self extractFromManifold:copyMani verticies:_copyVerticies faces:_copyFaces indicies:_copyIndices];
 
-    [self changeVerticiesColor:_original_verticies_copied toSelected:YES];
+    [self changeVerticiesColor_Set:_original_verticies_copied toSelected:YES];
     
 //    _pinPointLine = nil;
     _modState = MODIFICATION_BRANCH_COPIED_BRANCH_FOR_CLONING;
@@ -2338,7 +2324,7 @@ using namespace HMesh;
 
 -(void)dismissCopiedBranch {
     _modState = MODIFICATION_NONE;
-    [self changeVerticiesColor:_original_verticies_copied toSelected:NO];
+    [self changeVerticiesColor_Set:_original_verticies_copied toSelected:NO];
     _pinPointLine = nil;
     [self.delegate modStateChangedTo:_modState];
 }
@@ -2421,8 +2407,8 @@ using namespace HMesh;
     }
     
     [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
-    [self changeVerticiesColor:_cloned_verticies toColor:Vec4uc(0,200,0,255)];
-    [self changeVerticiesColor:_original_verticies_copied toSelected:YES];
+    [self changeVerticiesColor_Vector:_cloned_verticies toColor:Vec4uc(0,200,0,255)];
+    [self changeVerticiesColor_Set:_original_verticies_copied toSelected:YES];
     _modState = MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE;
 
     return YES;
@@ -2465,7 +2451,7 @@ using namespace HMesh;
     }
     
     [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
-    [self changeVerticiesColor:_original_verticies_copied toSelected:YES];
+    [self changeVerticiesColor_Set:_original_verticies_copied toSelected:YES];
     _cloned_verticies.clear();
     _modState = MODIFICATION_BRANCH_COPIED_BRANCH_FOR_CLONING;    
     return YES;
@@ -2756,7 +2742,7 @@ using namespace HMesh;
     _deletingBranchFromBody = deletingBranchFromBody;
     
     //Start flooding and get all the verticies to delete/move
-    _all_vector_vid = [self allVerticiesInDirection:toWalker];
+    _detached_verticies = [self allVerticiesInDirection:toWalker];
 
     //Save info
     _deleteBodyUpperRibEdge = toWalker.prev().halfedge(); //botton rib
@@ -2778,7 +2764,7 @@ using namespace HMesh;
     }
     
     [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
-    [self changeVerticiesColor:_all_vector_vid toSelected:YES];
+    [self changeVerticiesColor_Set:_detached_verticies toSelected:YES];
     
     _pinPointLine = nil;
     _modState = MODIFICATION_BRANCH_DETACHED;
@@ -2797,7 +2783,7 @@ using namespace HMesh;
     }
     
     //Delete verticies
-    for (VertexID vID: _all_vector_vid) {
+    for (VertexID vID: _detached_verticies) {
         _manifold.remove_vertex(vID);
     }
     
@@ -2897,7 +2883,7 @@ using namespace HMesh;
         [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
     }
     
-    _all_vector_vid.clear();
+    _detached_verticies.clear();
     _modState = MODIFICATION_NONE;
     [self.delegate modStateChangedTo:_modState];
     return YES;
@@ -2927,7 +2913,7 @@ using namespace HMesh;
     Vec secondRingCentroid = Vec(centroid_for_rib(_manifold, _deleteBranchSecondRingEdge, _edgeInfo));
     Vec toTouchPos = touchPos - boundaryCentroid;
     secondRingCentroid += toTouchPos;
-    for (VertexID vid: _all_vector_vid) {
+    for (VertexID vid: _detached_verticies) {
         _manifold.pos(vid) = _manifold.pos(vid) + toTouchPos;
     }
 
@@ -2936,7 +2922,7 @@ using namespace HMesh;
     CGLA::Quatd q;
     q.make_rot(normalize(currentNorm), normalize(normal));
     
-    for (VertexID vid: _all_vector_vid) {
+    for (VertexID vid: _detached_verticies) {
         Vec p = _manifold.pos(vid);
         p -= touchPos;
         p = q.apply(p);
@@ -2945,7 +2931,7 @@ using namespace HMesh;
     }
     
     [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
-    [self changeVerticiesColor:_all_vector_vid toSelected:YES];
+    [self changeVerticiesColor_Set:_detached_verticies toSelected:YES];
     _modState = MODIFICATION_BRANCH_DETACHED_AN_MOVED;
     return YES;
 }
@@ -2990,7 +2976,7 @@ using namespace HMesh;
     CGLA::Quatd q;
     q.make_rot(-_rotAngle, _zRotateVec);
     
-    for (VertexID vid: _all_vector_vid) {
+    for (VertexID vid: _detached_verticies) {
         Vec p = _manifold.pos(vid);
         p -= _zRotatePos;
         p = q.apply(p);
@@ -2999,7 +2985,7 @@ using namespace HMesh;
     }
 }
 
--(vector<VertexID>)allVerticiesInDirection:(Walker)deleteDir {
+-(set<VertexID>)allVerticiesInDirection:(Walker)deleteDir {
     //Flood rotational area
     HalfEdgeAttributeVector<EdgeInfo> sEdgeInfo(_manifold.allocated_halfedges());
     Walker bWalker = _manifold.walker(deleteDir.next().halfedge()); //Walk along pivot boundary loop
@@ -3035,8 +3021,8 @@ using namespace HMesh;
         }
     }
     
-    vector<VertexID> floodVerticiesVector(floodVerticiesSet.begin(), floodVerticiesSet.end());
-    return floodVerticiesVector;
+//    vector<VertexID> floodVerticiesVector(floodVerticiesSet.begin(), floodVerticiesSet.end());
+    return floodVerticiesSet;
 }
 
 
@@ -3094,7 +3080,7 @@ using namespace HMesh;
     
 }
 
--(void)changeVerticiesColor:(vector<HMesh::VertexID>) vertecies toColor:(Vec4uc) selectColor {
+-(void)changeVerticiesColor_Vector:(vector<HMesh::VertexID>) vertecies toColor:(Vec4uc) selectColor {
     
     [self.colorDataBuffer bind];
     unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
@@ -3107,7 +3093,7 @@ using namespace HMesh;
 
 }
 
--(void)changeVerticiesSetColor:(set<HMesh::VertexID>) vertecies toColor:(Vec4uc) selectColor {
+-(void)changeVerticiesColor_Set:(set<HMesh::VertexID>) vertecies toColor:(Vec4uc) selectColor {
     
     [self.colorDataBuffer bind];
     unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
@@ -3119,24 +3105,24 @@ using namespace HMesh;
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
--(void)changeVerticiesColor:(vector<HMesh::VertexID>) vertecies toSelected:(BOOL)isSelected {
+-(void)changeVerticiesColor_Vector:(vector<HMesh::VertexID>) vertecies toSelected:(BOOL)isSelected {
     Vec4uc selectColor;
     if (isSelected) {
         selectColor = Vec4uc(240, 0, 0, 255);
     } else {
         selectColor = Vec4uc(200,200,200,255);
     }
-    [self changeVerticiesColor:vertecies toColor:selectColor];
+    [self changeVerticiesColor_Vector:vertecies toColor:selectColor];
 }
 
--(void)changeVerticiesSetColor:(set<HMesh::VertexID>) vertecies toSelected:(BOOL)isSelected {
+-(void)changeVerticiesColor_Set:(set<HMesh::VertexID>) vertecies toSelected:(BOOL)isSelected {
     Vec4uc selectColor;
     if (isSelected) {
         selectColor = Vec4uc(240, 0, 0, 255);
     } else {
         selectColor = Vec4uc(200,200,200,255);
     }
-    [self changeVerticiesSetColor:vertecies toColor:selectColor];
+    [self changeVerticiesColor_Set:vertecies toColor:selectColor];
 }
 
 -(void)changeFacesColorToSelected:(vector<HMesh::FaceID>)fids toSelected:(BOOL)isSelected {
@@ -3204,7 +3190,7 @@ using namespace HMesh;
         
         [self.vertexDataBuffer bind];
         unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
-        for (VertexID vid: _all_vector_vid) {
+        for (VertexID vid: _sculpt_verticies_to_scale) {
             Vecf pos = _current_scale_position[vid];
             int index = vid.index;
             memcpy(temp + index*VERTEX_SIZE, pos.get(), VERTEX_SIZE);
@@ -3221,7 +3207,7 @@ using namespace HMesh;
         GLKMatrix4 fromOrigin = GLKMatrix4MakeTranslation(_centerOfRotation.x, _centerOfRotation.y, _centerOfRotation.z);
         GLKMatrix4 tMatrix = GLKMatrix4Multiply(GLKMatrix4Multiply(fromOrigin, rotMatrix), toOrigin);
 
-        for (VertexID vID: _all_vector_vid) {
+        for (VertexID vID: _transformed_verticies) {
             Vec pos = _manifold.pos(vID);
             GLKVector3 posGLK = GLKVector3Make(pos[0], pos[1], pos[2]);
             GLKVector3 newPosGLK = [Utilities matrix4:tMatrix multiplyVector3:posGLK];
@@ -3231,7 +3217,7 @@ using namespace HMesh;
         
         [self.vertexDataBuffer bind];
         unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
-        for (VertexID vid: _all_vector_vid) {
+        for (VertexID vid: _transformed_verticies) {
             Vecf pos = _current_rot_position[vid];
             int index = vid.index;
             memcpy(temp + index*VERTEX_SIZE, pos.get(), VERTEX_SIZE);
@@ -3272,7 +3258,7 @@ using namespace HMesh;
         GLKMatrix4 scaleMatrix = GLKMatrix4MakeScale(_scaleFactor, _scaleFactor, _scaleFactor);
         GLKMatrix4 tMatrix = GLKMatrix4Multiply(GLKMatrix4Multiply(fromOrigin, scaleMatrix), toOrigin);
         
-        for (VertexID vID: _all_vector_vid) {
+        for (VertexID vID: _transformed_verticies) {
             Vec pos = _manifold.pos(vID);
             GLKVector3 posGLK = GLKVector3Make(pos[0], pos[1], pos[2]);
             GLKVector3 newPosGLK = [Utilities matrix4:tMatrix multiplyVector3:posGLK];
@@ -3282,7 +3268,7 @@ using namespace HMesh;
         
         [self.vertexDataBuffer bind];
         unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
-        for (VertexID vid: _all_vector_vid) {
+        for (VertexID vid: _transformed_verticies) {
             Vecf pos = _current_rot_position[vid];
             int index = vid.index;
             memcpy(temp + index*VERTEX_SIZE, pos.get(), VERTEX_SIZE);
@@ -3321,7 +3307,7 @@ using namespace HMesh;
     {
         GLKMatrix4 translationMatrix = GLKMatrix4MakeTranslation(_translation.x, _translation.y, _translation.z);
         
-        for (VertexID vID: _all_vector_vid) {
+        for (VertexID vID: _transformed_verticies) {
             Vec pos = _manifold.pos(vID);
             GLKVector3 posGLK = GLKVector3Make(pos[0], pos[1], pos[2]);
             GLKVector3 newPosGLK = [Utilities matrix4:translationMatrix multiplyVector3:posGLK];
@@ -3331,7 +3317,7 @@ using namespace HMesh;
         
         [self.vertexDataBuffer bind];
         unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
-        for (VertexID vid: _all_vector_vid) {
+        for (VertexID vid: _transformed_verticies) {
             Vecf pos = _current_rot_position[vid];
             int index = vid.index;
             memcpy(temp + index*VERTEX_SIZE, pos.get(), VERTEX_SIZE);
@@ -3367,7 +3353,7 @@ using namespace HMesh;
         CGLA::Quatd q;
         q.make_rot(-_rotAngle, _zRotateVec);
         
-        for (VertexID vid: _all_vector_vid) {
+        for (VertexID vid: _detached_verticies) {
             Vec p = _manifold.pos(vid);
             p -= _zRotatePos;
             p = q.apply(p);
@@ -3377,7 +3363,7 @@ using namespace HMesh;
         
         [self.vertexDataBuffer bind];
         unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
-        for (VertexID vid: _all_vector_vid) {
+        for (VertexID vid: _detached_verticies) {
             Vecf pos = _current_rot_position[vid];
             int index = vid.index;
             memcpy(temp + index*VERTEX_SIZE, pos.get(), VERTEX_SIZE);

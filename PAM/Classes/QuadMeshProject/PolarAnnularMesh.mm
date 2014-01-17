@@ -367,6 +367,50 @@ using namespace HMesh;
     }
 }
 
+-(void)updateVerticiesOnGPU:(vector<VertexID>)verticies {
+    [self.vertexDataBuffer bind];
+    unsigned char* tempVerticies = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
+    for (VertexID vid: verticies) {
+        Vecf posf = _manifold.posf(vid);
+        int index = vid.index;
+        memcpy(tempVerticies + index*VERTEX_SIZE, posf.get(), VERTEX_SIZE);
+    }
+    glUnmapBufferOES(GL_ARRAY_BUFFER);
+    
+    [self.normalDataBuffer bind];
+    unsigned char* tempNormal = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
+    for (VertexID vid: verticies) {
+        Vecf normalf = HMesh::normalf(_manifold, vid);
+        int index = vid.index;
+        memcpy(tempNormal + index*VERTEX_SIZE, normalf.get(), VERTEX_SIZE);
+    }
+    glUnmapBufferOES(GL_ARRAY_BUFFER);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+-(void)updateVerticiesSetonGPU:(set<VertexID>)verticies {
+    [self.vertexDataBuffer bind];
+    unsigned char* tempVerticies = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
+    for (VertexID vid: verticies) {
+        Vecf posf = _manifold.posf(vid);
+        int index = vid.index;
+        memcpy(tempVerticies + index*VERTEX_SIZE, posf.get(), VERTEX_SIZE);
+    }
+    glUnmapBufferOES(GL_ARRAY_BUFFER);
+    
+    [self.normalDataBuffer bind];
+    unsigned char* tempNormal = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
+    for (VertexID vid: verticies) {
+        Vecf normalf = HMesh::normalf(_manifold, vid);
+        int index = vid.index;
+        memcpy(tempNormal + index*VERTEX_SIZE, normalf.get(), VERTEX_SIZE);
+    }
+    glUnmapBufferOES(GL_ARRAY_BUFFER);
+    
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
 #pragma mark - UTILITIES
 
 -(void)setModState:(CurrentModification)modState {
@@ -691,49 +735,50 @@ using namespace HMesh;
 }
 
 #pragma mark - SMOOTH
--(void)neighbours:(vector<VertexID>&)neighbours
-        weigths:(vector<float>&)weights
-    forVertexID:(VertexID)vID
-      brushSize:(float)brush_size
+
+//get all neighbouring points for the given verticies
+-(void)neighbours:(set<VertexID>&)neighbours
+     forVerticies:(vector<VertexID>&)verticies
+        brushSize:(float)brush_size
 {
     HalfEdgeAttributeVector<EdgeInfo> edge_info(_manifold.allocated_halfedges());
-    Vec originPos = _manifold.pos(vID);
     
-    queue<HalfEdgeID> hq;
-    
-    neighbours.push_back(vID);
-    weights.push_back(1.0f);
-    circulate_vertex_ccw(_manifold, vID, [&](Walker w) {
-        neighbours.push_back(w.vertex());
-        weights.push_back(1.0f);
-        edge_info[w.halfedge()] = EdgeInfo(SPINE, 0);
-        edge_info[w.opp().halfedge()] = EdgeInfo(SPINE, 0);
-        hq.push(w.opp().halfedge());
-    });
-    
-    while(!hq.empty())
-    {
-        HalfEdgeID h = hq.front();
-        Walker w = _manifold.walker(h);
-        hq.pop();
+    for (VertexID vID: verticies) {
+        Vec originPos = _manifold.pos(vID);
+        queue<HalfEdgeID> hq;
         
-        for (;!w.full_circle(); w = w.circulate_vertex_ccw()) {
-            if(edge_info[w.halfedge()].edge_type == UNKNOWN)
-            {
-                Vec pos = _manifold.pos(w.vertex());
-                float d = (pos - originPos).length();
-                if (d <= brush_size) {
-                    neighbours.push_back(w.vertex());
-                    weights.push_back(1.0f);
-                    
-                    edge_info[w.halfedge()] = EdgeInfo(SPINE,0);
-                    edge_info[w.opp().halfedge()] = EdgeInfo(SPINE,0);
-                    
-                    hq.push(w.opp().halfedge());
+        neighbours.insert(vID);
+        circulate_vertex_ccw(_manifold, vID, [&](Walker w) {
+            neighbours.insert(w.vertex());
+            edge_info[w.halfedge()] = EdgeInfo(SPINE, 0);
+            edge_info[w.opp().halfedge()] = EdgeInfo(SPINE, 0);
+            hq.push(w.opp().halfedge());
+        });
+        
+        while(!hq.empty())
+        {
+            HalfEdgeID h = hq.front();
+            Walker w = _manifold.walker(h);
+            hq.pop();
+            
+            for (;!w.full_circle(); w = w.circulate_vertex_ccw()) {
+                if(edge_info[w.halfedge()].edge_type == UNKNOWN)
+                {
+                    Vec pos = _manifold.pos(w.vertex());
+                    float d = (pos - originPos).length();
+                    if (d <= brush_size) {
+                        neighbours.insert(w.vertex());
+                        
+                        edge_info[w.halfedge()] = EdgeInfo(SPINE,0);
+                        edge_info[w.opp().halfedge()] = EdgeInfo(SPINE,0);
+                        
+                        hq.push(w.opp().halfedge());
+                    }
                 }
             }
         }
     }
+    
 }
 
 
@@ -753,71 +798,43 @@ using namespace HMesh;
     laplacian_spine_smooth_verticies(_manifold, allVert, _edgeInfo, iter);
 }
 
--(void)smoothPole:(VertexID)vID iter:(int)iter {
-    vector<VertexID> neighbours;
-    vector<float> weights;
-    Walker w = _manifold.walker(vID);
-    float brushSize = (_manifold.pos(w.vertex()) - _manifold.pos(vID)).length();
-    [self neighbours:neighbours weigths:weights forVertexID:vID brushSize:brushSize];
-    laplacian_smooth_verticies(_manifold, neighbours, weights, iter);
-}
-
--(void)smoothVertexID:(VertexID)vID iter:(int)iter isSpine:(bool)isSpine brushSize:(float)brushSize{
-    vector<VertexID> neighbours;
-    vector<float> weights;
-    [self neighbours:neighbours weigths:weights forVertexID:vID brushSize:brushSize];
-    if (isSpine) {
-        laplacian_spine_smooth_verticies(_manifold, neighbours, _edgeInfo, iter);
-    } else {
-        laplacian_smooth_verticies(_manifold, neighbours, weights, iter);
-    }
-    
-//    [self changeVerticiesColor:neighbours toSelected:YES];
-}
-
--(void)smoothAlongRibg:(HalfEdgeID)rib
-                  iter:(int)iter
-               isSpine:(bool)isSpine
-             brushSize:(float)brushSize
+//Smooth verticies along the rib
+-(set<VertexID>)smoothAlongRib:(HalfEdgeID)rib
+                 iter:(int)iter
+              isSpine:(bool)isSpine
+            brushSize:(float)brushSize
+             edgeInfo:(HMesh::HalfEdgeAttributeVector<EdgeInfo>&)edge_info
 {
-    assert(_edgeInfo[rib].is_rib());
+    assert(edge_info[rib].is_rib());
     vector<VertexID> vIDs;
-    for (Walker w = _manifold.walker(rib); !w.full_circle(); w = w.next().opp().next())
-    {
+    for (Walker w = _manifold.walker(rib); !w.full_circle(); w = w.next().opp().next()) {
         vIDs.push_back(w.vertex());
     }
-    [self smoothVerticies:vIDs iter:iter isSpine:isSpine brushSize:brushSize];
+    set<VertexID> affectedVerticies = [self smoothVerticies:vIDs iter:iter isSpine:isSpine brushSize:brushSize];
+    return affectedVerticies;
 }
 
--(void)smoothVerticies:(vector<VertexID>)vIDs iter:(int)iter isSpine:(bool)isSpine brushSize:(float)brushSize{
-    
+//Smooth at multiple verticies
+-(set<VertexID>)smoothVerticies:(vector<VertexID>)vIDs iter:(int)iter isSpine:(bool)isSpine brushSize:(float)brushSize{
     set<VertexID> allVerticiesSet;
-    for (VertexID vID: vIDs) {
-        vector<VertexID> neighbours;
-        vector<float> weights;
-        [self neighbours:neighbours weigths:weights forVertexID:vID brushSize:brushSize];
-        for (VertexID neighboutVID: neighbours) {
-            allVerticiesSet.insert(neighboutVID);
-        }
-    }
-    
-    vector<VertexID> allVerticiesVector(allVerticiesSet.begin(), allVerticiesSet.end());
+    [self neighbours:allVerticiesSet forVerticies:vIDs brushSize:brushSize];
     
     if (isSpine) {
-        laplacian_spine_smooth_verticies(_manifold, allVerticiesVector, _edgeInfo, iter);
+        laplacian_spine_smooth_verticies(_manifold, allVerticiesSet, _edgeInfo, iter);
     } else {
-        laplacian_smooth_verticies(_manifold, allVerticiesVector, iter);
+        laplacian_smooth_verticies(_manifold, allVerticiesSet, iter);
     }
+    return allVerticiesSet;
 }
 
+//Smooth at a touch point
 -(void)smoothAtPoint:(GLKVector3)touchPoint {
     VertexID closestPoint = [self closestVertexID_3D:touchPoint];
-    [self smoothVertexID:closestPoint iter:1 isSpine:NO brushSize:0.1];
-    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
-    
+    vector<VertexID> oneVID;
+    oneVID.push_back(closestPoint);
+    set<VertexID> affectedVerticies = [self smoothVerticies:oneVID iter:1 isSpine:NO brushSize:0.1];
+    [self updateVerticiesSetonGPU:affectedVerticies];
 }
-
-
 
 #pragma mark - SCULPTING BUMPS AND RINGS
 -(void)createBumpAtPoint:(vector<GLKVector3>)tPoints
@@ -829,15 +846,9 @@ using namespace HMesh;
         return;
     }
     
-    float brushSize;
-
-//    if (touchSize > 9.0f) {
-//        brushSize = 2;
-//    } else {
-//        brushSize = 1;
-//    }
+    [self saveState];
     
-    //make a small bump
+    float brushSize = 0.1;
     if (touchSpeed <= 500) {
         brushSize = 0.07;
     } else if (touchSpeed > 500  && touchSpeed <= 1000) {
@@ -846,20 +857,13 @@ using namespace HMesh;
         brushSize = 0.1;
     }
     
-    [self saveState];
-    
     VertexID touchedVID;
     if (touchedModel) {
-        //closest vertex in 3D space
         touchedVID = [self closestVertexID_3D:_startPoint];
     } else {
-        //closest vertex in 2D space
         touchedVID = [self closestVertexID_2D:_startPoint];
     }
-    
-//    Vec c;
-//    float r;
-//    bsphere(_manifold, c, r);
+
     Vec touchedPos = _manifold.pos(touchedVID);
     Vec norm = HMesh::normal(_manifold, touchedVID);
     Vec displace = 0.05*norm;
@@ -878,7 +882,12 @@ using namespace HMesh;
         displace = -1*displace;
     }
     
-    for (auto vid : _manifold.vertices())
+    set<VertexID> neighbours;
+    vector<VertexID> oneVertex;
+    oneVertex.push_back(touchedVID);
+    [self neighbours:neighbours forVerticies:oneVertex brushSize:brushSize];
+    
+    for (VertexID vid: neighbours)
     {
         double l = (touchedPos - _manifold.pos(vid)).length();
         float x = l/brushSize;
@@ -886,16 +895,8 @@ using namespace HMesh;
             float weight = pow(pow(x,2)-1, 2);
             _manifold.pos(vid) = _manifold.pos(vid) + displace * weight;
         }
-
-//        float l = (touchedPos - _manifold.pos(vid)).length();
-//        if (l < brushSize) {
-//            float x = l / brushSize;
-//            float weight  = pow(pow(x, 2) - 1, 2);
-//            _manifold.pos(vid) = _manifold.pos(vid) + displace * weight;
-//        }
-    }
-    
-    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
+    }    
+    [self updateVerticiesSetonGPU:neighbours];
 }
 
 //middlePoint - centroid between tow fingers of a pinch gesture
@@ -1018,8 +1019,6 @@ using namespace HMesh;
     _all_vector_vid.clear();
     
     [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
-
-
 }
 
 #pragma mark - UTILITIES BRANCH CREATION
@@ -1371,17 +1370,17 @@ using namespace HMesh;
     float smoothingBrushSize = [SettingsManager sharedInstance].smoothingBrushSize;
     int iterations = [SettingsManager sharedInstance].baseSmoothingIterations;
     if (![SettingsManager sharedInstance].spineSmoothing) {
-        [self smoothAlongRibg:limbOuterHalfEdge iter:5 isSpine:NO brushSize:smoothingBrushSize];
+        [self smoothAlongRib:limbOuterHalfEdge iter:5 isSpine:NO brushSize:smoothingBrushSize edgeInfo:_edgeInfo];
     } else {
-        [self smoothAlongRibg:limbOuterHalfEdge iter:iterations isSpine:YES brushSize:smoothingBrushSize];
+        [self smoothAlongRib:limbOuterHalfEdge iter:iterations isSpine:YES brushSize:smoothingBrushSize edgeInfo:_edgeInfo];
 //        [self smoothAlongRibg:limbOuterHalfEdge iter:1 isSpine:NO brushSize:0.1];
     }
     
     if (shouldStick) {
         if (![SettingsManager sharedInstance].spineSmoothing) {
-            [self smoothAlongRibg:endLimbOuterHaldEdge iter:5 isSpine:NO brushSize:smoothingBrushSize];
+            [self smoothAlongRib:endLimbOuterHaldEdge iter:5 isSpine:NO brushSize:smoothingBrushSize edgeInfo:_edgeInfo];
         } else {
-            [self smoothAlongRibg:endLimbOuterHaldEdge iter:iterations isSpine:YES brushSize:smoothingBrushSize];
+            [self smoothAlongRib:endLimbOuterHaldEdge iter:iterations isSpine:YES brushSize:smoothingBrushSize edgeInfo:_edgeInfo];
 //            [self smoothAlongRibg:endLimbOuterHaldEdge iter:1 isSpine:NO brushSize:0.1];
         }
     }
@@ -3130,6 +3129,18 @@ using namespace HMesh;
 
 }
 
+-(void)changeVerticiesSetColor:(set<HMesh::VertexID>) vertecies toColor:(Vec4uc) selectColor {
+    
+    [self.colorDataBuffer bind];
+    unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
+    for (VertexID vid: vertecies) {
+        int index = vid.index;
+        memcpy(temp + index*COLOR_SIZE, selectColor.get(), COLOR_SIZE);
+    }
+    glUnmapBufferOES(GL_ARRAY_BUFFER);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
 -(void)changeVerticiesColor:(vector<HMesh::VertexID>) vertecies toSelected:(BOOL)isSelected {
     Vec4uc selectColor;
     if (isSelected) {
@@ -3140,7 +3151,15 @@ using namespace HMesh;
     [self changeVerticiesColor:vertecies toColor:selectColor];
 }
 
-
+-(void)changeVerticiesSetColor:(set<HMesh::VertexID>) vertecies toSelected:(BOOL)isSelected {
+    Vec4uc selectColor;
+    if (isSelected) {
+        selectColor = Vec4uc(240, 0, 0, 255);
+    } else {
+        selectColor = Vec4uc(200,200,200,255);
+    }
+    [self changeVerticiesSetColor:vertecies toColor:selectColor];
+}
 
 -(void)changeFacesColorToSelected:(vector<HMesh::FaceID>)fids toSelected:(BOOL)isSelected {
     vector<VertexID> vIDs;

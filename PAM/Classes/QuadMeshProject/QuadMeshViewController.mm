@@ -1130,8 +1130,8 @@ typedef enum {
     if (_restorSessionAlert == alertView) {
         if (buttonIndex == 0) {
             [self restoreLastSession];
-            [self startBackupTimer];
         }
+        [self startBackupTimer];
     }
     [alertView dismissWithClickedButtonIndex:buttonIndex animated:YES];
 }

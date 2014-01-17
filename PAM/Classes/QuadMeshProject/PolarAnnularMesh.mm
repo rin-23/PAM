@@ -2044,7 +2044,7 @@ using namespace HMesh;
     _modState = MODIFICATION_PIN_POINT_SET;
     _all_vector_vid.clear();
     
-//    [self rotateRingsFrom:_deformDirHalfEdge toRingID:_pivotHalfEdgeID];
+    [self rotateRingsFrom:_deformDirHalfEdge toRingID:_pivotHalfEdgeID];
     
     [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
 
@@ -2511,7 +2511,7 @@ using namespace HMesh;
         [self smoothVerticies:verteciesToSmooth iter:10 isSpine:YES brushSize:0.1];
     }
     
-    [self rebufferWithCleanup:YES bufferData:YES edgeTrace:NO];
+    [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
     [self changeVerticiesColor:_original_verticies_copied toSelected:YES];
     _cloned_verticies.clear();
     _modState = MODIFICATION_BRANCH_COPIED_BRANCH_FOR_CLONING;    

@@ -11,7 +11,7 @@
 @protocol SettingsViewControllerDelegate <NSObject>
 -(void)showRibJunctions;
 -(void)showSkeleton:(BOOL)show;
--(void)transformModeIsOn:(BOOL)isOn;
+//-(void)transformModeIsOn:(BOOL)isOn;
 -(void)clearModel;
 -(void)resetTransformations;
 -(void)loadArmadillo;

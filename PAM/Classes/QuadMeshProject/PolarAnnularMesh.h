@@ -7,7 +7,7 @@
 //
 
 #import "Mesh.h"
-#include <vector>
+
 
 typedef enum {
     MODIFICATION_NONE,
@@ -21,7 +21,6 @@ typedef enum {
     MODIFICATION_BRANCH_DETACHED_ROTATE,
     MODIFICATION_BRANCH_COPIED_BRANCH_FOR_CLONING,
     MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE,
-    MODIFICATION_BRANCH_COPIED_AND_ATTACHED_THE_CLONE,
     MODIFICATION_BRANCH_CLONE_ROTATION
 } CurrentModification;
 
@@ -41,7 +40,7 @@ typedef enum {
 #pragma mark - BRANCH/BUMPS CREATION ONE FINGER
 -(void)startCreateBranch:(GLKVector3)touchPoint closestPoint:(GLKVector3)closestPoint;
 -(void)continueCreateBranch:(GLKVector3)touchPoint;
--(std::vector<std::vector<GLKVector3>>)endCreateBranchBended:(GLKVector3)touchPoint
+-(void)endCreateBranchBended:(GLKVector3)touchPoint
                                  touchedModelStart:(BOOL)touchedModel
                                    touchedModelEnd:(BOOL)touchedModelEnd                                        shouldStick:(BOOL)shouldStick
                                          touchSize:(float)touchSize
@@ -50,7 +49,7 @@ typedef enum {
 #pragma mark - BODY CREATION TWO FINGERS
 -(void)startCreateBodyFinger1:(GLKVector3)touchPoint1 finger2:(GLKVector3)touchPoint2;
 -(void)continueCreateBodyFinger1:(GLKVector3)touchPoint1 finger2:(GLKVector3)touchPoint2;
--(std::vector<std::vector<GLKVector3>>)endCreateBody;
+-(void)endCreateBody;
 
 #pragma mark - TOUCHES: FACE PICKING
 -(void)endSelectFaceWithRay:(GLKVector3)rayOrigin rayDirection:(GLKVector3)rayDir;

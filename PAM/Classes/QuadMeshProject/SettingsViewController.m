@@ -45,16 +45,16 @@
     [_skeletonSwitch addTarget:self action:@selector(skeletonSwitchClicked:) forControlEvents:UIControlEventValueChanged];
     [contentView addSubview:_skeletonSwitch];
     
+//    nextY = CGRectGetMaxY(skeletonLabel.frame);
+//    UILabel* transformLabel = [[UILabel alloc] initWithFrame:CGRectMake(15, nextY + 10, 100, 30)];
+//    [transformLabel setText:@"Transform"];
+//    [contentView addSubview:transformLabel];
+    
+//    _transformSwitch = [[UISwitch alloc] initWithFrame:CGRectMake(145, nextY + 10, 30, 20)];
+//    [_transformSwitch addTarget:self action:@selector(transformSwitchClicked:) forControlEvents:UIControlEventValueChanged];
+//    [contentView addSubview:_transformSwitch];
+    
     nextY = CGRectGetMaxY(skeletonLabel.frame);
-    UILabel* transformLabel = [[UILabel alloc] initWithFrame:CGRectMake(15, nextY + 10, 100, 30)];
-    [transformLabel setText:@"Transform"];
-    [contentView addSubview:transformLabel];
-    
-    _transformSwitch = [[UISwitch alloc] initWithFrame:CGRectMake(145, nextY + 10, 30, 20)];
-    [_transformSwitch addTarget:self action:@selector(transformSwitchClicked:) forControlEvents:UIControlEventValueChanged];
-    [contentView addSubview:_transformSwitch];
-    
-    nextY = CGRectGetMaxY(transformLabel.frame);
     _clearModelBtn = [UIButton buttonWithType:UIButtonTypeRoundedRect];
     [_clearModelBtn setFrame:CGRectMake(15, nextY + 10, 100, 30)];
     [_clearModelBtn setContentHorizontalAlignment:UIControlContentHorizontalAlignmentLeft];
@@ -192,9 +192,9 @@
     [self.delegate showSkeleton:_skeletonSwitch.isOn];
 }
 
--(void)transformSwitchClicked:(UIControl*)sender {
-    [self.delegate transformModeIsOn:_transformSwitch.isOn];
-}
+//-(void)transformSwitchClicked:(UIControl*)sender {
+//    [self.delegate transformModeIsOn:_transformSwitch.isOn];
+//}
 
 -(void)clearModelButton:(UIControl*)sender {
     [self.delegate clearModel];

@@ -185,7 +185,7 @@
 		15646605182033920000B985 /* newPolars.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = newPolars.obj; sourceTree = "<group>"; };
 		15646606182033920000B985 /* newTEST.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = newTEST.obj; sourceTree = "<group>"; };
 		15646607182033920000B985 /* teapot.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = teapot.obj; sourceTree = "<group>"; };
-		15646608182033920000B985 /* QuadMeshViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = QuadMeshViewController.h; sourceTree = "<group>"; };
+		15646608182033920000B985 /* QuadMeshViewController.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.h; fileEncoding = 4; path = QuadMeshViewController.h; sourceTree = "<group>"; };
 		15646609182033920000B985 /* QuadMeshViewController.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = QuadMeshViewController.mm; sourceTree = "<group>"; };
 		1564660C182033920000B985 /* WireFrame.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WireFrame.h; sourceTree = "<group>"; };
 		1564660D182033920000B985 /* WireFrame.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WireFrame.m; sourceTree = "<group>"; };

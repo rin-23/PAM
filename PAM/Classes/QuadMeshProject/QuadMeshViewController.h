@@ -8,10 +8,11 @@
 
 #import "BaseQuadMeshViewController.h"
 #import <MessageUI/MessageUI.h>
+#import "PolarAnnularMesh.h"
 
 @class RotationManager, ZoomManager, TranslationManager;
 
-@interface QuadMeshViewController : BaseQuadMeshViewController <UIAlertViewDelegate, UIGestureRecognizerDelegate,  MFMailComposeViewControllerDelegate>
+@interface QuadMeshViewController : BaseQuadMeshViewController <UIAlertViewDelegate, UIGestureRecognizerDelegate,  MFMailComposeViewControllerDelegate, PolarAnnularMeshDelegate>
 
 @property (nonatomic) RotationManager* rotationManager;
 @property (nonatomic) ZoomManager* zoomManager;

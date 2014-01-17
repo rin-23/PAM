@@ -10,12 +10,10 @@
 #import "RotationManager.h"
 #import "TranslationManager.h"
 #import "ZoomManager.h"
-#import "PolarAnnularMesh.h"
 #import "AGLKContext.h"
 #import "Utilities.h"
 #import "MeshLoader.h"
 #import "PlateStartPoint.h"
-#import "UITwoFingerHoldGestureRecognizer.h"
 #import "Line.h"
 #include <vector>
 #import "SettingsManager.h"
@@ -61,8 +59,9 @@ typedef enum {
 //    GLKVector3 _detachStartPoint;
 //    GLKVector3 _detachStartPoint;
     
-    UISwipeGestureRecognizer* swipeGesture;
-    UIPanGestureRecognizer* twoFingerTranslation;
+    UISwipeGestureRecognizer* _twoFingerSwipeUpGesture;
+    UISwipeGestureRecognizer* _twoFingerSwipeDownGesture;
+    UIPanGestureRecognizer* _twoFingerTranslation;
 }
 @end
 
@@ -161,21 +160,28 @@ typedef enum {
     UIPinchGestureRecognizer* pinchToZoom = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(handlePinchGesture:)];
     [view addGestureRecognizer:pinchToZoom];
     
-    
-    swipeGesture = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(handleSwipeGesture:)];
-    swipeGesture.delegate = self;
-    swipeGesture.enabled = NO;
-    swipeGesture.direction = UISwipeGestureRecognizerDirectionUp;
-    swipeGesture.numberOfTouchesRequired = 2;
-    [view addGestureRecognizer:swipeGesture];
-    
+    _twoFingerSwipeUpGesture = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(handleTwoFingerSwipeUpGesture:)];
+    _twoFingerSwipeUpGesture.delegate = self;
+    _twoFingerSwipeUpGesture.enabled = NO;
+    _twoFingerSwipeUpGesture.direction = UISwipeGestureRecognizerDirectionUp;
+    _twoFingerSwipeUpGesture.numberOfTouchesRequired = 2;
+    [view addGestureRecognizer:_twoFingerSwipeUpGesture];
+
+    _twoFingerSwipeDownGesture = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(handleTwoFingerSwipeDownGesture:)];
+    _twoFingerSwipeDownGesture.delegate = self;
+    _twoFingerSwipeDownGesture.enabled = NO;
+    _twoFingerSwipeDownGesture.direction = UISwipeGestureRecognizerDirectionDown;
+    _twoFingerSwipeDownGesture.numberOfTouchesRequired = 2;
+    [view addGestureRecognizer:_twoFingerSwipeDownGesture];
+
     //Translation along X, Y
-    twoFingerTranslation = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleTwoFingerPanGesture:)];
-    twoFingerTranslation.minimumNumberOfTouches = 2;
-    twoFingerTranslation.maximumNumberOfTouches = 2;
-    twoFingerTranslation.delegate = self;
-    [twoFingerTranslation requireGestureRecognizerToFail:swipeGesture];
-    [view addGestureRecognizer:twoFingerTranslation];
+    _twoFingerTranslation = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleTwoFingerPanGesture:)];
+    _twoFingerTranslation.minimumNumberOfTouches = 2;
+    _twoFingerTranslation.maximumNumberOfTouches = 2;
+    _twoFingerTranslation.delegate = self;
+    [_twoFingerTranslation requireGestureRecognizerToFail:_twoFingerSwipeDownGesture];
+    [_twoFingerTranslation requireGestureRecognizerToFail:_twoFingerSwipeUpGesture];
+    [view addGestureRecognizer:_twoFingerTranslation];
     
     //Rotate along Z-axis
     UIRotationGestureRecognizer* rotationInPlaneOfScreen = [[UIRotationGestureRecognizer alloc] initWithTarget:self action:@selector(handleRotationGesture:)];
@@ -209,8 +215,15 @@ typedef enum {
 //#pragma mark - UIGestureRecognizerDelegate
 -(BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
 {
-    if (gestureRecognizer == swipeGesture &&
-        otherGestureRecognizer == twoFingerTranslation)
+    if ([SettingsManager sharedInstance].transform) {
+        return NO;
+    }
+    if (gestureRecognizer == _twoFingerSwipeUpGesture &&
+        otherGestureRecognizer == _twoFingerTranslation)
+    {
+        return YES;
+    } else if (gestureRecognizer == _twoFingerSwipeDownGesture &&
+               otherGestureRecognizer == _twoFingerTranslation)
     {
         return YES;
     }
@@ -230,7 +243,6 @@ typedef enum {
         if (![SettingsManager sharedInstance].transform) {
             if (_pMesh.modState == MODIFICATION_PIN_POINT_SET) {
                 [_pMesh deleteCurrentPinPoint];
-                swipeGesture.enabled = NO;
             } else if (_pMesh.modState == MODIFICATION_NONE) {
                 GLKVector3 modelCoord;
                 if (![self modelCoordinates:&modelCoord forGesture:sender]) {
@@ -238,7 +250,8 @@ typedef enum {
                     return;
                 }
                 [_pMesh createPinPoint:modelCoord];
-                swipeGesture.enabled = YES;
+                _twoFingerSwipeDownGesture.enabled = YES;
+                _twoFingerSwipeUpGesture.enabled = YES;
             }
         }
     }
@@ -276,6 +289,22 @@ typedef enum {
 
 -(void)handleTwoFingeTapGesture:(UIGestureRecognizer*)sender {
     [SettingsManager sharedInstance].transform = ![SettingsManager sharedInstance].transform;
+    if ([SettingsManager sharedInstance].transform) {
+        _twoFingerSwipeUpGesture.enabled = NO;
+        _twoFingerSwipeDownGesture.enabled = NO;
+    } else{
+        BOOL enabled = NO;
+        if (_pMesh.modState == MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE ||
+            _pMesh.modState == MODIFICATION_BRANCH_COPIED_BRANCH_FOR_CLONING ||
+            _pMesh.modState == MODIFICATION_PIN_POINT_SET)
+        {
+            enabled = YES;
+        }
+        _twoFingerSwipeUpGesture.enabled = enabled;
+        _twoFingerSwipeDownGesture.enabled = enabled;
+        
+    }
+    
     _transformModeLabel.alpha = 1.0f;
     if ([SettingsManager sharedInstance].transform) {
         _transformModeLabel.text = @"Transform";
@@ -475,9 +504,9 @@ typedef enum {
                 
                 float averageSpeed = _speedSum/_touchCount;
                 NSLog(@"Average Speed: %f", averageSpeed);
-                std::vector<std::vector<GLKVector3>> allRibs;
+//                std::vector<std::vector<GLKVector3>> allRibs;
                 
-                allRibs = [_pMesh endCreateBranchBended:lastPoint
+                 [_pMesh endCreateBranchBended:lastPoint
                                       touchedModelStart:touchedModelStart
                                         touchedModelEnd:touchedModelEnd
                                             shouldStick:shouldStick
@@ -487,28 +516,28 @@ typedef enum {
                 _drawingState = TOUCHED_NONE;
                 _selectionLine = nil;
                 
-                _ribsLines = [[NSMutableArray alloc] initWithCapacity:allRibs.size()];
-                for (int i = 0; i <allRibs.size();i++) {
-                    std::vector<GLKVector3> rib = allRibs[i];
-                    NSMutableData* vData = [[NSMutableData alloc] init];
-    //                for (GLKVector3 v: rib) {
-
-                    for (int j = 0; j < rib.size(); j++) {
-                        GLKVector3 v = rib[j];
-                        GLubyte b = 0;
-                        GLubyte r = 0;
-    //                                            GLubyte b = j * (255.0f/rib.size());
-                        if (j%2 ==0) {
-                            r = 255;
-                        } else {
-                            b = 255;
-                        }
-                        VertexRGBA vertex1 = {{v.x, v.y, v.z}, {r,b,0,255}};
-                        [vData appendBytes:&vertex1 length:sizeof(VertexRGBA)];
-                    }
-                    Line* line = [[Line alloc] initWithVertexData:vData];
-                    [_ribsLines addObject:line];
-                }
+//                _ribsLines = [[NSMutableArray alloc] initWithCapacity:allRibs.size()];
+//                for (int i = 0; i <allRibs.size();i++) {
+//                    std::vector<GLKVector3> rib = allRibs[i];
+//                    NSMutableData* vData = [[NSMutableData alloc] init];
+//    //                for (GLKVector3 v: rib) {
+//
+//                    for (int j = 0; j < rib.size(); j++) {
+//                        GLKVector3 v = rib[j];
+//                        GLubyte b = 0;
+//                        GLubyte r = 0;
+//    //                                            GLubyte b = j * (255.0f/rib.size());
+//                        if (j%2 ==0) {
+//                            r = 255;
+//                        } else {
+//                            b = 255;
+//                        }
+//                        VertexRGBA vertex1 = {{v.x, v.y, v.z}, {r,b,0,255}};
+//                        [vData appendBytes:&vertex1 length:sizeof(VertexRGBA)];
+//                    }
+//                    Line* line = [[Line alloc] initWithVertexData:vData];
+//                    [_ribsLines addObject:line];
+//                }
 
     //            _bbox = _pMesh.boundingBox;
     //            _translationManager.scaleFactor = _bbox.radius;
@@ -609,7 +638,8 @@ typedef enum {
             } else if (sender.state == UIGestureRecognizerStateEnded) {
                 _selectionLine = nil;
                 _selectionLine2 = nil;
-                std::vector<std::vector<GLKVector3>> allRibs = [_pMesh endCreateBody];
+//                std::vector<std::vector<GLKVector3>> allRibs =
+                [_pMesh endCreateBody];
             }
                 
     //            _ribsLines = [[NSMutableArray alloc] initWithCapacity:allRibs.size()];
@@ -691,7 +721,7 @@ typedef enum {
     }
 }
 
--(void)handleSwipeGesture:(UIGestureRecognizer*)sender {
+-(void)handleTwoFingerSwipeUpGesture:(UIGestureRecognizer*)sender {
     if (_pMesh.modState == MODIFICATION_PIN_POINT_SET) {
         GLKVector3 modelCoord;
         if (![self modelCoordinates:&modelCoord forGesture:sender]) {
@@ -699,13 +729,16 @@ typedef enum {
             return;
         }
         [_pMesh copyBranchToBuffer:modelCoord];
-    } else if (_pMesh.modState == MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE) {
+    }
+}
+
+-(void)handleTwoFingerSwipeDownGesture:(UIGestureRecognizer*)sender {
+    if (_pMesh.modState == MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE) {
         [_pMesh attachClonedBranch];
     } else if (_pMesh.modState == MODIFICATION_BRANCH_COPIED_BRANCH_FOR_CLONING) {
         [_pMesh dismissCopiedBranch];
     }
 }
-
 
 #pragma mark - Helpers
 
@@ -808,6 +841,7 @@ typedef enum {
     
     if (_pMesh == nil) {
         _pMesh = [[PolarAnnularMesh alloc] init];
+        _pMesh.delegate = self;
     }
 
     //Load obj file
@@ -830,6 +864,7 @@ typedef enum {
     
     if (_pMesh == nil) {
         _pMesh = [[PolarAnnularMesh alloc] init];
+        _pMesh.delegate = self;
     }
     
     //Load obj file
@@ -1049,11 +1084,26 @@ typedef enum {
     [SettingsManager sharedInstance].showSkeleton = show;
     [_pMesh showSkeleton:show];
 }
-
--(void)transformModeIsOn:(BOOL)isOn {
-    //overwrite
-    [SettingsManager sharedInstance].transform = isOn;
-}
+//
+//-(void)transformModeIsOn:(BOOL)isOn {
+//    //overwrite
+//    if (isOn) {
+//        _twoFingerSwipeUpGesture.enabled = NO;
+//        _twoFingerSwipeDownGesture.enabled = NO;
+//    } else{
+//        BOOL enabled = NO;
+//        if (_pMesh.modState == MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE ||
+//            _pMesh.modState == MODIFICATION_BRANCH_COPIED_BRANCH_FOR_CLONING ||
+//            _pMesh.modState == MODIFICATION_PIN_POINT_SET)
+//        {
+//            enabled = YES;
+//        }
+//        _twoFingerSwipeUpGesture.enabled = enabled;
+//        _twoFingerSwipeDownGesture.enabled = enabled;
+//
+//    }
+//    [SettingsManager sharedInstance].transform = isOn;
+//}
 
 -(void)clearModel {
     //overwrite
@@ -1079,6 +1129,14 @@ typedef enum {
     viewMatrix = GLKMatrix4Identity;
     _zoomManager.scaleMatrix = GLKMatrix4Identity;
     //    [_branchPoints removeAllObjects];
+}
+
+#pragma mark - PolarAnnularMeshDelegate
+-(void)modStateChangedTo:(CurrentModification)modState {
+    if (modState == MODIFICATION_NONE) {
+        _twoFingerSwipeUpGesture.enabled = NO;
+        _twoFingerSwipeDownGesture.enabled = NO;
+    }
 }
 
 @end

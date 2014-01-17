@@ -150,6 +150,7 @@ using namespace HMesh;
 -(void)setMeshFromObjFile:(NSString*)objFilePath {
 
     _modState = MODIFICATION_NONE;
+    [self.delegate modStateChangedTo:_modState];
     _objLoaded = YES;
     
     //Load manifold
@@ -1036,11 +1037,14 @@ using namespace HMesh;
     }
     
     _modState = MODIFICATION_NONE;
+    [self.delegate modStateChangedTo:_modState];
     
     _edges_to_scale.clear();
     _all_vector_vid.clear();
     
     [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
+
+
 }
 
 #pragma mark - UTILITIES BRANCH CREATION
@@ -1097,17 +1101,18 @@ using namespace HMesh;
 }
 
 
--(vector<vector<GLKVector3>>)endCreateBranchBended:(GLKVector3)touchPoint
+-(void)endCreateBranchBended:(GLKVector3)touchPoint
                                  touchedModelStart:(BOOL)touchedModelStart
                                    touchedModelEnd:(BOOL)touchedModelEnd
                                        shouldStick:(BOOL)shouldStick
                                          touchSize:(float)touchSize
                                  averageTouchSpeed:(float)touchSpeed
 {
-    vector<vector<GLKVector3>> empty;
+//    vector<vector<GLKVector3>> empty;
     
     if (![self isLoaded]) {
-        return empty;
+        return;
+//        return empty;
     }
     
     VertexID touchedVID;
@@ -1118,7 +1123,8 @@ using namespace HMesh;
     }
     
     if (is_pole(_manifold, touchedVID)) {
-        return empty;
+        return;
+//        return empty;
     }
     
     if ( _touchPoints.size() < 8) {
@@ -1127,7 +1133,8 @@ using namespace HMesh;
         } else {
             NSLog(@"[PolarAnnularMesh][WARNING] Garbage point data");
         }
-        return empty;
+//        return empty;
+        return;
     }
     
     [self saveState];
@@ -1146,7 +1153,8 @@ using namespace HMesh;
     if (rawSkeleton.size() < 8) {
         NSLog(@"[PolarAnnularMesh][WARNING] Not enough controids");
         [self createBumpAtPoint:_touchPoints touchedModel:touchedModelStart touchSpeed:touchSpeed touchSize:touchSize];
-        return empty;
+//        return empty;
+        return;
     }
     
     //Create new pole
@@ -1157,7 +1165,8 @@ using namespace HMesh;
 
     int limbWidth = [self branchWidthForTouchSpeed:touchSpeed touchPoint:touchedVID];
     if (limbWidth <= 1 ) {
-        return empty;
+//        return empty;
+        return;
     }
 
     NSLog(@"Limb Width: %i", limbWidth);
@@ -1172,7 +1181,8 @@ using namespace HMesh;
     
     if (!result) {
         [self undo];
-        return empty;
+//        return empty;
+        return;
     }
 
     float END_zValueTouched;
@@ -1187,7 +1197,8 @@ using namespace HMesh;
         }
         if (is_pole(_manifold, END_touchedVID)) {
             [self undo];
-            return empty;
+//            return empty;
+            return;
         }
         
         //Create new pole
@@ -1208,7 +1219,8 @@ using namespace HMesh;
         
         if (!result) {
             [self undo];
-            return empty;
+//            return empty;
+            return;
         }
         
         //closest to the first centroid between two fingers vertex in 2D space
@@ -1400,7 +1412,7 @@ using namespace HMesh;
     }
 
     [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
-    return allRibs;
+//    return allRibs;
 }
 
 
@@ -1417,11 +1429,12 @@ using namespace HMesh;
     _touchPoints.push_back(touchPoint2);
 }
 
--(std::vector<vector<GLKVector3>>)endCreateBody {
+-(void)endCreateBody {
     
     if (_touchPoints.size() < 8 || _touchPoints.size() % 2 != 0) {
         NSLog(@"[PolarAnnularMesh][WARNING] Garbage point data");
-        return vector<vector<GLKVector3>>();
+//        return vector<vector<GLKVector3>>();
+        return;
     }
     
     [self saveState];
@@ -1444,7 +1457,8 @@ using namespace HMesh;
     [PAMUtilities centroids:rawSkeleton ribWidth:skeletonWidth forTwoFingerTouchPoint:touchPointsWorld withNextCentroidStep:c_step];
     if (rawSkeleton.size() < 4) {
         NSLog(@"[PolarAnnularMesh][WARNING] Not enough controids");
-        return vector<vector<GLKVector3>>();
+//        return vector<vector<GLKVector3>>();
+        return;
     }
     
     //Smooth
@@ -1503,7 +1517,7 @@ using namespace HMesh;
     [self populateManifold:allRibs];
     allRibs.push_back(skeletonModel);
     
-    return allRibs;
+//    return allRibs;
 }
 
 #pragma mark - BRANCH STICHING
@@ -1731,6 +1745,7 @@ using namespace HMesh;
     
     //    _branchWidth = 1;
     _modState = MODIFICATION_NONE;
+    [self.delegate modStateChangedTo:_modState];
     
     //Calculate Bounding Box
     Manifold::Vec pmin = Manifold::Vec();
@@ -1801,6 +1816,7 @@ using namespace HMesh;
 -(void)deleteCurrentPinPoint {
     _modState = MODIFICATION_NONE;
     _pinPointLine = nil;
+    [self.delegate modStateChangedTo:_modState];
 }
 
 -(void)createPivotPoint:(GLKVector3)touchPoint
@@ -2369,8 +2385,9 @@ using namespace HMesh;
 
 -(void)dismissCopiedBranch {
     _modState = MODIFICATION_NONE;
-    [self changeVerticiesColor:_original_verticies_copied toSelected:YES];
+    [self changeVerticiesColor:_original_verticies_copied toSelected:NO];
     _pinPointLine = nil;
+    [self.delegate modStateChangedTo:_modState];
 }
 
 -(BOOL)cloneBranchTo:(GLKVector3)touchPoint {
@@ -2452,6 +2469,7 @@ using namespace HMesh;
     
     [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
     [self changeVerticiesColor:_cloned_verticies toColor:Vec4uc(0,200,0,255)];
+    [self changeVerticiesColor:_original_verticies_copied toSelected:YES];
     _modState = MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE;
 
     return YES;
@@ -2480,16 +2498,23 @@ using namespace HMesh;
     HalfEdgeID cloneBranchUpperOppRibEdge = _manifold.walker(_cloningBranchLowerRibEdge).opp().halfedge();
     [self stitchBranch:_cloningBranchLowerRibEdge toBody:boundaryHalfEdge];
     
-    [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
+    
     vector<VertexID> verteciesToSmooth;
     for (Walker w = _manifold.walker(cloneBranchUpperOppRibEdge); !w.full_circle(); w = w.next().opp().next()) {
         verteciesToSmooth.push_back(w.vertex());
     }
     
-    [self smoothVerticies:verteciesToSmooth iter:10 isSpine:YES brushSize:0.1];
+    if (_objLoaded) {
+        [self smoothVerticies:verteciesToSmooth iter:2 isSpine:NO brushSize:0.1];
+    } else {
+        [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
+        [self smoothVerticies:verteciesToSmooth iter:10 isSpine:YES brushSize:0.1];
+    }
+    
     [self rebufferWithCleanup:YES bufferData:YES edgeTrace:NO];
+    [self changeVerticiesColor:_original_verticies_copied toSelected:YES];
     _cloned_verticies.clear();
-    _modState = MODIFICATION_BRANCH_COPIED_BRANCH_FOR_CLONING;
+    _modState = MODIFICATION_BRANCH_COPIED_BRANCH_FOR_CLONING;    
     return YES;
 }
 
@@ -2923,6 +2948,7 @@ using namespace HMesh;
     
     _all_vector_vid.clear();
     _modState = MODIFICATION_NONE;
+    [self.delegate modStateChangedTo:_modState];
     return YES;
 }
 
@@ -3111,7 +3137,7 @@ using namespace HMesh;
     if (isSelected) {
         selectColor = Vec4uc(240, 0, 0, 255);
     } else {
-        selectColor = Vec4uc(0,0,0,255);
+        selectColor = Vec4uc(180,180,180,255);
     }
     [self changeWireFrameColor:vertecies toColor:selectColor];
     
@@ -3135,7 +3161,7 @@ using namespace HMesh;
     if (isSelected) {
         selectColor = Vec4uc(240, 0, 0, 255);
     } else {
-        selectColor = Vec4uc(0,0,0,255);
+        selectColor = Vec4uc(200,200,200,255);
     }
     [self changeVerticiesColor:vertecies toColor:selectColor];
 }
@@ -3155,7 +3181,7 @@ using namespace HMesh;
     if (isSelected) {
         selectColor = Vec4uc(240, 0, 0, 255);
     } else {
-        selectColor = Vec4uc(0,0,0,255);
+        selectColor = Vec4uc(200,200,200,255);
     }
     
     [self.colorDataBuffer bind];

@@ -60,6 +60,9 @@ typedef enum {
 //    //Branch deletion/moving
 //    GLKVector3 _detachStartPoint;
 //    GLKVector3 _detachStartPoint;
+    
+    UISwipeGestureRecognizer* swipeGesture;
+    UIPanGestureRecognizer* twoFingerTranslation;
 }
 @end
 
@@ -158,15 +161,26 @@ typedef enum {
     UIPinchGestureRecognizer* pinchToZoom = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(handlePinchGesture:)];
     [view addGestureRecognizer:pinchToZoom];
     
+    
+    swipeGesture = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(handleSwipeGesture:)];
+    swipeGesture.delegate = self;
+    swipeGesture.enabled = NO;
+    swipeGesture.direction = UISwipeGestureRecognizerDirectionUp;
+    swipeGesture.numberOfTouchesRequired = 2;
+    [view addGestureRecognizer:swipeGesture];
+    
     //Translation along X, Y
-    UIPanGestureRecognizer* twoFingerTranslation = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleTwoFingerPanGesture:)];
+    twoFingerTranslation = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleTwoFingerPanGesture:)];
     twoFingerTranslation.minimumNumberOfTouches = 2;
     twoFingerTranslation.maximumNumberOfTouches = 2;
+    twoFingerTranslation.delegate = self;
+    [twoFingerTranslation requireGestureRecognizerToFail:swipeGesture];
     [view addGestureRecognizer:twoFingerTranslation];
     
     //Rotate along Z-axis
     UIRotationGestureRecognizer* rotationInPlaneOfScreen = [[UIRotationGestureRecognizer alloc] initWithTarget:self action:@selector(handleRotationGesture:)];
     [view addGestureRecognizer:rotationInPlaneOfScreen];
+    
     
     //ArcBall Rotation
     PAMPanGestureRecognizer* oneFingerPanning = [[PAMPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleOneFingerPanGesture:)];
@@ -188,13 +202,20 @@ typedef enum {
     UILongPressGestureRecognizer* longPress = [[ UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGesture:)];
     longPress.numberOfTouchesRequired = 1;
     [view addGestureRecognizer:longPress];
+    
 
 }
 
 //#pragma mark - UIGestureRecognizerDelegate
-//-(BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
-//    
-//}
+-(BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
+{
+    if (gestureRecognizer == swipeGesture &&
+        otherGestureRecognizer == twoFingerTranslation)
+    {
+        return YES;
+    }
+    return NO;
+}
 
 #pragma mark - Gesture recognizer selectors
 -(void)handleLongPressGesture:(UIGestureRecognizer*)sender {
@@ -209,6 +230,7 @@ typedef enum {
         if (![SettingsManager sharedInstance].transform) {
             if (_pMesh.modState == MODIFICATION_PIN_POINT_SET) {
                 [_pMesh deleteCurrentPinPoint];
+                swipeGesture.enabled = NO;
             } else if (_pMesh.modState == MODIFICATION_NONE) {
                 GLKVector3 modelCoord;
                 if (![self modelCoordinates:&modelCoord forGesture:sender]) {
@@ -216,6 +238,7 @@ typedef enum {
                     return;
                 }
                 [_pMesh createPinPoint:modelCoord];
+                swipeGesture.enabled = YES;
             }
         }
     }
@@ -231,6 +254,14 @@ typedef enum {
             return;
         }
         [_pMesh moveDetachedBranchToPoint:modelCoord];
+    } else if (_pMesh.modState == MODIFICATION_BRANCH_COPIED_BRANCH_FOR_CLONING) {
+        GLKVector3 modelCoord;
+        if (![self modelCoordinates:&modelCoord forGesture:sender]) {
+            NSLog(@"[WARNING] Touched background");
+            return;
+        }
+
+        [_pMesh cloneBranchTo:modelCoord];
     }
 }
 
@@ -431,7 +462,7 @@ typedef enum {
                 BOOL touchedModelStart = _drawingState == TOUCHED_MODEL;
                 BOOL touchedModelEnd = [self modelCoordinates:&modelCoord forGesture:sender];
 //                BOOL shouldStick = cur_speed < 10;
-                BOOL shouldStick = YES;
+                BOOL shouldStick = NO;
                 [self rayOrigin:&rayOrigin rayDirection:&rayDirection forGesture:sender];
                 rayOrigin = GLKVector3Add(rayOrigin, rayDirection);
                 
@@ -646,7 +677,32 @@ typedef enum {
             } else if (sender.state == UIGestureRecognizerStateEnded) {
                 [_pMesh endRotateDetachedBranch:rotGesture.rotation];
             }
+        } else if (_pMesh.modState == MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE ||
+                   _pMesh.modState == MODIFICATION_BRANCH_CLONE_ROTATION)
+        {
+            if (sender.state == UIGestureRecognizerStateBegan) {
+                [_pMesh startRotateClonedBranch:rotGesture.rotation];
+            } else if (sender.state == UIGestureRecognizerStateChanged) {
+                [_pMesh continueRotateClonedBranch:rotGesture.rotation];
+            } else if (sender.state == UIGestureRecognizerStateEnded) {
+                [_pMesh endRotateClonedBranch:rotGesture.rotation];
+            }
         }
+    }
+}
+
+-(void)handleSwipeGesture:(UIGestureRecognizer*)sender {
+    if (_pMesh.modState == MODIFICATION_PIN_POINT_SET) {
+        GLKVector3 modelCoord;
+        if (![self modelCoordinates:&modelCoord forGesture:sender]) {
+            NSLog(@"[WARNING] Touched background");
+            return;
+        }
+        [_pMesh copyBranchToBuffer:modelCoord];
+    } else if (_pMesh.modState == MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE) {
+        [_pMesh attachClonedBranch];
+    } else if (_pMesh.modState == MODIFICATION_BRANCH_COPIED_BRANCH_FOR_CLONING) {
+        [_pMesh dismissCopiedBranch];
     }
 }
 

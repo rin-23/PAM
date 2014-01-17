@@ -91,6 +91,22 @@ using namespace HMesh;
     Vec _zRotateVec;
     Vec _zRotatePos;
     
+    //CLONING
+    HalfEdgeID _cloningDirection;
+    HalfEdgeID _cloningBodyUpperRibEdge;
+    HalfEdgeID _cloningBranchLowerRibEdge;
+    HalfEdgeID _cloningSecondRing;
+    VertexID _newClonedVertexID;
+    int _copyNumBoundaryRibSegments;
+
+    //copy buffer
+    vector<Vecf> _copyVerticies;
+    vector<int> _copyFaces;
+    vector<int> _copyIndices;
+    vector<VertexID> _cloned_verticies;
+    vector<VertexID> _original_verticies_copied;
+    
+    
     CurrentModification _prevMod;
     
     BOOL _objLoaded;
@@ -354,7 +370,6 @@ using namespace HMesh;
         }
     }
     [self changeWireFrameColor:verticies toSelected:YES];
-    
 }
 
 -(BOOL)isLoaded; {
@@ -1223,51 +1238,50 @@ using namespace HMesh;
     
     //Smooth
     vector<GLKVector3> skeleton = [PAMUtilities laplacianSmoothing3D:rawSkeleton iterations:3];
-//    
-//    //Skeleton should start from the branch point
-//    GLKVector3 translate = GLKVector3Subtract(touchedV_world, skeleton[0]);
-//    for (int i = 0; i < skeleton.size(); i++) {
-//        skeleton[i] = GLKVector3Add(skeleton[i], translate);
-//    }
 
-//    [self rebufferWithCleanup:YES bufferData:YES edgeTrace:NO];
-//    return empty;
+    if (!shouldStick) {
+        
+        //Skeleton should start from the branch point
+        GLKVector3 translate = GLKVector3Subtract(touchedV_world, skeleton[0]);
+        for (int i = 0; i < skeleton.size(); i++) {
+            skeleton[i] = GLKVector3Add(skeleton[i], translate);
+        }
+        
+        //Length
+        float totalLength = 0;
+        GLKVector3 lastSkelet = skeleton[0];
+        for (int i = 1; i < skeleton.size(); i++) {
+            totalLength += GLKVector3Distance(lastSkelet, skeleton[i]);
+            lastSkelet = skeleton[i];
+        }
+        
+        float deformLength = 0.1f * totalLength;
+        int deformIndex;
+        totalLength = 0;
+        lastSkelet = skeleton[0];
+
+        for (int i = 1; i < skeleton.size(); i++) {
+            totalLength += GLKVector3Distance(lastSkelet, skeleton[i]);
+            lastSkelet = skeleton[i];
+            if (totalLength > deformLength) {
+                deformIndex = i + 1;
+                break;
+            }
+        }
     
-//    //Length
-//    float totalLength = 0;
-//    GLKVector3 lastSkelet = skeleton[0];
-//    for (int i = 1; i < skeleton.size(); i++) {
-//        totalLength += GLKVector3Distance(lastSkelet, skeleton[i]);
-//        lastSkelet = skeleton[i];
-//    }
-//    
-//    float deformLength = 0.1f * totalLength;
-//    int deformIndex;
-//    totalLength = 0;
-//    lastSkelet = skeleton[0];
-//
-//    for (int i = 1; i < skeleton.size(); i++) {
-//        totalLength += GLKVector3Distance(lastSkelet, skeleton[i]);
-//        lastSkelet = skeleton[i];
-//        if (totalLength > deformLength) {
-//            deformIndex = i + 1;
-//            break;
-//        }
-//    }
-    
-//    //Move branch by weighted norm
-//    GLKVector3 holeNormWorld = GLKVector3Normalize([Utilities matrix4:self.modelViewMatrix multiplyVector3NoTranslation:holeNorm]);
-//    holeNormWorld = GLKVector3MultiplyScalar(holeNormWorld, deformLength);
-//    for (int i = 0; i < skeleton.size(); i++) {
-//        if (i < deformIndex) {
-//            float x = (float)i/(float)deformIndex;
-//            float weight = sqrt(x);
-//            skeleton[i] = GLKVector3Add(skeleton[i], GLKVector3MultiplyScalar(holeNormWorld, weight));
-//        } else {
-//            skeleton[i] = GLKVector3Add(skeleton[i], holeNormWorld);
-//        }
-//    }
-   
+        //Move branch by weighted norm
+        GLKVector3 holeNormWorld = GLKVector3Normalize([Utilities matrix4:self.modelViewMatrix multiplyVector3NoTranslation:holeNorm]);
+        holeNormWorld = GLKVector3MultiplyScalar(holeNormWorld, deformLength);
+        for (int i = 0; i < skeleton.size(); i++) {
+            if (i < deformIndex) {
+                float x = (float)i/(float)deformIndex;
+                float weight = sqrt(x);
+                skeleton[i] = GLKVector3Add(skeleton[i], GLKVector3MultiplyScalar(holeNormWorld, weight));
+            } else {
+                skeleton[i] = GLKVector3Add(skeleton[i], holeNormWorld);
+            }
+        }
+    }
     skeleton = [PAMUtilities laplacianSmoothing3D:skeleton iterations:1];
     
     //Get norm vectors for skeleton joints
@@ -2277,6 +2291,378 @@ using namespace HMesh;
     }
 }
 
+#pragma mark - CLONING BRANCHES
+-(BOOL)copyBranchToBuffer:(GLKVector3)touchPoint {
+    if (_modState != MODIFICATION_PIN_POINT_SET) {
+        NSLog(@"[WARNING][PolarAnnularMesh] Cant copy. Pin point is not chosen");
+        return NO;
+    }
+    
+    VertexID touchVID = [self closestVertexID_2D:touchPoint];
+    VertexID pinV = _pinVertexID;
+    
+    if (valency(_manifold, pinV) == 6) {
+        NSLog(@"stop here");
+        return NO;
+    }
+    
+    Vec pinPos = _manifold.pos(pinV);
+    //Decide which side to delete
+    Walker up = _manifold.walker(pinV);
+    if (!_edgeInfo[up.halfedge()].is_spine()) {
+        up = up.prev().opp();
+    }
+    assert(_edgeInfo[up.halfedge()].is_spine());
+    Walker down = up.prev().opp().prev().opp();
+    assert(_edgeInfo[down.halfedge()].is_spine());
+    
+    Vec downVec = _manifold.pos(down.vertex()) - pinPos;
+    downVec.normalize();
+    Vec upVec = _manifold.pos(up.vertex()) - pinPos;
+    upVec.normalize();
+    Vec touchVec = _manifold.pos(touchVID) - pinPos;
+    touchVec.normalize();
+    
+    float downDotP = dot(downVec, touchVec);
+    float upDotP = dot(upVec, touchVec);
+
+    Walker toWalker = up;
+    if (downDotP >= 0) {
+        toWalker = down;
+    }
+    _cloningDirection = toWalker.halfedge();
+    _cloningBodyUpperRibEdge = toWalker.prev().halfedge();
+    
+    //Number of rib segments araound boundary rib
+    _copyNumBoundaryRibSegments = 0;
+    for (Walker boundaryW = _manifold.walker(_cloningBodyUpperRibEdge);
+         !boundaryW.full_circle();
+         boundaryW = boundaryW.next().opp().next())
+    {
+        _copyNumBoundaryRibSegments++;
+    }
+
+    //find all verticies that we need to delete
+    _original_verticies_copied =  [self allVerticiesInDirection:toWalker];
+    vector<VertexID> all_verticies_to_delete =  [self allVerticiesInDirection:toWalker.opp()];
+//        [self changeVerticiesColor:all_verticies_to_delete toSelected:YES];
+
+    //remove verticies from duplicate manifold, so that only copy part is left
+    Manifold copyMani = _manifold;
+    for (VertexID vID: all_verticies_to_delete) {
+        copyMani.remove_vertex(vID);
+    }
+    copyMani.cleanup();
+    
+
+    _copyFaces.clear();
+    _copyIndices.clear();
+    _copyVerticies.clear();
+    [self extractFromManifold:copyMani verticies:_copyVerticies faces:_copyFaces indicies:_copyIndices];
+
+    [self changeVerticiesColor:_original_verticies_copied toSelected:YES];
+    
+//    _pinPointLine = nil;
+    _modState = MODIFICATION_BRANCH_COPIED_BRANCH_FOR_CLONING;
+    return YES;
+}
+
+-(void)dismissCopiedBranch {
+    _modState = MODIFICATION_NONE;
+    [self changeVerticiesColor:_original_verticies_copied toSelected:YES];
+    _pinPointLine = nil;
+}
+
+-(BOOL)cloneBranchTo:(GLKVector3)touchPoint {
+    if (_modState != MODIFICATION_BRANCH_COPIED_BRANCH_FOR_CLONING) {
+        NSLog(@"[WARNING] No branch was chosen for cloning");
+    }
+
+    VertexID touchVID = [self closestVertexID_3D:touchPoint];
+    _newClonedVertexID = touchVID;
+    Vec touchPos = _manifold.pos(touchVID);
+    Vec normal = HMesh::normal(_manifold, touchVID);
+    
+    //check if you can possible move here
+    int numRibSegments = count_rib_segments(_manifold, _edgeInfo, touchVID);
+    if (numRibSegments - 2 < _copyNumBoundaryRibSegments) {
+        return NO;
+    }
+
+    [self saveState];
+    
+    assert(_copyVerticies.size() != 0);
+    assert(_copyFaces.size() != 0);
+    assert(_copyIndices.size() != 0);
+    
+    FaceIDIterator lastFace = _manifold.faces_end();
+    _manifold.build(_copyVerticies.size(),
+                    reinterpret_cast<float*>(&_copyVerticies[0]),
+                    _copyFaces.size(),
+                    &_copyFaces[0],
+                    &_copyIndices[0]);
+    
+    lastFace++;
+    Walker w = _manifold.walker(*lastFace);
+
+
+    vector<HalfEdgeID>newEdges;
+    _cloned_verticies.clear();
+    [self allVerticies:_cloned_verticies halfEdges:newEdges fromVertex:w.vertex()];
+
+    Vec boundaryCentroid = Vec(centroid_for_rib(_manifold, _cloningBodyUpperRibEdge, _edgeInfo));
+    Vec toTouchPos = touchPos - boundaryCentroid;
+    for (VertexID vid: _cloned_verticies) {
+        _manifold.pos(vid) = _manifold.pos(vid) + toTouchPos;
+    }
+   
+    if (![self boundaryHalfEdgeForClonedMesh:_cloningBranchLowerRibEdge edges:newEdges]) {
+        [self undo];
+        return NO;
+    }
+    
+    vector<VertexID> verticies;
+    for(HalfEdgeID hid: newEdges)
+    {
+        Walker w = _manifold.walker(hid);
+        verticies.push_back(w.vertex());
+    }
+
+//    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
+//    [self changeWireFrameColor:_cloned_verticies toSelected:YES];
+//    return NO;
+
+    Walker toSecondRing = _manifold.walker(_cloningBranchLowerRibEdge);
+    toSecondRing = toSecondRing.next().next().opp().next().next().opp();
+    _cloningSecondRing = toSecondRing.halfedge();
+    Vec secondRingCentroid = Vec(centroid_for_rib(_manifold, _cloningSecondRing));
+    
+    Vec currentNorm = secondRingCentroid - touchPos;
+    
+    CGLA::Quatd q;
+    q.make_rot(normalize(currentNorm), normalize(normal));
+    
+    for (VertexID vid: _cloned_verticies) {
+        Vec p = _manifold.pos(vid);
+        p -= touchPos;
+        p = q.apply(p);
+        p += touchPos;
+        _manifold.pos(vid) = p;
+    }
+    
+    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
+    [self changeVerticiesColor:_cloned_verticies toColor:Vec4uc(0,200,0,255)];
+    _modState = MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE;
+
+    return YES;
+}
+
+-(BOOL)attachClonedBranch {
+    if (_modState != MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE)
+    {
+        NSLog(@"[WARNING][PolarAnnularMesh] Cant attach. Havent cloned");
+        return NO;
+    }
+    
+    //Create new pole
+    VertexID newPoleID;
+    float bWidth;
+    GLKVector3 holeCenter, holeNorm;
+    HalfEdgeID boundaryHalfEdge;
+    BOOL result = [self createHoleAtVertex:_newClonedVertexID
+                               numOfSpines:_copyNumBoundaryRibSegments/2
+                                  vertexID:&newPoleID
+                               branchWidth:&bWidth
+                                holeCenter:&holeCenter
+                                  holeNorm:&holeNorm
+                          boundaryHalfEdge:&boundaryHalfEdge];
+    
+    HalfEdgeID cloneBranchUpperOppRibEdge = _manifold.walker(_cloningBranchLowerRibEdge).opp().halfedge();
+    [self stitchBranch:_cloningBranchLowerRibEdge toBody:boundaryHalfEdge];
+    
+    [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
+    vector<VertexID> verteciesToSmooth;
+    for (Walker w = _manifold.walker(cloneBranchUpperOppRibEdge); !w.full_circle(); w = w.next().opp().next()) {
+        verteciesToSmooth.push_back(w.vertex());
+    }
+    
+    [self smoothVerticies:verteciesToSmooth iter:10 isSpine:YES brushSize:0.1];
+    [self rebufferWithCleanup:YES bufferData:YES edgeTrace:NO];
+    _cloned_verticies.clear();
+    _modState = MODIFICATION_BRANCH_COPIED_BRANCH_FOR_CLONING;
+    return YES;
+}
+
+-(BOOL)startRotateClonedBranch:(float)angle {
+    if (_modState != MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE)
+    {
+        NSLog(@"[WARNING][PolarAnnularMesh] Cant rotate non cloned branch");
+        return NO;
+    }
+    
+    _rotAngle = angle;
+    
+    Vec secondRingCentroid = Vec(centroid_for_rib(_manifold, _cloningSecondRing));
+    Vec touchPos = _manifold.pos(_newClonedVertexID);
+    _zRotatePos = touchPos;
+    _zRotateVec = secondRingCentroid - touchPos;;
+    _prevMod = _modState;
+    _current_rot_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
+    
+    _modState = MODIFICATION_BRANCH_CLONE_ROTATION;
+    return YES;
+}
+
+-(void)continueRotateClonedBranch:(float)angle {
+    _rotAngle = angle;
+}
+
+-(void)endRotateClonedBranch:(float)angle {
+    _rotAngle = angle;
+    _modState = _prevMod;
+    
+    CGLA::Quatd q;
+    q.make_rot(-_rotAngle, _zRotateVec);
+    
+    for (VertexID vid: _cloned_verticies) {
+        Vec p = _manifold.pos(vid);
+        p -= _zRotatePos;
+        p = q.apply(p);
+        p += _zRotatePos;
+        _manifold.pos(vid) = p;
+    }
+    _modState = MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE;
+}
+
+-(BOOL)boundaryHalfEdgeForClonedMesh:(HalfEdgeID&)boundaryHalfedge
+                        edges:(vector<HalfEdgeID>&)newHalfEdges
+{
+    for (HalfEdgeID hID: newHalfEdges) {
+        Walker w = _manifold.walker(hID);
+        if (w.face() == InvalidFaceID) {
+            boundaryHalfedge = w.halfedge();
+            return YES;
+        }
+    }
+    return NO;
+}
+
+-(void)allVerticies:(vector<VertexID>&)verticies halfEdges:(vector<HalfEdgeID>&)halfedges fromVertex:(VertexID)vID
+{
+    //Flood rotational area
+    HalfEdgeAttributeVector<EdgeInfo> sEdgeInfo(_manifold.allocated_halfedges());
+    queue<HalfEdgeID> hq;
+    
+    set<HalfEdgeID> floodEdgesSet;
+    circulate_vertex_ccw(_manifold, vID, [&](Walker w) {
+        sEdgeInfo[w.halfedge()] = EdgeInfo(SPINE, 0);
+        sEdgeInfo[w.opp().halfedge()] = EdgeInfo(SPINE, 0);
+        floodEdgesSet.insert(w.halfedge());
+        floodEdgesSet.insert(w.opp().halfedge());
+        hq.push(w.opp().halfedge());
+    });
+    
+    set<VertexID> floodVerticiesSet;
+    floodVerticiesSet.insert(vID);
+    while(!hq.empty())
+    {
+        HalfEdgeID h = hq.front();
+        Walker w = _manifold.walker(h);
+        hq.pop();
+        bool is_spine = _edgeInfo[h].edge_type == SPINE;
+        for (;!w.full_circle(); w=w.circulate_vertex_ccw(),is_spine = !is_spine) {
+            if(sEdgeInfo[w.halfedge()].edge_type == UNKNOWN)
+            {
+                EdgeInfo ei = is_spine ? EdgeInfo(SPINE,0) : EdgeInfo(RIB,0);
+                
+                floodVerticiesSet.insert(w.vertex());
+                floodVerticiesSet.insert(w.opp().vertex());
+                
+                floodEdgesSet.insert(w.halfedge());
+                floodEdgesSet.insert(w.opp().halfedge());
+
+                sEdgeInfo[w.halfedge()] = ei;
+                sEdgeInfo[w.opp().halfedge()] = ei;
+                
+                hq.push(w.opp().halfedge());
+            }
+        }
+    }
+    
+    vector<VertexID> floodVerticiesVector(floodVerticiesSet.begin(), floodVerticiesSet.end());
+    verticies = floodVerticiesVector;
+    
+    vector<HalfEdgeID> floodEdgesVector(floodEdgesSet.begin(), floodEdgesSet.end());
+    halfedges = floodEdgesVector;
+}
+
+-(vector<FaceID>)allFacesInDirection:(Walker)deleteDir {
+    //Flood rotational area
+    HalfEdgeAttributeVector<EdgeInfo> sEdgeInfo(_manifold.allocated_halfedges());
+    Walker bWalker = _manifold.walker(deleteDir.next().halfedge()); //Walk along pivot boundary loop
+    queue<HalfEdgeID> hq;
+    
+    for (;!bWalker.full_circle(); bWalker = bWalker.next().opp().next()) {
+        HalfEdgeID hID = bWalker.next().halfedge();
+        HalfEdgeID opp_hID = bWalker.next().opp().halfedge();
+        sEdgeInfo[hID] = EdgeInfo(SPINE, 0);
+        sEdgeInfo[opp_hID] = EdgeInfo(SPINE, 0);
+        hq.push(hID);
+    }
+    
+    set<FaceID> floodFacesSet;
+    while(!hq.empty())
+    {
+        HalfEdgeID h = hq.front();
+        Walker w = _manifold.walker(h);
+        hq.pop();
+        bool is_spine = _edgeInfo[h].edge_type == SPINE;
+        for (;!w.full_circle(); w=w.circulate_vertex_ccw(),is_spine = !is_spine) {
+            if(sEdgeInfo[w.halfedge()].edge_type == UNKNOWN)
+            {
+                EdgeInfo ei = is_spine ? EdgeInfo(SPINE,0) : EdgeInfo(RIB,0);
+                
+                floodFacesSet.insert(w.face());
+                floodFacesSet.insert(w.opp().face());
+                
+                sEdgeInfo[w.halfedge()] = ei;
+                sEdgeInfo[w.opp().halfedge()] = ei;
+                hq.push(w.opp().halfedge());
+            }
+        }
+    }
+    
+    vector<FaceID> floodFacesVector(floodFacesSet.begin(), floodFacesSet.end());
+    return floodFacesVector;
+}
+
+
+-(void)extractFromManifold:(Manifold&)mani
+                 verticies:(vector<Vecf>&)verticies
+                     faces:(vector<int>&)faces
+                  indicies:(vector<int>&) indices
+{
+    for (VertexIDIterator vid = mani.vertices_begin(); vid != mani.vertices_end(); ++vid) {
+        assert((*vid).index < mani.no_vertices());
+        Vecf position = mani.posf(*vid);
+        verticies.push_back(position);
+    }
+    
+    for (FaceIDIterator fid = mani.faces_begin(); fid != mani.faces_end(); ++fid) {
+        //iterate over every vertex of the face
+        int vertexNum = 0;
+        for(Walker w = mani.walker(*fid); !w.full_circle(); w = w.circulate_face_ccw()) {
+            //add vertex to the data array
+            VertexID vID = w.vertex();
+            unsigned int index = vID.index;
+            assert(index < mani.no_vertices());
+            vertexNum++;
+            indices.push_back(index);
+        }
+        faces.push_back(vertexNum);
+    }
+}
+
 #pragma mark - DELETING/REPOSITIONING BRANCH
 
 -(BOOL)detachBranch:(GLKVector3)touchPoint
@@ -2392,7 +2778,7 @@ using namespace HMesh;
     _deletingBranchFromBody = deletingBranchFromBody;
     
     //Start flooding and get all the verticies to delete/move
-    [self setBranchToDelete:toWalker];
+    _all_vector_vid = [self allVerticiesInDirection:toWalker];
 
     //Save info
     _deleteBodyUpperRibEdge = toWalker.prev().halfedge(); //botton rib
@@ -2636,7 +3022,7 @@ using namespace HMesh;
     }
 }
 
--(void)setBranchToDelete:(Walker)deleteDir {
+-(vector<VertexID>)allVerticiesInDirection:(Walker)deleteDir {
     //Flood rotational area
     HalfEdgeAttributeVector<EdgeInfo> sEdgeInfo(_manifold.allocated_halfedges());
     Walker bWalker = _manifold.walker(deleteDir.next().halfedge()); //Walk along pivot boundary loop
@@ -2673,9 +3059,9 @@ using namespace HMesh;
     }
     
     vector<VertexID> floodVerticiesVector(floodVerticiesSet.begin(), floodVerticiesSet.end());
-    _all_vector_vid = floodVerticiesVector;
-//    [self changeVerticiesColor:floodVerticiesVector toSelected:YES];
+    return floodVerticiesVector;
 }
+
 
 -(void)closeHole:(HalfEdgeID)hID numberOfRingEdges:(int*)numOfEdges{
     Walker boundaryW = _manifold.walker(hID);
@@ -3001,6 +3387,28 @@ using namespace HMesh;
             memcpy(temp + index*VERTEX_SIZE, pos.get(), VERTEX_SIZE);
         }
 
+        glUnmapBufferOES(GL_ARRAY_BUFFER);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+    } else if (_modState == MODIFICATION_BRANCH_CLONE_ROTATION) {
+        CGLA::Quatd q;
+        q.make_rot(-_rotAngle, _zRotateVec);
+        
+        for (VertexID vid: _cloned_verticies) {
+            Vec p = _manifold.pos(vid);
+            p -= _zRotatePos;
+            p = q.apply(p);
+            p += _zRotatePos;
+            _current_rot_position[vid] = Vecf(p);;
+        }
+        [self.vertexDataBuffer bind];
+        
+        unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
+        for (VertexID vid: _cloned_verticies) {
+            Vecf pos = _current_rot_position[vid];
+            int index = vid.index;
+            memcpy(temp + index*VERTEX_SIZE, pos.get(), VERTEX_SIZE);
+        }
+        
         glUnmapBufferOES(GL_ARRAY_BUFFER);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }

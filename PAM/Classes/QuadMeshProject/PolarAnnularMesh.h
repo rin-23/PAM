@@ -18,12 +18,23 @@ typedef enum {
     MODIFICATION_BRANCH_TRANSLATION,
     MODIFICATION_BRANCH_DETACHED,
     MODIFICATION_BRANCH_DETACHED_AN_MOVED,
-    MODIFICATION_BRANCH_DETACHED_ROTATE    
+    MODIFICATION_BRANCH_DETACHED_ROTATE,
+    MODIFICATION_BRANCH_COPIED_BRANCH_FOR_CLONING,
+    MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE,
+    MODIFICATION_BRANCH_COPIED_AND_ATTACHED_THE_CLONE,
+    MODIFICATION_BRANCH_CLONE_ROTATION
 } CurrentModification;
+
+@protocol PolarAnnularMeshDelegate <NSObject>
+
+-(void)modStateChangedTo:(CurrentModification)modState;
+
+@end
 
 @interface PolarAnnularMesh : Mesh
 
 @property (nonatomic, assign) CurrentModification modState;
+@property (nonatomic, weak) id<PolarAnnularMeshDelegate> delegate;
 
 -(void)setMeshFromObjFile:(NSString*)objFile;
 
@@ -107,7 +118,14 @@ typedef enum {
 -(void)continueRotateDetachedBranch:(float)angle;
 -(void)endRotateDetachedBranch:(float)angle;
 
-
+#pragma mark - CLONING
+-(BOOL)copyBranchToBuffer:(GLKVector3)touchPoint;
+-(BOOL)cloneBranchTo:(GLKVector3)touchPoint;
+-(BOOL)attachClonedBranch;
+-(void)dismissCopiedBranch;
+-(BOOL)startRotateClonedBranch:(float)angle;
+-(void)continueRotateClonedBranch:(float)angle;
+-(void)endRotateClonedBranch:(float)angle;
 
 #pragma mark - UTILITIES
 -(void)clear;

@@ -991,6 +991,11 @@ using namespace HMesh;
         return NO;
     }
     
+    if (valency(_manifold, vID) > 4) {
+        NSLog(@"[WARNING]Tried to create a branch at a rib junction");
+        return NO;
+    }
+    
     
     int leftWidth;
     int rightWidth;
@@ -1003,9 +1008,9 @@ using namespace HMesh;
     }
     
     //Find rib halfedge that points to a given vertex
-    Walker walker = _manifold.walker(vID);
+    Walker walker = _manifold.walker(vID).opp();
     if (_edgeInfo[walker.halfedge()].edge_type == SPINE) {
-        walker = walker.prev();
+        walker = walker.next().opp();
     }
     assert(_edgeInfo[walker.halfedge()].is_rib()); //its a rib
     assert(walker.vertex() == vID); //points to a given vertex

@@ -94,13 +94,6 @@
     [_subdivide setFrame:CGRectMake(15, nextY + 10, 200, 30)];
     [contentView addSubview:_subdivide];
     
-    nextY = CGRectGetMaxY(_loadArmadillo.frame);
-    _subdivide = [UIButton buttonWithType:UIButtonTypeRoundedRect];
-    [_subdivide setContentHorizontalAlignment:UIControlContentHorizontalAlignmentLeft];
-    [_subdivide setTitle:@"Subdivide" forState:UIControlStateNormal];
-    [_subdivide addTarget:self action:@selector(subdivide:) forControlEvents:UIControlEventTouchUpInside];
-    [_subdivide setFrame:CGRectMake(15, nextY + 10, 200, 30)];
-    [contentView addSubview:_subdivide];
     
     nextY = CGRectGetMaxY(_subdivide.frame);
     _saveObjFile = [UIButton buttonWithType:UIButtonTypeRoundedRect];
@@ -116,7 +109,7 @@
     
     nextY = CGRectGetMaxY(_saveObjFile.frame);
     UILabel* branchCreationHeader = [[UILabel alloc] initWithFrame:CGRectMake(15, nextY + 10, 300, 30)];
-    [branchCreationHeader setText:@"BRANCH CREATION"];
+    [branchCreationHeader setText:@"BRANCH CREATION SETTINGS"];
     branchCreationHeader.font = [UIFont boldSystemFontOfSize:15.0f];
     branchCreationHeader.adjustsFontSizeToFitWidth = YES;
     branchCreationHeader.textAlignment = NSTextAlignmentCenter;
@@ -134,7 +127,7 @@
     
     nextY = CGRectGetMaxY(_spineSmoothing.frame);
     UILabel* smoothingBrushSize = [[UILabel alloc] initWithFrame:CGRectMake(15, nextY + 10, 300, 30)];
-    [smoothingBrushSize setText:@"Base smoothing brush size"];
+    [smoothingBrushSize setText:@"Base smoothing multiplier of radius 0.5-2"];
     smoothingBrushSize.adjustsFontSizeToFitWidth = YES;
     [contentView addSubview:smoothingBrushSize];
     
@@ -148,7 +141,7 @@
     
     nextY = CGRectGetMaxY(_smoothingSlider.frame);
     UILabel* baseSmoothingIterations = [[UILabel alloc] initWithFrame:CGRectMake(15, nextY + 10, 300, 30)];
-    [baseSmoothingIterations setText:@"Base smoothing iterations"];
+    [baseSmoothingIterations setText:@"Base smoothing iterations 0-30"];
     baseSmoothingIterations.adjustsFontSizeToFitWidth = YES;
     [contentView addSubview:baseSmoothingIterations];
     
@@ -162,7 +155,7 @@
     
     nextY = CGRectGetMaxY(_baseSmoothingIterationsSlider.frame);
     UILabel* thinBranchWidthSizeLabel = [[UILabel alloc] initWithFrame:CGRectMake(15, nextY + 10, 300, 30)];
-    [thinBranchWidthSizeLabel setText:@"Thin branch width"];
+    [thinBranchWidthSizeLabel setText:@"Thin branch width 0-100 degress"];
     thinBranchWidthSizeLabel.adjustsFontSizeToFitWidth = YES;
     [contentView addSubview:thinBranchWidthSizeLabel];
     

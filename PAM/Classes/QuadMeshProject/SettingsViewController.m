@@ -168,7 +168,7 @@
     
     nextY = CGRectGetMaxY(_baseSmoothingIterationsSlider.frame);
     UILabel* thinBranchWidthSizeLabel = [[UILabel alloc] initWithFrame:CGRectMake(15, nextY + 10, 300, 30)];
-    [thinBranchWidthSizeLabel setText:@"Thin branch width 0-100 degress"];
+    [thinBranchWidthSizeLabel setText:@"Small branch width 0-100 degress"];
     thinBranchWidthSizeLabel.adjustsFontSizeToFitWidth = YES;
     [contentView addSubview:thinBranchWidthSizeLabel];
     
@@ -179,6 +179,64 @@
     [_thinBranchWidth addTarget:self action:@selector(thinBranchWidth:) forControlEvents:UIControlEventValueChanged];
     [_thinBranchWidth setFrame:CGRectMake(15, nextY + 10, 200, 30)];
     [contentView addSubview:_thinBranchWidth];
+    
+    nextY = CGRectGetMaxY(_thinBranchWidth.frame);
+    UILabel* mediumBranchWidthLabel = [[UILabel alloc] initWithFrame:CGRectMake(15, nextY + 10, 300, 30)];
+    [mediumBranchWidthLabel setText:@"Medium branch width 0-100 degress"];
+    mediumBranchWidthLabel.adjustsFontSizeToFitWidth = YES;
+    [contentView addSubview:mediumBranchWidthLabel];
+    
+    nextY = CGRectGetMaxY(mediumBranchWidthLabel.frame);
+    _mediumBranchWidth = [[UISlider alloc] init];
+    _mediumBranchWidth.minimumValue = 0;
+    _mediumBranchWidth.maximumValue = 100;
+    [_mediumBranchWidth addTarget:self action:@selector(mediumBranchWidth:) forControlEvents:UIControlEventValueChanged];
+    [_mediumBranchWidth setFrame:CGRectMake(15, nextY + 10, 200, 30)];
+    [contentView addSubview:_mediumBranchWidth];
+    
+    nextY = CGRectGetMaxY(_mediumBranchWidth.frame);
+    UILabel* largeBranchWidthLabel = [[UILabel alloc] initWithFrame:CGRectMake(15, nextY + 10, 300, 30)];
+    [largeBranchWidthLabel setText:@"Large branch width 0-100 degress"];
+    largeBranchWidthLabel.adjustsFontSizeToFitWidth = YES;
+    [contentView addSubview:largeBranchWidthLabel];
+    
+    nextY = CGRectGetMaxY(largeBranchWidthLabel.frame);
+    _largeBranchWidth = [[UISlider alloc] init];
+    _largeBranchWidth.minimumValue = 0;
+    _largeBranchWidth.maximumValue = 100;
+    [_largeBranchWidth addTarget:self action:@selector(largeBranchWidth:) forControlEvents:UIControlEventValueChanged];
+    [_largeBranchWidth setFrame:CGRectMake(15, nextY + 10, 200, 30)];
+    [contentView addSubview:_largeBranchWidth];
+    
+    
+    /*
+     * SCULPTING
+     */
+    
+//    nextY = CGRectGetMaxY(_thinBranchWidth.frame);
+//    UILabel* suclptingHeader = [[UILabel alloc] initWithFrame:CGRectMake(15, nextY + 10, 300, 30)];
+//    [suclptingHeader setText:@"SCULPTING BRUSHES AND SETTINGS"];
+//    suclptingHeader.font = [UIFont boldSystemFontOfSize:15.0f];
+//    suclptingHeader.adjustsFontSizeToFitWidth = YES;
+//    suclptingHeader.textAlignment = NSTextAlignmentCenter;
+//    [contentView addSubview:suclptingHeader];
+//    
+//    nextY = CGRectGetMaxY(suclptingHeader.frame);
+//    _circularScalingSculpt = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+//    [_circularScalingSculpt setContentHorizontalAlignment:UIControlContentHorizontalAlignmentLeft];
+//    [_circularScalingSculpt setTitle:@"Circular scaling" forState:UIControlStateNormal];
+//    [_circularScalingSculpt addTarget:self action:@selector(scalingSculptTypeChanged:) forControlEvents:UIControlEventTouchUpInside];
+//    [_circularScalingSculpt setFrame:CGRectMake(15, nextY + 10, 200, 30)];
+//    [contentView addSubview:_circularScalingSculpt];
+//    
+//    nextY = CGRectGetMaxY(suclptingHeader.frame);
+//    _silhouetteScalingSculpt = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+//    [_silhouetteScalingSculpt setContentHorizontalAlignment:UIControlContentHorizontalAlignmentLeft];
+//    [_silhouetteScalingSculpt setTitle:@"Silhouette scaling" forState:UIControlStateNormal];
+//    [_silhouetteScalingSculpt addTarget:self action:@selector(scalingSculptTypeChanged:) forControlEvents:UIControlEventTouchUpInside];
+//    [_silhouetteScalingSculpt setFrame:CGRectMake(CGRectGetMaxX(_circularScalingSculpt.frame), nextY + 10, 200, 30)];
+//    [contentView addSubview:_silhouetteScalingSculpt];
+    
     
     
     if ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPhone) {
@@ -199,6 +257,8 @@
     [_skeletonSwitch setOn:[SettingsManager sharedInstance].showSkeleton];
     _smoothingSlider.value = [SettingsManager sharedInstance].smoothingBrushSize;
     _thinBranchWidth.value = [SettingsManager sharedInstance].thinBranchWidth;
+    _mediumBranchWidth.value = [SettingsManager sharedInstance].mediumBranchWidth;
+    _largeBranchWidth.value = [SettingsManager sharedInstance].largeBranchWidth;
     _baseSmoothingIterationsSlider.value = [SettingsManager sharedInstance].baseSmoothingIterations;
     [_spineSmoothing setOn:[SettingsManager sharedInstance].spineSmoothing];
     [_poleSmoothing setOn:[SettingsManager sharedInstance].poleSmoothing];
@@ -266,10 +326,28 @@
     [self.delegate thinBranchWidth:slider.value];    
 }
 
+-(void)mediumBranchWidth:(UIControl*)sender {
+    UISlider* slider = (UISlider*)sender;
+    [self.delegate mediumBranchWidth:slider.value];
+}
+
+-(void)largeBranchWidth:(UIControl*)sender {
+    UISlider* slider = (UISlider*)sender;
+    [self.delegate largeBranchWidth:slider.value];
+}
+
 
 -(void)dismissButtonClicked:(UIControl*)sender {
     [self.delegate dismiss];
 }
 
+#pragma mark - SCULPTING
+-(void)scalingSculptTypeChanged:(UIControl*)sender {
+    if (sender == _silhouetteScalingSculpt) {
+        [self.delegate scalingSculptTypeChanged:SilhouetteScaling];
+    } else if (sender == _circularScalingSculpt) {
+        [self.delegate scalingSculptTypeChanged:CircularScaling];
+    }
+}
 
 @end

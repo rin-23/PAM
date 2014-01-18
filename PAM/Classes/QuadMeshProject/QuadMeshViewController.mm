@@ -1234,6 +1234,14 @@ typedef enum {
     [SettingsManager sharedInstance].thinBranchWidth = width;
 }
 
+-(void)mediumBranchWidth:(float)width {
+    [SettingsManager sharedInstance].mediumBranchWidth = width;
+}
+
+-(void)largeBranchWidth:(float)width {
+    [SettingsManager sharedInstance].largeBranchWidth = width;
+}
+
 -(void)spineSmoothing:(BOOL)spineSmoothin {
     [SettingsManager sharedInstance].spineSmoothing = spineSmoothin;
 }
@@ -1249,6 +1257,12 @@ typedef enum {
     viewMatrix = GLKMatrix4Identity;
     _zoomManager.scaleMatrix = GLKMatrix4Identity;
     //    [_branchPoints removeAllObjects];
+}
+
+
+//SCULPTING
+-(void)scalingSculptTypeChanged:(ScultpScalingType)type {
+    [SettingsManager sharedInstance].sculptScalingType = type;
 }
 
 #pragma mark - PolarAnnularMeshDelegate

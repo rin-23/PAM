@@ -688,7 +688,6 @@ using namespace HMesh;
     }
 }
 
-
 //Smooth according to number of edges from the vertex
 -(void)smoothPole:(VertexID)vID edgeDepth:(int)depth iter:(int)iter {
     assert(is_pole(_manifold, vID));
@@ -741,27 +740,27 @@ using namespace HMesh;
 //Smooth at a touch point
 -(void)smoothAtPoint:(GLKVector3)touchPoint {
     VertexID closestPoint = [self closestVertexID_3D:touchPoint];
-//    vector<VertexID> oneVID;
-//    oneVID.push_back(closestPoint);
-//    set<VertexID> affectedVerticies = [self smoothVerticies:oneVID iter:1 isSpine:NO brushSize:0.1 edgeInfo:_edgeInfo];
-//    [self updateVertexPositionOnGPU_Set:affectedVerticies];
-//    [self updateVertexNormOnGPU_Set:affectedVerticies];
+    vector<VertexID> oneVID;
+    oneVID.push_back(closestPoint);
+    set<VertexID> affectedVerticies = [self smoothVerticies:oneVID iter:1 isSpine:NO brushSize:0.1 edgeInfo:_edgeInfo];
+    [self updateVertexPositionOnGPU_Set:affectedVerticies];
+    [self updateVertexNormOnGPU_Set:affectedVerticies];
     
-    if (is_pole(_manifold, closestPoint)) {
-        Walker wBaseEnd = _manifold.walker(closestPoint);
-        HalfEdgeID pole_rib = wBaseEnd.next().halfedge();
-        float radius = rib_radius(_manifold, pole_rib, _edgeInfo);
-        vector<HMesh::VertexID> verticiesToSmooth;
-        for (Walker w = _manifold.walker(pole_rib); !w.full_circle(); w = w.next().opp().next()) {
-            verticiesToSmooth.push_back(w.vertex());
-        }
-        verticiesToSmooth.push_back(closestPoint);
-        set<VertexID> vSet = [self smoothVerticies:verticiesToSmooth iter:10 isSpine:YES brushSize:radius edgeInfo:_edgeInfo];
-        [self changeVerticiesColor_Set:vSet toSelected:YES];
-        [self changeVerticiesColor_Vector:verticiesToSmooth toColor:Vec4uc(0,0,255,255)];
-//        [self smoothVerticies:verticiesToSmooth iter:1 isSpine:NO brushSize:radius*0.7 edgeInfo:_edgeInfo];
-
-    }
+//    if (is_pole(_manifold, closestPoint)) {
+//        Walker wBaseEnd = _manifold.walker(closestPoint);
+//        HalfEdgeID pole_rib = wBaseEnd.next().halfedge();
+//        float radius = rib_radius(_manifold, pole_rib, _edgeInfo);
+//        vector<HMesh::VertexID> verticiesToSmooth;
+//        for (Walker w = _manifold.walker(pole_rib); !w.full_circle(); w = w.next().opp().next()) {
+//            verticiesToSmooth.push_back(w.vertex());
+//        }
+//        verticiesToSmooth.push_back(closestPoint);
+//        set<VertexID> vSet = [self smoothVerticies:verticiesToSmooth iter:10 isSpine:YES brushSize:radius edgeInfo:_edgeInfo];
+//        [self changeVerticiesColor_Set:vSet toSelected:YES];
+//        [self changeVerticiesColor_Vector:verticiesToSmooth toColor:Vec4uc(0,0,255,255)];
+////        [self smoothVerticies:verticiesToSmooth iter:1 isSpine:NO brushSize:radius*0.7 edgeInfo:_edgeInfo];
+//
+//    }
 }
 
 #pragma mark - SCULPTING BUMPS AND RINGS
@@ -1066,9 +1065,9 @@ using namespace HMesh;
     if (touchSpeed <= 500) {
         angle = GLKMathDegreesToRadians([SettingsManager sharedInstance].thinBranchWidth);
     } else if (touchSpeed > 500  && touchSpeed <= 1100) {
-        angle = GLKMathDegreesToRadians(40);
+        angle = GLKMathDegreesToRadians([SettingsManager sharedInstance].mediumBranchWidth);
     } else if (touchSpeed > 1100) {
-        angle = GLKMathDegreesToRadians(80);
+        angle = GLKMathDegreesToRadians([SettingsManager sharedInstance].largeBranchWidth);
     }
     
     Walker walker = _manifold.walker(vID);

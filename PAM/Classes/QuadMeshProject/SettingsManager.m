@@ -20,6 +20,8 @@ static SettingsManager* instance = nil;
         _smoothingBrushSize = 1.0;
         _baseSmoothingIterations = 15;
         _thinBranchWidth = 20;
+        _mediumBranchWidth = 40;
+        _largeBranchWidth = 80;
         _spineSmoothing = YES;
         _poleSmoothing = YES;
     }

@@ -8,6 +8,8 @@
 
 #import <UIKit/UIKit.h>
 
+#import "SettingsManager.h"
+
 @protocol SettingsViewControllerDelegate <NSObject>
 -(void)showRibJunctions;
 -(void)showSkeleton:(BOOL)show;
@@ -24,7 +26,12 @@
 -(void)spineSmoothing:(BOOL)spineSmoothing;
 -(void)smoothingBrushSize:(float)brushSize;
 -(void)thinBranchWidth:(float)width;
+-(void)mediumBranchWidth:(float)width;
+-(void)largeBranchWidth:(float)width;
 -(void)baseSmoothingIterations:(float)iter;
+
+//SCULPTING
+-(void)scalingSculptTypeChanged:(ScultpScalingType)type;
 @end
 
 @interface SettingsViewController : UIViewController <UIScrollViewDelegate> {
@@ -44,9 +51,12 @@
     UISlider* _smoothingSlider;
     UISlider* _baseSmoothingIterationsSlider;
     UISlider* _thinBranchWidth;
-    UISlider* _mediumBranchWidthSize;
-    UISlider* _thickBranchWidthSize;
+    UISlider* _mediumBranchWidth;
+    UISlider* _largeBranchWidth;
     
+    //Sculpting
+    UIButton* _circularScalingSculpt;
+    UIButton* _silhouetteScalingSculpt;
 }
 
 @property (nonatomic, weak) id<SettingsViewControllerDelegate> delegate;

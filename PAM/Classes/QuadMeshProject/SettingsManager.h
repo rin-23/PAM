@@ -8,6 +8,11 @@
 
 #import <Foundation/Foundation.h>
 
+typedef enum {
+    CircularScaling,
+    SilhouetteScaling
+} ScultpScalingType;
+
 @interface SettingsManager : NSObject
 
 +(SettingsManager*)sharedInstance;
@@ -16,7 +21,11 @@
 @property (nonatomic, assign) BOOL showSkeleton;
 @property (nonatomic, assign) float smoothingBrushSize;
 @property (nonatomic, assign) float thinBranchWidth;
+@property (nonatomic, assign) float mediumBranchWidth;
+@property (nonatomic, assign) float largeBranchWidth;
 @property (nonatomic, assign) int baseSmoothingIterations;
 @property (nonatomic, assign) BOOL spineSmoothing;
 @property (nonatomic, assign) BOOL poleSmoothing;
+@property (nonatomic, assign) ScultpScalingType sculptScalingType;
+
 @end

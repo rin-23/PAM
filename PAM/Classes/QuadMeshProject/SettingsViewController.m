@@ -115,6 +115,7 @@
     branchCreationHeader.textAlignment = NSTextAlignmentCenter;
     [contentView addSubview:branchCreationHeader];
 
+    /******/
     nextY = CGRectGetMaxY(branchCreationHeader.frame);
     UILabel* spineSmoothinLabel = [[UILabel alloc] initWithFrame:CGRectMake(15, nextY, 200, 30)];
     [spineSmoothinLabel setText:@"Spine smoothing"];
@@ -125,7 +126,19 @@
     [_spineSmoothing addTarget:self action:@selector(spineSmoothing:) forControlEvents:UIControlEventValueChanged];
     [contentView addSubview:_spineSmoothing];
     
-    nextY = CGRectGetMaxY(_spineSmoothing.frame);
+    /******/
+    nextY = CGRectGetMaxY(_spineSmoothing.frame) + 10;
+    UILabel* poleSmoothing = [[UILabel alloc] initWithFrame:CGRectMake(15, nextY, 200, 30)];
+    [poleSmoothing setText:@"Smooth Poles"];
+    [contentView addSubview:poleSmoothing];
+    
+    nextY = CGRectGetMaxY(_spineSmoothing.frame) + 10;
+    _poleSmoothing = [[UISwitch alloc] initWithFrame:CGRectMake(200, nextY, 30, 20)];
+    [_poleSmoothing addTarget:self action:@selector(poleSmoothing:) forControlEvents:UIControlEventValueChanged];
+    [contentView addSubview:_poleSmoothing];
+    
+    /*****/
+    nextY = CGRectGetMaxY(_poleSmoothing.frame);
     UILabel* smoothingBrushSize = [[UILabel alloc] initWithFrame:CGRectMake(15, nextY + 10, 300, 30)];
     [smoothingBrushSize setText:@"Base smoothing multiplier of radius 0.5-2"];
     smoothingBrushSize.adjustsFontSizeToFitWidth = YES;
@@ -188,6 +201,7 @@
     _thinBranchWidth.value = [SettingsManager sharedInstance].thinBranchWidth;
     _baseSmoothingIterationsSlider.value = [SettingsManager sharedInstance].baseSmoothingIterations;
     [_spineSmoothing setOn:[SettingsManager sharedInstance].spineSmoothing];
+    [_poleSmoothing setOn:[SettingsManager sharedInstance].poleSmoothing];
 }
 
 -(void)didReceiveMemoryWarning
@@ -231,6 +245,10 @@
 #pragma mark - BRANCH CREATION
 -(void)spineSmoothing:(UISwitch*)sender {
     [self.delegate spineSmoothing:sender.isOn];
+}
+
+-(void)poleSmoothing:(UISwitch*)sender {
+    [self.delegate poleSmoothing:sender.isOn];
 }
 
 -(void)smoothingBrushSize:(UIControl*)sender {

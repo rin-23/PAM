@@ -20,7 +20,8 @@
 -(void)emailObj;
 
 //BRANCH CREATION
--(void)spineSmoothing:(BOOL)spineSmoothin;
+-(void)poleSmoothing:(BOOL)poleSmoothing;
+-(void)spineSmoothing:(BOOL)spineSmoothing;
 -(void)smoothingBrushSize:(float)brushSize;
 -(void)thinBranchWidth:(float)width;
 -(void)baseSmoothingIterations:(float)iter;
@@ -39,11 +40,13 @@
     
     //Branch creation
     UISwitch* _spineSmoothing;
+    UISwitch* _poleSmoothing;
     UISlider* _smoothingSlider;
     UISlider* _baseSmoothingIterationsSlider;
     UISlider* _thinBranchWidth;
     UISlider* _mediumBranchWidthSize;
     UISlider* _thickBranchWidthSize;
+    
 }
 
 @property (nonatomic, weak) id<SettingsViewControllerDelegate> delegate;

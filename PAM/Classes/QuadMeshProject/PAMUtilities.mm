@@ -189,6 +189,40 @@
     }
 }
 
++(void)normals3D:(std::vector<GLKVector3>&)normals
+      tangents3D:(std::vector<GLKVector3>&)tangents
+     forSkeleton:(std::vector<GLKVector3>)skeleton
+     firstNormal:(GLKVector3)firstNorm
+{
+    for (int i = 0; i < skeleton.size(); i++) {
+        GLKVector3 t;
+        if (i == 0) {
+            t = GLKVector3Subtract(skeleton[1], skeleton[0]);
+        } else if (i == (skeleton.size() - 1)) {
+            t = GLKVector3Subtract(skeleton[i], skeleton[i-1]);
+        } else {
+            GLKVector3 v1 = GLKVector3Subtract(skeleton[i], skeleton[i-1]);
+            GLKVector3 v2 = GLKVector3Subtract(skeleton[i+1], skeleton[i]);
+            t = GLKVector3Lerp(v1, v2, 0.5f);
+        }
+        tangents.push_back(GLKVector3Normalize(t));
+    }
+    
+    CGLA::Vec3d lastTangent = CGLA::Vec3d(tangents[0].x, tangents[0].y, tangents[0].z);
+    CGLA::Vec3d lastNorm = CGLA::Vec3d(firstNorm.x, firstNorm.y, firstNorm.z);
+    
+    for (int i = 0; i < skeleton.size(); i++) {
+        CGLA::Vec3d tangent = CGLA::Vec3d(tangents[i].x, tangents[i].y, tangents[i].z);
+        CGLA::Quatd q;
+        q.make_rot(lastTangent, tangent);
+        CGLA::Vec3d curNorm = q.apply(lastNorm);
+        GLKVector3 curNormGLK = GLKVector3Normalize(GLKVector3Make(curNorm[0], curNorm[1], curNorm[2]));
+        normals.push_back(curNormGLK);
+        lastTangent = tangent;
+        lastNorm = curNorm;
+    }
+}
+
 +(std::vector<GLKVector2>)laplacianSmoothing:(std::vector<GLKVector2>)points
                                   iterations:(int)iterations
 {

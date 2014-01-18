@@ -21,6 +21,7 @@ static SettingsManager* instance = nil;
         _baseSmoothingIterations = 15;
         _thinBranchWidth = 20;
         _spineSmoothing = YES;
+        _poleSmoothing = YES;
     }
     return self;
 }

@@ -28,6 +28,11 @@
       tangents3D:(std::vector<GLKVector3>&)tangents
       forSkeleton:(std::vector<GLKVector3>)skeleton;
 
++(void)normals3D:(std::vector<GLKVector3>&)normals
+      tangents3D:(std::vector<GLKVector3>&)tangents
+     forSkeleton:(std::vector<GLKVector3>)skeleton
+     firstNormal:(GLKVector3)firstNorm;
+
 //+(std::vector<float>)ribWidthForSkeleton:(std::vector<GLKVector2>)skeleton
 //                                 normals:(std::vector<GLKVector2>)normals
 //                                tangents:(std::vector<GLKVector2>)tangents

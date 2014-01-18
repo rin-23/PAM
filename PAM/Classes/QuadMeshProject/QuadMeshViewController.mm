@@ -1238,6 +1238,10 @@ typedef enum {
     [SettingsManager sharedInstance].spineSmoothing = spineSmoothin;
 }
 
+-(void)poleSmoothing:(BOOL)poleSmoothing {
+    [SettingsManager sharedInstance].poleSmoothing = poleSmoothing;
+}
+
 -(void)resetTransformations {
     //overwrite
     [_rotationManager reset];

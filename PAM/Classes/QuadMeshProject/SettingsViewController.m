@@ -140,8 +140,8 @@
     
     nextY = CGRectGetMaxY(smoothingBrushSize.frame);
     _smoothingSlider = [[UISlider alloc] init];
-    _smoothingSlider.minimumValue = 0.0;
-    _smoothingSlider.maximumValue = 0.3;
+    _smoothingSlider.minimumValue = 0.5;
+    _smoothingSlider.maximumValue = 2.0;
     [_smoothingSlider addTarget:self action:@selector(smoothingBrushSize:) forControlEvents:UIControlEventValueChanged];
     [_smoothingSlider setFrame:CGRectMake(15, nextY + 10, 200, 30)];
     [contentView addSubview:_smoothingSlider];

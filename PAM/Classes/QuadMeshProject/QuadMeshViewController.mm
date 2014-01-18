@@ -963,6 +963,11 @@ typedef enum {
 
     _bbox = _pMesh.boundingBox;
     _translationManager.scaleFactor = _bbox.radius;
+    
+    [SettingsManager sharedInstance].smoothingBrushSize = 0.3;
+    [SettingsManager sharedInstance].baseSmoothingIterations = 2;
+    [SettingsManager sharedInstance].spineSmoothing = NO;
+    
     [self hideLoadingIndicator];
     [self setPaused:NO];
 }

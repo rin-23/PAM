@@ -52,6 +52,7 @@ using namespace HMesh;
     HMesh::HalfEdgeAttributeVector<EdgeInfo> _edgeInfo;
     BoundingBox _boundingBox;
     
+    //SCULPTING
     //Scaling of Rings
     vector<VertexID> _sculpt_verticies_to_scale;
     float _scaleFactor;
@@ -64,6 +65,7 @@ using namespace HMesh;
     HalfEdgeID _pinHalfEdgeID;
     HalfEdgeID _pivotHalfEdgeID;
     set<HMesh::VertexID> _transformed_verticies;
+    vector<HMesh::VertexID> _transition_verticies;
 
     //Rotation
     float _rotAngle;
@@ -79,7 +81,6 @@ using namespace HMesh;
     
     //Scaling
     vector<HMesh::HalfEdgeID> _edges_to_scale;
-//    vector<HMesh::VertexID> _all_vector_vid;
     vector<CGLA::Vec3f> _centroids;
     vector<GLKVector3> _touchPoints;
     GLKVector3 _startPoint;
@@ -1861,6 +1862,10 @@ using namespace HMesh;
         NSLog(@"[WARNING] Didnt fine direction to pivot");
         return NO;
     }
+    
+    _transition_verticies.clear();
+    _transformed_verticies.clear();
+    
     _deformDirHalfEdge = toPivotEdge;
     assert(_edgeInfo[toPivotEdge].is_spine());
     Walker pivotDir = _manifold.walker(toPivotEdge);
@@ -1881,7 +1886,9 @@ using namespace HMesh;
         vector<VertexID> verticies = verticies_along_the_rib(_manifold, loopRib, _edgeInfo);
         for (VertexID vID: verticies) {
             vertexToLoop[vID] = loopID;
+            _transition_verticies.push_back(vID);
         }
+
         pivotDir = pivotDir.next().opp().next();
         loopRib = pivotDir.next().halfedge();
         loopID = _edgeInfo[loopRib].id;
@@ -1905,6 +1912,7 @@ using namespace HMesh;
     _ringToDeformValue = ringToDeformValue;
     _transformed_verticies = [self allVerticiesInDirection:pivotDir];
     [self changeVerticiesColor_Set:_transformed_verticies toSelected:YES];
+    [self changeVerticiesColor_Vector:_transition_verticies toColor:Vec4uc(0, 120, 180, 255)];
     return YES;
 }
 
@@ -1975,12 +1983,14 @@ using namespace HMesh;
         _manifold.pos(vid) = newPos;
     }
     
-    [self rotateRingsFrom:_deformDirHalfEdge toRingID:_pivotHalfEdgeID];
-    
-    _transformed_verticies.clear();
     [self setModState:MODIFICATION_PIN_POINT_SET];
     
-    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
+    [self rotateRingsFrom:_deformDirHalfEdge toRingID:_pivotHalfEdgeID];
+    
+    [self updateVertexPositionOnGPU_Set:_transformed_verticies];
+    [self updateVertexPositionOnGPU_Vector:_transition_verticies];
+    [self changeVerticiesColor_Set:_transformed_verticies toSelected:NO];
+    [self changeVerticiesColor_Vector:_transition_verticies toSelected:NO];
 
 }
 
@@ -2050,10 +2060,12 @@ using namespace HMesh;
         _manifold.pos(vid) = newPos;
     }
     
-    _transformed_verticies.clear();
     [self setModState:MODIFICATION_PIN_POINT_SET];
     
-    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
+    [self updateVertexPositionOnGPU_Set:_transformed_verticies];
+    [self updateVertexPositionOnGPU_Vector:_transition_verticies];
+    [self changeVerticiesColor_Set:_transformed_verticies toSelected:NO];
+    [self changeVerticiesColor_Vector:_transition_verticies toSelected:NO];
 }
 
 #pragma mark - ROTATION THE BRANCH TREE
@@ -2120,13 +2132,14 @@ using namespace HMesh;
         _manifold.pos(vid) = newPos;
     }
 
-
-    _transformed_verticies.clear();
-    [self setModState:MODIFICATION_PIN_POINT_SET];
-    
     [self rotateRingsFrom:_deformDirHalfEdge toRingID:_pivotHalfEdgeID];
     
-    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
+    [self setModState:MODIFICATION_PIN_POINT_SET];
+    
+    [self updateVertexPositionOnGPU_Set:_transformed_verticies];
+    [self updateVertexPositionOnGPU_Vector:_transition_verticies];
+    [self changeVerticiesColor_Set:_transformed_verticies toSelected:NO];
+    [self changeVerticiesColor_Vector:_transition_verticies toSelected:NO];
 }
 
 
@@ -2323,10 +2336,9 @@ using namespace HMesh;
 }
 
 -(void)dismissCopiedBranch {
-    _modState = MODIFICATION_NONE;
-    [self changeVerticiesColor_Set:_original_verticies_copied toSelected:NO];
+    [self setModState:MODIFICATION_NONE];
     _pinPointLine = nil;
-    [self.delegate modStateChangedTo:_modState];
+    [self changeVerticiesColor_Set:_original_verticies_copied toSelected:NO];
 }
 
 -(BOOL)cloneBranchTo:(GLKVector3)touchPoint {
@@ -2409,7 +2421,8 @@ using namespace HMesh;
     [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
     [self changeVerticiesColor_Vector:_cloned_verticies toColor:Vec4uc(0,200,0,255)];
     [self changeVerticiesColor_Set:_original_verticies_copied toSelected:YES];
-    _modState = MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE;
+    
+    [self setModState:MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE];
 
     return YES;
 }
@@ -2453,7 +2466,7 @@ using namespace HMesh;
     [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
     [self changeVerticiesColor_Set:_original_verticies_copied toSelected:YES];
     _cloned_verticies.clear();
-    _modState = MODIFICATION_BRANCH_COPIED_BRANCH_FOR_CLONING;    
+    [self setModState:MODIFICATION_BRANCH_COPIED_BRANCH_FOR_CLONING];
     return YES;
 }
 
@@ -2473,7 +2486,7 @@ using namespace HMesh;
     _prevMod = _modState;
     _current_rot_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
     
-    _modState = MODIFICATION_BRANCH_CLONE_ROTATION;
+    [self setModState:MODIFICATION_BRANCH_CLONE_ROTATION];
     return YES;
 }
 
@@ -2495,7 +2508,7 @@ using namespace HMesh;
         p += _zRotatePos;
         _manifold.pos(vid) = p;
     }
-    _modState = MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE;
+    [self setModState:MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE];
 }
 
 -(BOOL)boundaryHalfEdgeForClonedMesh:(HalfEdgeID&)boundaryHalfedge
@@ -2930,9 +2943,12 @@ using namespace HMesh;
         _manifold.pos(vid) = p;
     }
     
-    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
+    [self updateVertexPositionOnGPU_Set:_detached_verticies];
+    [self updateVertexNormOnGPU_Set:_detached_verticies];
+
     [self changeVerticiesColor_Set:_detached_verticies toSelected:YES];
-    _modState = MODIFICATION_BRANCH_DETACHED_AN_MOVED;
+    [self setModState:MODIFICATION_BRANCH_DETACHED_AN_MOVED];
+
     return YES;
 }
 
@@ -2961,7 +2977,7 @@ using namespace HMesh;
     _prevMod = _modState;
     _current_rot_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
     
-    _modState = MODIFICATION_BRANCH_DETACHED_ROTATE;
+    [self setModState:MODIFICATION_BRANCH_DETACHED_ROTATE];
     return YES;
 }
 
@@ -3020,8 +3036,6 @@ using namespace HMesh;
             }
         }
     }
-    
-//    vector<VertexID> floodVerticiesVector(floodVerticiesSet.begin(), floodVerticiesSet.end());
     return floodVerticiesSet;
 }
 
@@ -3368,7 +3382,6 @@ using namespace HMesh;
             int index = vid.index;
             memcpy(temp + index*VERTEX_SIZE, pos.get(), VERTEX_SIZE);
         }
-
         glUnmapBufferOES(GL_ARRAY_BUFFER);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     } else if (_modState == MODIFICATION_BRANCH_CLONE_ROTATION) {

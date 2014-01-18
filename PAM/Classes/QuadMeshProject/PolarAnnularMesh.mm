@@ -830,12 +830,17 @@ using namespace HMesh;
 //middlePoint - centroid between tow fingers of a pinch gesture
 -(void)startScalingSingleRibWithTouchPoint1:(GLKVector3)touchPoint1
                                 touchPoint2:(GLKVector3)touchPoint2
+//                              touchedOutside:(BOOL)touchedOutside
                                       scale:(float)scale
                                    velocity:(float)velocity
 {
     if (![self isLoaded]) {
         return;
     }
+    
+//    if (!touchedOutside) {
+//        return;
+//    }
     
     GLKVector3 middlePoint = GLKVector3Lerp(touchPoint1, touchPoint2, 0.5f);
     VertexID vID = [self closestVertexID_2D:middlePoint];
@@ -3131,7 +3136,15 @@ using namespace HMesh;
             [self smoothVerticies:vertexToSmooth iter:2 isSpine:NO brushSize:boundaryRadius/2 edgeInfo:_edgeInfo];
         } else {
             VertexID poleVID = pole_from_hole(_manifold, boundaryW.halfedge());
-            numOfEdges = valency(_manifold, poleVID)/2;
+            numOfEdges = valency(_manifold, poleVID);
+            numOfEdges = numOfEdges/2;
+
+//            if (numOfEdges%2 != 0) {
+//                numOfEdges = numOfEdges/2;
+//            } else {
+//                numOfEdges = numOfEdges/2+1;
+//            }
+
             [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
 //            [self smoothPole:poleVID edgeDepth:3 iter:2];
         }
@@ -3150,7 +3163,8 @@ using namespace HMesh;
                                     holeCenter:&holeCenter
                                       holeNorm:&holeNorm
                               boundaryHalfEdge:&boundaryHalfEdge];
-        
+//        [self rebufferWithCleanup:YES bufferData:YES edgeTrace:NO];
+//        return NO;
         HalfEdgeID deleteBranchUpperOppRibEdge = _manifold.walker(_deleteBranchLowerRibEdge).opp().halfedge();
         [self stitchBranch:_deleteBranchLowerRibEdge toBody:boundaryHalfEdge];
         
@@ -3182,7 +3196,7 @@ using namespace HMesh;
     VertexID touchVID = [self closestVertexID_3D:touchPoint];
     //check if you can possible move here
     int numRibSegments = count_rib_segments(_manifold, _edgeInfo, touchVID);
-    if (numRibSegments - 2 < _deleteBranchNumberOfBoundaryRibs) {
+    if (2*numRibSegments + 2 < _deleteBranchNumberOfBoundaryRibs) {
         return NO;
     }
     

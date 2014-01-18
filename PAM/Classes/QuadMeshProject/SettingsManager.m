@@ -24,6 +24,8 @@ static SettingsManager* instance = nil;
         _largeBranchWidth = 80;
         _spineSmoothing = YES;
         _poleSmoothing = YES;
+        _sculptScalingType = SilhouetteScaling;
+        _silhouetteScalingBrushSize = 90;
     }
     return self;
 }

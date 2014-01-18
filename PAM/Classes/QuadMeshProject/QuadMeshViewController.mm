@@ -1265,6 +1265,10 @@ typedef enum {
     [SettingsManager sharedInstance].sculptScalingType = type;
 }
 
+-(void)silhouetteScalingBrushSize:(float)width {
+    [SettingsManager sharedInstance].silhouetteScalingBrushSize = width;
+}
+
 #pragma mark - PolarAnnularMeshDelegate
 -(void)modStateChangedTo:(CurrentModification)modState {
     if (modState == MODIFICATION_NONE) {        

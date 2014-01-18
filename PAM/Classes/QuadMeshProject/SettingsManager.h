@@ -27,5 +27,6 @@ typedef enum {
 @property (nonatomic, assign) BOOL spineSmoothing;
 @property (nonatomic, assign) BOOL poleSmoothing;
 @property (nonatomic, assign) ScultpScalingType sculptScalingType;
+@property (nonatomic, assign) float silhouetteScalingBrushSize;
 
 @end

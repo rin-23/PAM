@@ -220,7 +220,22 @@
 //    suclptingHeader.adjustsFontSizeToFitWidth = YES;
 //    suclptingHeader.textAlignment = NSTextAlignmentCenter;
 //    [contentView addSubview:suclptingHeader];
+    
+//    nextY = CGRectGetMaxY(suclptingHeader.frame);
+//    UILabel* silhouetteScalingBrushSizeLabel = [[UILabel alloc] initWithFrame:CGRectMake(15, nextY + 10, 300, 30)];
+//    [silhouetteScalingBrushSizeLabel setText:@"Silhouette scalling arc 0-180 degress"];
+//    silhouetteScalingBrushSizeLabel.adjustsFontSizeToFitWidth = YES;
+//    [contentView addSubview:silhouetteScalingBrushSizeLabel];
 //    
+//    nextY = CGRectGetMaxY(silhouetteScalingBrushSizeLabel.frame);
+//    _silhouetteScalingBrushSize = [[UISlider alloc] init];
+//    _silhouetteScalingBrushSize.minimumValue = 0;
+//    _silhouetteScalingBrushSize.maximumValue = 100;
+//    [_silhouetteScalingBrushSize addTarget:self action:@selector(silhouetteScalingBrushSize:) forControlEvents:UIControlEventValueChanged];
+//    [_silhouetteScalingBrushSize setFrame:CGRectMake(15, nextY + 10, 200, 30)];
+//    [contentView addSubview:_silhouetteScalingBrushSize];
+    
+    
 //    nextY = CGRectGetMaxY(suclptingHeader.frame);
 //    _circularScalingSculpt = [UIButton buttonWithType:UIButtonTypeRoundedRect];
 //    [_circularScalingSculpt setContentHorizontalAlignment:UIControlContentHorizontalAlignmentLeft];
@@ -228,7 +243,7 @@
 //    [_circularScalingSculpt addTarget:self action:@selector(scalingSculptTypeChanged:) forControlEvents:UIControlEventTouchUpInside];
 //    [_circularScalingSculpt setFrame:CGRectMake(15, nextY + 10, 200, 30)];
 //    [contentView addSubview:_circularScalingSculpt];
-//    
+    
 //    nextY = CGRectGetMaxY(suclptingHeader.frame);
 //    _silhouetteScalingSculpt = [UIButton buttonWithType:UIButtonTypeRoundedRect];
 //    [_silhouetteScalingSculpt setContentHorizontalAlignment:UIControlContentHorizontalAlignmentLeft];
@@ -262,6 +277,7 @@
     _baseSmoothingIterationsSlider.value = [SettingsManager sharedInstance].baseSmoothingIterations;
     [_spineSmoothing setOn:[SettingsManager sharedInstance].spineSmoothing];
     [_poleSmoothing setOn:[SettingsManager sharedInstance].poleSmoothing];
+    _silhouetteScalingBrushSize.value = [SettingsManager sharedInstance].silhouetteScalingBrushSize;
 }
 
 -(void)didReceiveMemoryWarning
@@ -336,7 +352,6 @@
     [self.delegate largeBranchWidth:slider.value];
 }
 
-
 -(void)dismissButtonClicked:(UIControl*)sender {
     [self.delegate dismiss];
 }
@@ -348,6 +363,11 @@
     } else if (sender == _circularScalingSculpt) {
         [self.delegate scalingSculptTypeChanged:CircularScaling];
     }
+}
+
+-(void)silhouetteScalingBrushSize:(UIControl*)sender {
+    UISlider* slider = (UISlider*)sender;
+    [self.delegate silhouetteScalingBrushSize:slider.value];
 }
 
 @end

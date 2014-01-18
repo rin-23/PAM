@@ -32,6 +32,7 @@
 
 //SCULPTING
 -(void)scalingSculptTypeChanged:(ScultpScalingType)type;
+-(void)silhouetteScalingBrushSize:(float)width;
 @end
 
 @interface SettingsViewController : UIViewController <UIScrollViewDelegate> {
@@ -57,6 +58,7 @@
     //Sculpting
     UIButton* _circularScalingSculpt;
     UIButton* _silhouetteScalingSculpt;
+    UISlider* _silhouetteScalingBrushSize;
 }
 
 @property (nonatomic, weak) id<SettingsViewControllerDelegate> delegate;

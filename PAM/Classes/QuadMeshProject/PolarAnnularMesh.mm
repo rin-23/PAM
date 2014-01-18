@@ -58,6 +58,9 @@ using namespace HMesh;
     float _scaleFactor;
     vector<float> _scale_weight_vector;
     HMesh::VertexAttributeVector<Vecf> _current_scale_position;
+//    HMesh::VertexID _silhouetteVertex;
+//    vector<Vec> anisotrop_scaling_direction;
+    HMesh::VertexAttributeVector<Vecf> _anisotropic_projections;
     
     //BRANCH TRANSFORMATION
     //Common
@@ -830,7 +833,6 @@ using namespace HMesh;
 //middlePoint - centroid between tow fingers of a pinch gesture
 -(void)startScalingSingleRibWithTouchPoint1:(GLKVector3)touchPoint1
                                 touchPoint2:(GLKVector3)touchPoint2
-//                              touchedOutside:(BOOL)touchedOutside
                                       scale:(float)scale
                                    velocity:(float)velocity
 {
@@ -838,61 +840,79 @@ using namespace HMesh;
         return;
     }
     
-//    if (!touchedOutside) {
-//        return;
-//    }
-    
-    GLKVector3 middlePoint = GLKVector3Lerp(touchPoint1, touchPoint2, 0.5f);
-    VertexID vID = [self closestVertexID_2D:middlePoint];
+    VertexID vID;
+    if ([SettingsManager sharedInstance].sculptScalingType == SilhouetteScaling) {
+        vID = [self closestVertexID_2D:touchPoint1];
+    } else {
+        GLKVector3 middlePoint = GLKVector3Lerp(touchPoint1, touchPoint2, 0.5f);
+        vID = [self closestVertexID_2D:middlePoint];
+    }
     if (is_pole(_manifold, vID)) {
         return;
     }
     
-    Walker ribWalker = _manifold.walker(vID);
+    Walker ribWalker = _manifold.walker(vID).opp();
     if (_edgeInfo[ribWalker.halfedge()].is_spine()) {
-        ribWalker = ribWalker.opp().next();
+        ribWalker = ribWalker.next().opp();
     }
     assert(_edgeInfo[ribWalker.halfedge()].is_rib());
+    assert(ribWalker.vertex() == vID);
     
     _edges_to_scale.clear();
     _sculpt_verticies_to_scale.clear();
     
     Walker upWalker = _manifold.walker(ribWalker.next().halfedge());
-    Walker downWalker = _manifold.walker(ribWalker.opp().next().halfedge());
+    Walker downWalker = _manifold.walker(ribWalker.opp().prev().opp().halfedge());
+    assert(upWalker.opp().vertex() == downWalker.opp().vertex());
     
     Vec origin = _manifold.pos(vID);
     float brushSize = 0.1;
     vector<float> allDistances;
-    
+    vector<Vec> silhouette_Verticies;
     vector<VertexID> vector_vid;
+    vector<vector<VertexID>> verticies_along_ribs;
     float distance = (origin - _manifold.pos(upWalker.vertex())).length();
     while (distance <= brushSize) {
         if (is_pole(_manifold, upWalker.vertex())) {
             break;
         }
-        _edges_to_scale.push_back(upWalker.next().halfedge());
-        vector_vid = verticies_along_the_rib(_manifold, upWalker.next().halfedge(), _edgeInfo);
+        HalfEdgeID ribID = upWalker.next().halfedge();
+        _edges_to_scale.push_back(ribID);
+        vector_vid = verticies_along_the_rib(_manifold, ribID, _edgeInfo);
+        verticies_along_ribs.push_back(vector_vid);
         _sculpt_verticies_to_scale.insert(_sculpt_verticies_to_scale.end(), vector_vid.begin(), vector_vid.end());
         allDistances.push_back(distance);
+        Vec silhouette = _manifold.pos(upWalker.vertex());
+        silhouette_Verticies.push_back(silhouette);
+        
         upWalker = upWalker.next().opp().next();
         distance = (origin - _manifold.pos(upWalker.vertex())).length();
     }
     
+    HalfEdgeID ribID = ribWalker.halfedge();
     distance = 0;
     allDistances.push_back(distance);
-    _edges_to_scale.push_back(ribWalker.halfedge());
-    vector_vid = verticies_along_the_rib(_manifold, ribWalker.halfedge(), _edgeInfo);
+    _edges_to_scale.push_back(ribID);
+    vector_vid = verticies_along_the_rib(_manifold, ribID, _edgeInfo);
+    verticies_along_ribs.push_back(vector_vid);
     _sculpt_verticies_to_scale.insert(_sculpt_verticies_to_scale.end(), vector_vid.begin(), vector_vid.end());
+    Vec silhouette = origin;
+    silhouette_Verticies.push_back(silhouette);
     
     distance = (origin - _manifold.pos(downWalker.vertex())).length();
     while (distance <= brushSize) {
         if (is_pole(_manifold, downWalker.vertex())) {
             break;
         }
-        _edges_to_scale.push_back(downWalker.next().halfedge());
-        vector_vid = verticies_along_the_rib(_manifold, downWalker.next().halfedge(), _edgeInfo);
+        HalfEdgeID ribID = downWalker.next().halfedge();
+        _edges_to_scale.push_back(ribID);
+        vector_vid = verticies_along_the_rib(_manifold, ribID, _edgeInfo);
+        verticies_along_ribs.push_back(vector_vid);
         _sculpt_verticies_to_scale.insert(_sculpt_verticies_to_scale.end(), vector_vid.begin(), vector_vid.end());
         allDistances.push_back(distance);
+        Vec silhouette = _manifold.pos(downWalker.vertex());
+        silhouette_Verticies.push_back(silhouette);
+        
         downWalker = downWalker.next().opp().next();
         distance = (origin - _manifold.pos(downWalker.vertex())).length();
     }
@@ -921,10 +941,63 @@ using namespace HMesh;
             }
             NSLog(@"%f", weight);
             _scale_weight_vector.push_back(weight);
+//            _scale_weight_vector.push_back(1.0f);
         }
     }
     
-    [self setModState:MODIFICATION_SCULPTING_SCALING];
+    if ([SettingsManager sharedInstance].sculptScalingType == SilhouetteScaling) {
+        _anisotropic_projections = VertexAttributeVector<Vecf>(_manifold.no_vertices());
+        for(int i = 0; i < _centroids.size(); i++)
+        {
+            Vec center = Vec(_centroids[i]);
+            vector<VertexID> verticies = verticies_along_ribs[i];
+            
+            Mat3x3d cov(0);
+            for (int i = 0; i < verticies.size(); i++) {
+                VertexID vID = verticies[i];
+                Vec pos = _manifold.pos(vID);
+                Vec d = pos - center;
+                Mat3x3d m;
+                outer_product(d,d,m);
+                cov += m;
+            }
+            
+            Mat3x3d Q, L;
+            int sol = power_eigensolution(cov, Q, L);
+            
+            Vec3d n;
+            assert(sol>=2);
+            n = normalize(cross(Q[0],Q[1]));
+            
+            GLKVector3 nGLK = GLKVector3Make(n[0], n[1], n[2]);
+            GLKVector3 nGLKWorld = [Utilities matrix4:self.modelViewMatrix multiplyVector3NoTranslation:nGLK];
+            GLKVector3 zWorld = GLKVector3Make(0, 0, 1);
+            GLKVector3 to_silhouette_axis_world = GLKVector3CrossProduct(zWorld, nGLKWorld);
+            GLKVector3 to_silhouette_axis_model = [Utilities invertVector3NoTranslation:to_silhouette_axis_world withMatrix:self.modelViewMatrix];
+            to_silhouette_axis_model = GLKVector3Normalize(to_silhouette_axis_model);
+            Vec to_silhouette_axis = Vec(to_silhouette_axis_model.x,
+                                         to_silhouette_axis_model.y,
+                                         to_silhouette_axis_model.z);
+            
+//            Vec silhouette = silhouette_Verticies[i];
+//            Vec to_silhouette_axis = silhouette - center;
+//            normalize(to_silhouette_axis);
+            HalfEdgeID ribID = _edges_to_scale[i];
+            for (Walker w = _manifold.walker(ribID); !w.full_circle(); w = w.next().opp().next()) {
+                Vec pos = _manifold.pos(w.vertex()) - center;
+                float c = dot(pos, to_silhouette_axis)/dot(to_silhouette_axis, to_silhouette_axis);
+                Vec proj = c * to_silhouette_axis;
+                _anisotropic_projections[w.vertex()] = Vecf(proj);
+            }
+        }
+    }
+
+
+    if ([SettingsManager sharedInstance].sculptScalingType == SilhouetteScaling) {
+        [self setModState:MODIFICATION_SCULPTING_ANISOTROPIC_SCALING];
+    } else {
+        [self setModState:MODIFICATION_SCULPTING_SCALING];
+    }
 }
 
 -(void)changeScalingSingleRibWithScaleFactor:(float)scale {
@@ -938,19 +1011,42 @@ using namespace HMesh;
 
     [self saveState];
     
-    vector<VertexID> allAffectedVerticies;
-    for (int i = 0; i < _edges_to_scale.size(); i++) {
-        vector<VertexID> affected = change_rib_radius(_manifold, _edges_to_scale[i], _centroids[i], _edgeInfo, 1 + (_scaleFactor - 1)*_scale_weight_vector[i]); //update _manifold
-        allAffectedVerticies.insert(allAffectedVerticies.end(), affected.begin(), affected.end());
+    
+    if (_modState == MODIFICATION_SCULPTING_SCALING) {
+        [self setModState:MODIFICATION_NONE];
+        vector<VertexID> allAffectedVerticies;
+        for (int i = 0; i < _edges_to_scale.size(); i++) {
+            vector<VertexID> affected = change_rib_radius(_manifold, _edges_to_scale[i], _centroids[i], _edgeInfo, 1 + (_scaleFactor - 1)*_scale_weight_vector[i]); //update _manifold
+            allAffectedVerticies.insert(allAffectedVerticies.end(), affected.begin(), affected.end());
+        }
+        
+        _scale_weight_vector.clear();
+        _edges_to_scale.clear();
+        _sculpt_verticies_to_scale.clear();
+        [self updateVertexPositionOnGPU_Vector:allAffectedVerticies];
+        [self updateVertexNormOnGPU_Vector:allAffectedVerticies];
+    } else if (_modState == MODIFICATION_SCULPTING_ANISOTROPIC_SCALING) {
+        [self setModState:MODIFICATION_NONE];
+        vector<VertexID> allAffectedVerticies;
+        for (int i = 0; i < _edges_to_scale.size(); i ++) {
+            
+            HalfEdgeID ribID = _edges_to_scale[i];
+            float scale =   1 + (_scaleFactor - 1)*_scale_weight_vector[i];
+            for (Walker w = _manifold.walker(ribID); !w.full_circle(); w = w.next().opp().next()) {
+                VertexID vID = w.vertex();
+                Vecf proj = _anisotropic_projections[vID];
+                Vec newPos = Vec(_manifold.posf(vID) + (scale - 1) * proj);
+                _manifold.pos(vID) = newPos;
+                allAffectedVerticies.push_back(vID);
+            }
+        }
+        
+        _scale_weight_vector.clear();
+        _edges_to_scale.clear();
+        [self updateVertexPositionOnGPU_Vector:allAffectedVerticies];
+        [self updateVertexNormOnGPU_Vector:allAffectedVerticies];
     }
-    
-    [self setModState:MODIFICATION_NONE];
-    
-    _scale_weight_vector.clear();
-    _edges_to_scale.clear();
-    _sculpt_verticies_to_scale.clear();
-    [self updateVertexPositionOnGPU_Vector:allAffectedVerticies];
-    [self updateVertexNormOnGPU_Vector:allAffectedVerticies];
+   
 }
 
 #pragma mark - BRANCH CREATION HELPERS
@@ -3494,6 +3590,30 @@ using namespace HMesh;
         glUnmapBufferOES(GL_ARRAY_BUFFER);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         
+    }
+    else if (_modState == MODIFICATION_SCULPTING_ANISOTROPIC_SCALING)
+    {
+        for (int i = 0; i < _edges_to_scale.size(); i ++) {
+            
+            HalfEdgeID ribID = _edges_to_scale[i];
+            float scale =   1 + (_scaleFactor - 1)*_scale_weight_vector[i];
+            for (Walker w = _manifold.walker(ribID); !w.full_circle(); w = w.next().opp().next()) {
+                VertexID vID = w.vertex();
+                Vecf proj = _anisotropic_projections[vID];
+                Vecf newPos = _manifold.posf(vID) + (scale - 1) * proj;
+                _current_scale_position[w.vertex()] = newPos;
+            }
+        }
+        
+        [self.vertexDataBuffer bind];
+        unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
+        for (VertexID vid: _sculpt_verticies_to_scale) {
+            Vecf pos = _current_scale_position[vid];
+            int index = vid.index;
+            memcpy(temp + index*VERTEX_SIZE, pos.get(), VERTEX_SIZE);
+        }
+        glUnmapBufferOES(GL_ARRAY_BUFFER);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
     else if (_modState == MODIFICATION_BRANCH_ROTATION)
     {

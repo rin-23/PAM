@@ -458,7 +458,8 @@ typedef enum {
                 [_pMesh endScalingBranchTreeWithScale:pinch.scale];
             }
         } else if (_pMesh.modState == MODIFICATION_NONE ||
-                   _pMesh.modState == MODIFICATION_SCULPTING_SCALING)
+                   _pMesh.modState == MODIFICATION_SCULPTING_SCALING ||
+                   _pMesh.modState == MODIFICATION_SCULPTING_ANISOTROPIC_SCALING)
         {
             //sculpting
             UIPinchGestureRecognizer* pinch = (UIPinchGestureRecognizer*) sender;

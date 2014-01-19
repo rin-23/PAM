@@ -13,6 +13,7 @@ typedef enum {
     MODIFICATION_NONE,
     MODIFICATION_SCULPTING_SCALING,
     MODIFICATION_SCULPTING_ANISOTROPIC_SCALING,
+    MODIFICATION_SCULPTING_BUMP_CREATION,
     MODIFICATION_PIN_POINT_SET,
     MODIFICATION_BRANCH_ROTATION,
     MODIFICATION_BRANCH_SCALING,
@@ -52,9 +53,17 @@ typedef enum {
 -(void)continueCreateBranch:(GLKVector3)touchPoint;
 -(void)endCreateBranchBended:(GLKVector3)touchPoint
                                  touchedModelStart:(BOOL)touchedModel
-                                   touchedModelEnd:(BOOL)touchedModelEnd                                        shouldStick:(BOOL)shouldStick
+                                   touchedModelEnd:(BOOL)touchedModelEnd
+                                       shouldStick:(BOOL)shouldStick
                                          touchSize:(float)touchSize
                                  averageTouchSpeed:(float)touchSpeed;
+
+-(void)startBumpCreationAtPoint:(GLKVector3)touchPoint
+                      brushSize:(float)brushSize
+                     brushDepth:(float)brushDepth;
+
+-(void)continueBumpCreationWithBrushDepth:(float)brushDepth;
+-(void)endBumpCreation;
 
 #pragma mark - BODY CREATION TWO FINGERS
 -(void)startCreateBodyFinger1:(GLKVector3)touchPoint1 finger2:(GLKVector3)touchPoint2;
@@ -65,8 +74,7 @@ typedef enum {
 -(void)endSelectFaceWithRay:(GLKVector3)rayOrigin rayDirection:(GLKVector3)rayDir;
 
 #pragma mark - TOUCHES: SINGLE RING SCALING
--(void)startScalingSingleRibWithTouchPoint1:(GLKVector3)touchPoint1
-                                touchPoint2:(GLKVector3)touchPoint2
+-(void)startScalingSingleRibWithTouchPoint:(GLKVector3)touchPoint
                                       scale:(float)scale
                                    velocity:(float)velocity;
 -(void)changeScalingSingleRibWithScaleFactor:(float)scale;

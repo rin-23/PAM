@@ -52,17 +52,24 @@ using namespace HMesh;
     HMesh::HalfEdgeAttributeVector<EdgeInfo> _edgeInfo;
     BoundingBox _boundingBox;
     
-    //SCULPTING
+    /*****SCULPTING*****/
     //Scaling of Rings
     vector<VertexID> _sculpt_verticies_to_scale;
     float _scaleFactor;
     vector<float> _scale_weight_vector;
     HMesh::VertexAttributeVector<Vecf> _current_scale_position;
-//    HMesh::VertexID _silhouetteVertex;
-//    vector<Vec> anisotrop_scaling_direction;
     HMesh::VertexAttributeVector<Vecf> _anisotropic_projections;
+
+    //Bump Creation
+    float _bumpBrushDepth;
+    CGLA::Vec3d _bumpDirection;
+    HMesh::VertexAttributeVector<float> _bump_verticies_weigths;
+    HMesh::VertexAttributeVector<Vecf> _bump_current_displacement;
+    HMesh::VertexAttributeVector<int> _bump_current_displacement_vid_is_set;
+    HMesh::VertexAttributeVector<Vecf> _bump_current_norms;
+    set<VertexID> _bump_verticies;
     
-    //BRANCH TRANSFORMATION
+    /*****BRANCH TRANSFORMATION****/
     //Common
     VertexID _pinVertexID;
     HalfEdgeID _pinHalfEdgeID;
@@ -767,72 +774,138 @@ using namespace HMesh;
 }
 
 #pragma mark - SCULPTING BUMPS AND RINGS
--(void)createBumpAtPoint:(vector<GLKVector3>)tPoints
-            touchedModel:(BOOL)touchedModel 
-              touchSpeed:(float)touchSpeed 
-               touchSize:(float)touchSize
+
+-(void)startBumpCreationAtPoint:(GLKVector3)touchPoint
+                      brushSize:(float)brushSize
+                     brushDepth:(float)brushDepth
 {
-    if (tPoints.size() < 2) {
+    if (![self isLoaded]) {
         return;
     }
     
-    [self saveState];
-    
-    float brushSize = 0.1;
-    if (touchSpeed <= 500) {
-        brushSize = 0.07;
-    } else if (touchSpeed > 500  && touchSpeed <= 1000) {
-        brushSize = 0.08;
-    } else if (touchSpeed > 1000) {
-        brushSize = 0.1;
-    }
-    
-    VertexID touchedVID;
-    if (touchedModel) {
-        touchedVID = [self closestVertexID_3D:_startPoint];
-    } else {
-        touchedVID = [self closestVertexID_2D:_startPoint];
-    }
-
+    VertexID touchedVID = [self closestVertexID_3D:touchPoint];
     Vec touchedPos = _manifold.pos(touchedVID);
     Vec norm = HMesh::normal(_manifold, touchedVID);
     Vec displace = 0.05*norm;
-    
-    //Decide if its a bump or dent, based on direction of the normal and a stoke in 2D
-    GLKVector3 firstCentroidWorld = [Utilities matrix4:self.viewMatrix multiplyVector3:tPoints[0]];
-    GLKVector3 lastCentroidWorld = [Utilities matrix4:self.viewMatrix multiplyVector3:tPoints[tPoints.size() - 1]];
-    GLKVector3 strokeDirWorld = GLKVector3Subtract(lastCentroidWorld, firstCentroidWorld);
-    GLKVector2 strokeDirWorld2D = GLKVector2Make(strokeDirWorld.x, strokeDirWorld.y);
-    GLKVector3 normModel = GLKVector3Make(norm[0], norm[1], norm[2]);
-    GLKVector3 normWorld = [Utilities matrix4:self.modelViewMatrix multiplyVector3:normModel];
-    GLKVector2 normWorld2D = GLKVector2Make(normWorld.x, normWorld.y);
 
-    float dotP = GLKVector2DotProduct(normWorld2D, strokeDirWorld2D);
-    if (dotP < 0) {
-        displace = -1*displace;
-    }
+    _bumpDirection = displace;
+    _bumpBrushDepth = brushDepth;
+    _bump_verticies_weigths = VertexAttributeVector<float>(_manifold.no_vertices());
+    _bump_current_displacement = VertexAttributeVector<Vecf>(_manifold.no_vertices());
+    _bump_current_displacement_vid_is_set = VertexAttributeVector<int>(_manifold.no_vertices(), 0);
+    _bump_current_norms = VertexAttributeVector<Vecf>(_manifold.no_vertices());
+    _bump_verticies.clear();
     
-    set<VertexID> neighbours;
     vector<VertexID> oneVertex;
     oneVertex.push_back(touchedVID);
-    [self neighbours:neighbours forVerticies:oneVertex brushSize:brushSize];
+    [self neighbours:_bump_verticies forVerticies:oneVertex brushSize:brushSize];
     
-    for (VertexID vid: neighbours)
+    for (VertexID vid: _bump_verticies)
     {
         double l = (touchedPos - _manifold.pos(vid)).length();
         float x = l/brushSize;
         if (x <= 1) {
             float weight = pow(pow(x,2)-1, 2);
-            _manifold.pos(vid) = _manifold.pos(vid) + displace * weight;
+            _bump_verticies_weigths[vid] = weight;
         }
-    }    
-    [self updateVertexPositionOnGPU_Set:neighbours];
-    [self updateVertexNormOnGPU_Set:neighbours];
+        _bump_current_displacement_vid_is_set[vid] = 1;
+    }
+//    [self changeVerticiesColor_Set:_bump_verticies toSelected:YES];
+    [self setModState:MODIFICATION_SCULPTING_BUMP_CREATION];
+    
 }
 
+-(void)continueBumpCreationWithBrushDepth:(float)brushDepth
+{
+    _bumpBrushDepth = brushDepth;
+    NSLog(@"Bump depth %f",brushDepth);
+}
+
+-(void)endBumpCreation
+{
+    
+    if (![self isLoaded])
+        return;
+    
+    [self saveState];
+    
+    [self setModState:MODIFICATION_NONE];
+    
+    for (VertexID vid: _bump_verticies)
+    {
+        _manifold.pos(vid) = Vec(_bump_current_displacement[vid]);
+    }
+    
+    [self updateVertexPositionOnGPU_Set:_bump_verticies];
+    [self updateVertexNormOnGPU_Set:_bump_verticies];
+
+}
+
+//-(void)createBumpAtPoint:(vector<GLKVector3>)tPoints
+//            touchedModel:(BOOL)touchedModel
+//              touchSpeed:(float)touchSpeed 
+//               touchSize:(float)touchSize
+//{
+//    if (tPoints.size() < 2) {
+//        return;
+//    }
+//    
+//    [self saveState];
+//    
+//    float brushSize = 0.1;
+//    if (touchSpeed <= 500) {
+//        brushSize = 0.07;
+//    } else if (touchSpeed > 500  && touchSpeed <= 1000) {
+//        brushSize = 0.08;
+//    } else if (touchSpeed > 1000) {
+//        brushSize = 0.1;
+//    }
+//    
+//    VertexID touchedVID;
+//    if (touchedModel) {
+//        touchedVID = [self closestVertexID_3D:_startPoint];
+//    } else {
+//        touchedVID = [self closestVertexID_2D:_startPoint];
+//    }
+//
+//    Vec touchedPos = _manifold.pos(touchedVID);
+//    Vec norm = HMesh::normal(_manifold, touchedVID);
+//    Vec displace = 0.05*norm;
+//    
+//    //Decide if its a bump or dent, based on direction of the normal and a stoke in 2D
+//    GLKVector3 firstCentroidWorld = [Utilities matrix4:self.viewMatrix multiplyVector3:tPoints[0]];
+//    GLKVector3 lastCentroidWorld = [Utilities matrix4:self.viewMatrix multiplyVector3:tPoints[tPoints.size() - 1]];
+//    GLKVector3 strokeDirWorld = GLKVector3Subtract(lastCentroidWorld, firstCentroidWorld);
+//    GLKVector2 strokeDirWorld2D = GLKVector2Make(strokeDirWorld.x, strokeDirWorld.y);
+//    GLKVector3 normModel = GLKVector3Make(norm[0], norm[1], norm[2]);
+//    GLKVector3 normWorld = [Utilities matrix4:self.modelViewMatrix multiplyVector3:normModel];
+//    GLKVector2 normWorld2D = GLKVector2Make(normWorld.x, normWorld.y);
+//
+//    float dotP = GLKVector2DotProduct(normWorld2D, strokeDirWorld2D);
+//    if (dotP < 0) {
+//        displace = -1*displace;
+//    }
+//    
+//    set<VertexID> neighbours;
+//    vector<VertexID> oneVertex;
+//    oneVertex.push_back(touchedVID);
+//    [self neighbours:neighbours forVerticies:oneVertex brushSize:brushSize];
+//    
+//    for (VertexID vid: neighbours)
+//    {
+//        double l = (touchedPos - _manifold.pos(vid)).length();
+//        float x = l/brushSize;
+//        if (x <= 1) {
+//            float weight = pow(pow(x,2)-1, 2);
+//            _manifold.pos(vid) = _manifold.pos(vid) + displace * weight;
+//        }
+//    }    
+//    [self updateVertexPositionOnGPU_Set:neighbours];
+//    [self updateVertexNormOnGPU_Set:neighbours];
+//}
+
 //middlePoint - centroid between tow fingers of a pinch gesture
--(void)startScalingSingleRibWithTouchPoint1:(GLKVector3)touchPoint1
-                                touchPoint2:(GLKVector3)touchPoint2
+-(void)startScalingSingleRibWithTouchPoint:(GLKVector3)touchPoint
                                       scale:(float)scale
                                    velocity:(float)velocity
 {
@@ -841,12 +914,14 @@ using namespace HMesh;
     }
     
     VertexID vID;
-    if ([SettingsManager sharedInstance].sculptScalingType == SilhouetteScaling) {
-        vID = [self closestVertexID_2D:touchPoint1];
-    } else {
-        GLKVector3 middlePoint = GLKVector3Lerp(touchPoint1, touchPoint2, 0.5f);
-        vID = [self closestVertexID_2D:middlePoint];
-    }
+    vID = [self closestVertexID_2D:touchPoint];
+//    if ([SettingsManager sharedInstance].sculptScalingType == SilhouetteScaling) {
+//        vID = [self closestVertexID_2D:touchPoint];
+//    } else {
+////        GLKVector3 middlePoint = GLKVector3Lerp(touchPoint1, touchPoint2, 0.5f);
+//        vID = [self closestVertexID_2D:touchPoint];
+//    }
+    
     if (is_pole(_manifold, vID)) {
         return;
     }
@@ -939,9 +1014,8 @@ using namespace HMesh;
             } else {
                 weight = 0;
             }
-            NSLog(@"%f", weight);
+//            NSLog(@"%f", weight);
             _scale_weight_vector.push_back(weight);
-//            _scale_weight_vector.push_back(1.0f);
         }
     }
     
@@ -1294,7 +1368,7 @@ using namespace HMesh;
     
     if (_touchPoints.size() < 8) {
         if (_touchPoints.size() >= 2) {
-            [self createBumpAtPoint:_touchPoints touchedModel:touchedModelStart touchSpeed:touchSpeed touchSize:touchSize];
+//            [self createBumpAtPoint:_touchPoints touchedModel:touchedModelStart touchSpeed:touchSpeed touchSize:touchSize];
         } else {
             NSLog(@"[PolarAnnularMesh][WARNING] Garbage point data");
         }
@@ -1314,7 +1388,7 @@ using namespace HMesh;
     [PAMUtilities centroids3D:rawSkeleton forOneFingerTouchPoint:touchPointsWorld withNextCentroidStep:c_step];
     if (rawSkeleton.size() < 8) {
         NSLog(@"[PolarAnnularMesh][WARNING] Not enough controids");
-        [self createBumpAtPoint:_touchPoints touchedModel:touchedModelStart touchSpeed:touchSpeed touchSize:touchSize];
+//        [self createBumpAtPoint:_touchPoints touchedModel:touchedModelStart touchSpeed:touchSpeed touchSize:touchSize];
         return;
     }
     
@@ -3584,7 +3658,7 @@ using namespace HMesh;
         unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
         for (VertexID vid: _sculpt_verticies_to_scale) {
             Vecf pos = _current_scale_position[vid];
-            int index = vid.index;
+            unsigned long index = vid.index;
             memcpy(temp + index*VERTEX_SIZE, pos.get(), VERTEX_SIZE);
         }
         glUnmapBufferOES(GL_ARRAY_BUFFER);
@@ -3609,8 +3683,86 @@ using namespace HMesh;
         unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
         for (VertexID vid: _sculpt_verticies_to_scale) {
             Vecf pos = _current_scale_position[vid];
-            int index = vid.index;
+            unsigned long index = vid.index;
             memcpy(temp + index*VERTEX_SIZE, pos.get(), VERTEX_SIZE);
+        }
+        glUnmapBufferOES(GL_ARRAY_BUFFER);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        
+    }
+    else if (_modState == MODIFICATION_SCULPTING_BUMP_CREATION)
+    {
+        for (VertexID vid: _bump_verticies)
+        {
+            float weight = _bump_verticies_weigths[vid];
+            float depth;
+            if (_bumpBrushDepth < 1) {
+                depth = 1 - _bumpBrushDepth;
+            } else {
+                depth = -1*(_bumpBrushDepth - 1);
+            }
+            _bump_current_displacement[vid] = Vecf(_manifold.pos(vid) + depth*_bumpDirection*weight);
+        }
+        
+        for (VertexID v: _bump_verticies)
+        {
+            Vecf p0 = _bump_current_displacement[v];
+
+            vector<Vecf> one_ring;
+            
+            // run through outgoing edges, and store them normalized
+            circulate_vertex_ccw(_manifold, v, (std::function<void(VertexID)>)[&](VertexID vn) {
+                Vecf edge;
+                if(_bump_current_displacement_vid_is_set[vn]) {
+                    edge = _bump_current_displacement[vn] - p0;
+                } else {
+                    edge = _manifold.posf(vn) - p0;
+                }
+                
+                double l = length(edge);
+                if(l > 0.0)
+                    one_ring.push_back(edge/l);
+            });
+            int N = one_ring.size();
+            
+            size_t N_count = N;
+            size_t N_start = 0;
+            if(boundary(_manifold, v))
+                N_start = 1;
+            
+            // sum up the normals of each face surrounding the vertex
+            Vecf n(0);
+            for(size_t i = N_start; i < N_count; ++i){
+                Vecf e0 = one_ring[i];
+                Vecf e1 = one_ring[(i+1) % N];
+                
+                Vecf n_part = normalize(cross(e0, e1));
+                n += n_part * acos(max(-1.0, fmin(1.0, dot(e0, e1))));
+            }
+            
+            // normalize and return the normal
+            float sqr_l = sqr_length(n);
+            if(sqr_l > 0.0f)
+                n = n / sqrt(sqr_l);
+            
+            _bump_current_norms[v] = n;
+        }
+        
+        [self.vertexDataBuffer bind];
+        unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
+        for (VertexID vid: _bump_verticies) {
+            Vecf pos = _bump_current_displacement[vid];
+            size_t index = vid.index;
+            memcpy(temp + index*VERTEX_SIZE, pos.get(), VERTEX_SIZE);
+        }
+        glUnmapBufferOES(GL_ARRAY_BUFFER);
+        
+        [self.normalDataBuffer bind];
+        unsigned char* tempnorm = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
+        for (VertexID vid: _bump_verticies) {
+            Vecf norm = _bump_current_norms[vid];
+            size_t index = vid.index;
+            memcpy(tempnorm + index*VERTEX_SIZE, norm.get(), VERTEX_SIZE);
         }
         glUnmapBufferOES(GL_ARRAY_BUFFER);
         glBindBuffer(GL_ARRAY_BUFFER, 0);

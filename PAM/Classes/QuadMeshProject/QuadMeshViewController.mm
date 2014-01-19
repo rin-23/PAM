@@ -459,30 +459,62 @@ typedef enum {
             }
         } else if (_pMesh.modState == MODIFICATION_NONE ||
                    _pMesh.modState == MODIFICATION_SCULPTING_SCALING ||
-                   _pMesh.modState == MODIFICATION_SCULPTING_ANISOTROPIC_SCALING)
+                   _pMesh.modState == MODIFICATION_SCULPTING_ANISOTROPIC_SCALING ||
+                   _pMesh.modState == MODIFICATION_SCULPTING_BUMP_CREATION)
         {
             //sculpting
             UIPinchGestureRecognizer* pinch = (UIPinchGestureRecognizer*) sender;
-            NSLog(@"Scale %f", pinch.velocity);
+//            NSLog(@"Scale %f", pinch.velocity);
             if (sender.state == UIGestureRecognizerStateBegan) {
                 CGPoint touchPoint1 = [self scaleTouchPoint:[sender locationOfTouch:0 inView:(GLKView*)sender.view]
                                                      inView:(GLKView*)sender.view];
                 CGPoint touchPoint2 = [self scaleTouchPoint:[sender locationOfTouch:1 inView:(GLKView*)sender.view]
                                                      inView:(GLKView*)sender.view];
                 
-                GLKVector3 rayOrigin1, rayDir1, rayOrigin2, rayDir2;
-                BOOL result1 = [self rayOrigin:&rayOrigin1 rayDirection:&rayDir1 forTouchPoint:touchPoint1];
-                BOOL result2 = [self rayOrigin:&rayOrigin2 rayDirection:&rayDir2 forTouchPoint:touchPoint2];
-                if (!result1 || !result2) {
-                    NSLog(@"[WARNING] Couldn't determine touch area");
-                    return;
-                }
+                NSMutableData* pixelData = [self renderToOffscreenDepthBuffer:@[_pMesh]];
+                float depth1 = [self depthForPoint:touchPoint1 depthBuffer:pixelData];
+                float depth2 = [self depthForPoint:touchPoint2 depthBuffer:pixelData];
                 
-                [_pMesh startScalingSingleRibWithTouchPoint1:rayOrigin1 touchPoint2:rayOrigin2 scale:pinch.scale velocity:pinch.velocity];
+                if (depth1 < 0 || depth2 < 0) {
+                    //on of the fingers touched background. Start scaling.
+                    CGPoint touchPoint = (depth1 < 0) ? touchPoint1 :touchPoint2;
+                    GLKVector3 rayOrigin, rayDir;
+                    if (![self rayOrigin:&rayOrigin rayDirection:&rayDir forTouchPoint:touchPoint]) {
+                        NSLog(@"[WARNING] Couldn't determine touch area");
+                        return;
+                    }
+                    [_pMesh startScalingSingleRibWithTouchPoint:rayOrigin scale:pinch.scale velocity:pinch.velocity];
+                } else if (depth1 >= 0 && depth2 >= 0) {
+                    //touched the model so start bump creation
+                    GLKVector3 modelCoord1, modelCoord2;
+                    GLKVector3 worldTouchPoint1 = GLKVector3Make(touchPoint1.x, touchPoint1.y, depth1);
+                    GLKVector3 worldTouchPoint2 = GLKVector3Make(touchPoint2.x, touchPoint2.y, depth2);
+                    [self modelCoordinates:&modelCoord1 forTouchPoint:worldTouchPoint1];
+                    [self modelCoordinates:&modelCoord2 forTouchPoint:worldTouchPoint2];
+                    float distanceBetweenFingers = GLKVector3Length(GLKVector3Subtract(modelCoord2, modelCoord1));
+                    
+                    CGPoint touchPoint = CGPointMake(floorf(0.5*(touchPoint1.x +touchPoint2.x)),
+                                                     floorf(0.5*(touchPoint1.y +touchPoint2.y)));
+                    float depth = [self depthForPoint:touchPoint depthBuffer:pixelData];
+                    GLKVector3 modelCoord;
+                    [self modelCoordinates:&modelCoord forTouchPoint:GLKVector3Make(touchPoint.x, touchPoint.y, depth)];
+                    float brushSize = distanceBetweenFingers/2;
+                    [_pMesh startBumpCreationAtPoint:modelCoord
+                                           brushSize:brushSize
+                                          brushDepth:pinch.scale];
+                }
             } else if (sender.state == UIGestureRecognizerStateChanged) {
-                [_pMesh changeScalingSingleRibWithScaleFactor:pinch.scale];
+                if (_pMesh.modState == MODIFICATION_SCULPTING_BUMP_CREATION) {
+                    [_pMesh continueBumpCreationWithBrushDepth:pinch.scale];
+                } else {
+                    [_pMesh changeScalingSingleRibWithScaleFactor:pinch.scale];
+                }
             } else if (sender.state == UIGestureRecognizerStateEnded) {
-                [_pMesh endScalingSingleRibWithScaleFactor:pinch.scale];
+                if (_pMesh.modState == MODIFICATION_SCULPTING_BUMP_CREATION) {
+                    [_pMesh endBumpCreation];
+                } else {
+                    [_pMesh endScalingSingleRibWithScaleFactor:pinch.scale];
+                }
             }
         }
     }

@@ -19,7 +19,6 @@
 #import "SettingsManager.h"
 #import "PAMPanGestureRecognizer.h"
 
-
 typedef enum {
     TOUCHED_NONE,
     TOUCHED_MODEL,
@@ -477,13 +476,28 @@ typedef enum {
                 
                 if (depth1 < 0 || depth2 < 0) {
                     //on of the fingers touched background. Start scaling.
-                    CGPoint touchPoint = (depth1 < 0) ? touchPoint1 :touchPoint2;
-                    GLKVector3 rayOrigin, rayDir;
-                    if (![self rayOrigin:&rayOrigin rayDirection:&rayDir forTouchPoint:touchPoint]) {
-                        NSLog(@"[WARNING] Couldn't determine touch area");
-                        return;
+                    if (depth1 < 0 && depth2 < 0) {
+                        GLKVector3 rayOrigin, rayDir;
+                        if (![self rayOrigin:&rayOrigin rayDirection:&rayDir forTouchPoint:touchPoint1]) {
+                            NSLog(@"[WARNING] Couldn't determine touch area");
+                            return;
+                        }
+                        [_pMesh startScalingSingleRibWithTouchPoint:rayOrigin secondPointOnTheModel:NO scale:pinch.scale velocity:pinch.velocity];
+                    } else if ( depth1 < 0) {
+                        GLKVector3 rayOrigin, rayDir;
+                        if (![self rayOrigin:&rayOrigin rayDirection:&rayDir forTouchPoint:touchPoint1]) {
+                            NSLog(@"[WARNING] Couldn't determine touch area");
+                            return;
+                        }
+                        [_pMesh startScalingSingleRibWithTouchPoint:rayOrigin secondPointOnTheModel:YES scale:pinch.scale velocity:pinch.velocity];
+                    } else {
+                        GLKVector3 rayOrigin, rayDir;
+                        if (![self rayOrigin:&rayOrigin rayDirection:&rayDir forTouchPoint:touchPoint2]) {
+                            NSLog(@"[WARNING] Couldn't determine touch area");
+                            return;
+                        }
+                        [_pMesh startScalingSingleRibWithTouchPoint:rayOrigin secondPointOnTheModel:YES scale:pinch.scale velocity:pinch.velocity];
                     }
-                    [_pMesh startScalingSingleRibWithTouchPoint:rayOrigin scale:pinch.scale velocity:pinch.velocity];
                 } else if (depth1 >= 0 && depth2 >= 0) {
                     //touched the model so start bump creation
                     GLKVector3 modelCoord1, modelCoord2;

@@ -75,8 +75,10 @@ typedef enum {
 
 #pragma mark - TOUCHES: SINGLE RING SCALING
 -(void)startScalingSingleRibWithTouchPoint:(GLKVector3)touchPoint
+                      secondPointOnTheModel:(BOOL)secondPointOnTheModel
                                       scale:(float)scale
                                    velocity:(float)velocity;
+
 -(void)changeScalingSingleRibWithScaleFactor:(float)scale;
 -(void)endScalingSingleRibWithScaleFactor:(float)scale;
 

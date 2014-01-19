@@ -906,6 +906,7 @@ using namespace HMesh;
 
 //middlePoint - centroid between tow fingers of a pinch gesture
 -(void)startScalingSingleRibWithTouchPoint:(GLKVector3)touchPoint
+                      secondPointOnTheModel:(BOOL)secondPointOnTheModel
                                       scale:(float)scale
                                    velocity:(float)velocity
 {
@@ -1040,13 +1041,23 @@ using namespace HMesh;
             int sol = power_eigensolution(cov, Q, L);
             
             Vec3d n;
-            assert(sol>=2);
+            assert(sol >= 2);
             n = normalize(cross(Q[0],Q[1]));
             
             GLKVector3 nGLK = GLKVector3Make(n[0], n[1], n[2]);
             GLKVector3 nGLKWorld = [Utilities matrix4:self.modelViewMatrix multiplyVector3NoTranslation:nGLK];
             GLKVector3 zWorld = GLKVector3Make(0, 0, 1);
             GLKVector3 to_silhouette_axis_world = GLKVector3CrossProduct(zWorld, nGLKWorld);
+            
+
+//            
+//            if (secondPointOnTheModel) {
+//                
+//            }
+//            GLKVector3 touchPoint2World = [Utilities matrix4:self.modelViewMatrix multiplyVector3:touchPoint2];
+//            touchPoint2World.z = to_silhouette_axis_world.z;
+//            GLKVector3 touchPoint2
+            
             GLKVector3 to_silhouette_axis_model = [Utilities invertVector3NoTranslation:to_silhouette_axis_world withMatrix:self.modelViewMatrix];
             to_silhouette_axis_model = GLKVector3Normalize(to_silhouette_axis_model);
             Vec to_silhouette_axis = Vec(to_silhouette_axis_model.x,
@@ -1061,6 +1072,13 @@ using namespace HMesh;
                 Vec pos = _manifold.pos(w.vertex()) - center;
                 float c = dot(pos, to_silhouette_axis)/dot(to_silhouette_axis, to_silhouette_axis);
                 Vec proj = c * to_silhouette_axis;
+                if (secondPointOnTheModel) {
+                    Vec toOrg = origin - center;
+                    if (dot(toOrg, proj) < 0) {
+                        proj = Vec(0,0,0);
+                    }
+                }
+
                 _anisotropic_projections[w.vertex()] = Vecf(proj);
             }
         }

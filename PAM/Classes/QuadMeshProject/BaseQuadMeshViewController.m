@@ -65,8 +65,19 @@
     _transformModeLabel.textAlignment = NSTextAlignmentCenter;
     _transformModeLabel.center = CGPointMake(self.view.frame.size.width/2, _transformModeLabel.frame.size.height/2);
     _transformModeLabel.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin|UIViewAutoresizingFlexibleRightMargin;
-    _transformModeLabel.alpha = 0.0f;
+    if ([SettingsManager sharedInstance].transform) {
+        _transformModeLabel.text = @"Transform";
+    } else {
+        _transformModeLabel.text = @"Model";
+    }
     [view addSubview:_transformModeLabel];
+    
+    _hintLabel = [[UILabel alloc] initWithFrame:CGRectMake(self.view.frame.size.width - 400, self.view.frame.size.height - 30, 400, 30)];
+    _hintLabel.textColor = [UIColor blackColor];
+    _hintLabel.textAlignment = NSTextAlignmentRight;
+    _hintLabel.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin|UIViewAutoresizingFlexibleTopMargin;
+    _hintLabel.alpha = 0.0f;
+    [view addSubview:_hintLabel];
     
     self.view = view;
 }

@@ -29,6 +29,7 @@ typedef enum {
 @protocol PolarAnnularMeshDelegate <NSObject>
 
 -(void)modStateChangedTo:(CurrentModification)modState;
+-(void)displayHint:(NSString*)hintString;
 
 @end
 

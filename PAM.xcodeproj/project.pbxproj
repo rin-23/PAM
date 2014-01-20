@@ -67,6 +67,7 @@
 		1A9438AD1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m in Sources */ = {isa = PBXBuildFile; fileRef = 1A9438AC1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m */; };
 		1A976FC0184683EF0022AC3D /* PAMUtilities.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1A976FBF184683EF0022AC3D /* PAMUtilities.mm */; };
 		1ABD4F401885D684001FA009 /* polarized_from_075_100_refit_simpl_600.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1ABD4F3F1885D684001FA009 /* polarized_from_075_100_refit_simpl_600.obj */; };
+		1AF3EBBA188C5A8200AB0C09 /* man-polar150-simpl420-refit34_0.5-subd-refit10_0.5.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1AF3EBB9188C5A8200AB0C09 /* man-polar150-simpl420-refit34_0.5-subd-refit10_0.5.obj */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -204,6 +205,7 @@
 		1A976FBE184683EF0022AC3D /* PAMUtilities.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PAMUtilities.h; sourceTree = "<group>"; };
 		1A976FBF184683EF0022AC3D /* PAMUtilities.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = PAMUtilities.mm; sourceTree = "<group>"; };
 		1ABD4F3F1885D684001FA009 /* polarized_from_075_100_refit_simpl_600.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = polarized_from_075_100_refit_simpl_600.obj; sourceTree = "<group>"; };
+		1AF3EBB9188C5A8200AB0C09 /* man-polar150-simpl420-refit34_0.5-subd-refit10_0.5.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "man-polar150-simpl420-refit34_0.5-subd-refit10_0.5.obj"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -440,6 +442,7 @@
 		15646602182033920000B985 /* ObjFiles */ = {
 			isa = PBXGroup;
 			children = (
+				1AF3EBB9188C5A8200AB0C09 /* man-polar150-simpl420-refit34_0.5-subd-refit10_0.5.obj */,
 				1ABD4F3F1885D684001FA009 /* polarized_from_075_100_refit_simpl_600.obj */,
 				158D8BB41841765C00FA8AFB /* sphere_mid_res.obj */,
 				1A408F3F18357CAA0044E48E /* quad_sphere_high_res.obj */,
@@ -615,6 +618,7 @@
 				155746931840052700401921 /* Shader.fsh in Resources */,
 				155746941840052700401921 /* Shader.vsh in Resources */,
 				1553C239183EFFB300839072 /* simpleshader.vsh in Resources */,
+				1AF3EBBA188C5A8200AB0C09 /* man-polar150-simpl420-refit34_0.5-subd-refit10_0.5.obj in Resources */,
 				1553C23A183EFFB300839072 /* simpleshader.fsh in Resources */,
 				153B4E4F18206CF400962DB2 /* DirectionalLight.fsh in Resources */,
 				153B4E5018206CF400962DB2 /* DirectionalLight.vsh in Resources */,
@@ -761,7 +765,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 6.0;
 				ONLY_ACTIVE_ARCH = YES;
-				PROVISIONING_PROFILE = "1DC8B0D3-AC31-455C-86F7-77D250152886";
+				PROVISIONING_PROFILE = "5F422754-4526-4807-81C2-924B5FC1CF12";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -796,7 +800,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 6.0;
-				PROVISIONING_PROFILE = "1DC8B0D3-AC31-455C-86F7-77D250152886";
+				PROVISIONING_PROFILE = "5F422754-4526-4807-81C2-924B5FC1CF12";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALIDATE_PRODUCT = YES;
@@ -816,7 +820,7 @@
 				INFOPLIST_FILE = "PAM/PAM-Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE = "1DC8B0D3-AC31-455C-86F7-77D250152886";
+				PROVISIONING_PROFILE = "5F422754-4526-4807-81C2-924B5FC1CF12";
 				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/GEL-iOS/**";
 				WRAPPER_EXTENSION = app;
 			};
@@ -835,7 +839,7 @@
 				INFOPLIST_FILE = "PAM/PAM-Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE = "1DC8B0D3-AC31-455C-86F7-77D250152886";
+				PROVISIONING_PROFILE = "5F422754-4526-4807-81C2-924B5FC1CF12";
 				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/GEL-iOS/**";
 				WRAPPER_EXTENSION = app;
 			};

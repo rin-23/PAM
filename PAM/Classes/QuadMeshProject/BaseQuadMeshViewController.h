@@ -18,6 +18,7 @@
     UIPopoverController* _settingsPopover;
     
     UILabel* _transformModeLabel;
+    UILabel* _hintLabel;
 }
 
 -(void)showLoadingIndicator;

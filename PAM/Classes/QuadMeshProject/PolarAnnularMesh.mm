@@ -1384,7 +1384,7 @@ using namespace HMesh;
         return;
     }
     
-    if (_touchPoints.size() < 8) {
+    if (_touchPoints.size() < 6) {
         if (_touchPoints.size() >= 2) {
 //            [self createBumpAtPoint:_touchPoints touchedModel:touchedModelStart touchSpeed:touchSpeed touchSize:touchSize];
         } else {
@@ -1404,7 +1404,7 @@ using namespace HMesh;
     GLKMatrix3 m = GLKMatrix4GetMatrix3(self.modelViewMatrix);
     float c_step = GLKVector3Length(GLKMatrix3MultiplyVector3(m, GLKVector3Make(kCENTROID_STEP, 0, 0)));
     [PAMUtilities centroids3D:rawSkeleton forOneFingerTouchPoint:touchPointsWorld withNextCentroidStep:c_step];
-    if (rawSkeleton.size() < 8) {
+    if (rawSkeleton.size() < 4) {
         NSLog(@"[PolarAnnularMesh][WARNING] Not enough controids");
 //        [self createBumpAtPoint:_touchPoints touchedModel:touchedModelStart touchSpeed:touchSpeed touchSize:touchSize];
         return;
@@ -2248,7 +2248,7 @@ using namespace HMesh;
     //find rib edge
     Walker walker = _manifold.walker(vID).opp();
     if (_edgeInfo[walker.halfedge()].is_spine()) {
-        walker = walker.next();
+        walker = walker.next().opp();
     }
     assert(_edgeInfo[walker.halfedge()].is_rib());
     _pivotHalfEdgeID = walker.halfedge();
@@ -2275,7 +2275,7 @@ using namespace HMesh;
     Walker sW2 = w2;
     
     BOOL w1ReachedRibJunction = NO;
-    BOOL w2ReachedRibJunction = YES;
+    BOOL w2ReachedRibJunction = NO;
     int iterations = 0;
     while (true) {
         HalfEdgeID hID = w1.next().halfedge();
@@ -2408,6 +2408,7 @@ using namespace HMesh;
     if (_modState != MODIFICATION_BRANCH_TRANSLATION) {
         return;
     }
+    [self saveState];
     
     _translation = translation;
     
@@ -2483,7 +2484,10 @@ using namespace HMesh;
         return;
     }
     
+    [self saveState];
+    
     _scaleFactor = scale;
+    
     
     GLKMatrix4 toOrigin = GLKMatrix4MakeTranslation(-_centerOfRotation.x, -_centerOfRotation.y, -_centerOfRotation.z);
     GLKMatrix4 fromOrigin = GLKMatrix4MakeTranslation(_centerOfRotation.x, _centerOfRotation.y, _centerOfRotation.z);
@@ -2556,6 +2560,7 @@ using namespace HMesh;
     if (_modState != MODIFICATION_BRANCH_ROTATION) {
         return;
     }
+    [self saveState];
     
     GLKVector3 zAxis = GLKMatrix4MultiplyVector3(GLKMatrix4Invert(self.viewMatrix, NULL), GLKVector3Make(0, 0, -1));
     GLKMatrix4 toOrigin = GLKMatrix4MakeTranslation(-_centerOfRotation.x, -_centerOfRotation.y, -_centerOfRotation.z);
@@ -2721,7 +2726,101 @@ using namespace HMesh;
 }
 
 #pragma mark - CLONING BRANCHES
+
+-(BOOL)newcopyBranchToBuffer:(GLKVector3)touchPoint {
+    if (_modState != MODIFICATION_PIN_POINT_SET) {
+        NSLog(@"[WARNING][PolarAnnularMesh] Cant copy. Pin point is not chosen");
+        return NO;
+    }
+
+    number_rib_edges(_manifold, _edgeInfo);
+    if (_edgeInfo[_pinHalfEdgeID].edge_type == RIB_JUNCTION) {
+        NSLog(@"Can't clone at a branch junction");
+        [self.delegate displayHint:@"Can't clone at a branch junction"];
+        return NO;
+    }
+
+    //Decide which side to delete
+    Walker up = _manifold.walker(_pinVertexID);
+    if (!_edgeInfo[up.halfedge()].is_spine()) {
+        up = up.prev().opp();
+    }
+    assert(_edgeInfo[up.halfedge()].is_spine());
+    Walker down = up.prev().opp().prev().opp();
+    assert(_edgeInfo[down.halfedge()].is_spine());
+    assert(up.opp().vertex() == down.opp().vertex());
+    
+    
+    Vecf upCentr = centroid_for_rib(_manifold, up.next().halfedge(), _edgeInfo);
+    Vecf downCentr = centroid_for_rib(_manifold, down.next().halfedge(), _edgeInfo);
+    Vecf pinCentr = centroid_for_rib(_manifold, _pinHalfEdgeID);
+    
+    Vecf upVec = upCentr - pinCentr;
+    Vecf downVec = downCentr - pinCentr;
+    
+    GLKVector3 pinCentroidWorld = [Utilities matrix4:self.modelViewMatrix
+                                     multiplyVector3:GLKVector3Make(pinCentr[0], pinCentr[1], pinCentr[2])];
+    GLKVector3 touchPointWorld = [Utilities matrix4:self.modelViewMatrix
+                                    multiplyVector3:touchPoint];
+    touchPointWorld.z = pinCentroidWorld.z;
+    GLKVector3 touchPointModel = [Utilities invertVector3:touchPointWorld
+                                               withMatrix:self.modelViewMatrix];
+    
+    Vecf touchDir = Vecf(touchPointModel.x, touchPointModel.y, touchPointModel.z) - pinCentr;
+    
+    Walker toWalker = up;
+    if (dot(touchDir, upVec) >= 0) {
+        toWalker = up;
+    } else if (dot(touchDir, downVec) >= 0) {
+        toWalker = down;
+    } else {
+        NSLog(@"Couldn't decide witch side to detach");
+        [self.delegate displayHint:@"Couldn't decide witch side to detach"];
+        return NO;
+    }
+        
+    _cloningDirection = toWalker.halfedge();
+    _cloningBodyUpperRibEdge = toWalker.prev().halfedge();
+    
+    //Number of rib segments araound boundary rib
+    _copyNumBoundaryRibSegments = 0;
+    for (Walker boundaryW = _manifold.walker(_cloningBodyUpperRibEdge);
+         !boundaryW.full_circle();
+         boundaryW = boundaryW.next().opp().next())
+    {
+        _copyNumBoundaryRibSegments++;
+    }
+    
+    //find all verticies that we need to delete
+    _original_verticies_copied =  [self allVerticiesInDirection:toWalker];
+    set<VertexID> all_verticies_to_delete =  [self allVerticiesInDirection:toWalker.opp()];
+    //        [self changeVerticiesColor:all_verticies_to_delete toSelected:YES];
+    
+    //remove verticies from duplicate manifold, so that only copy part is left
+    Manifold copyMani = _manifold;
+    for (VertexID vID: all_verticies_to_delete) {
+        copyMani.remove_vertex(vID);
+    }
+    copyMani.cleanup();
+    
+    
+    _copyFaces.clear();
+    _copyIndices.clear();
+    _copyVerticies.clear();
+    [self extractFromManifold:copyMani verticies:_copyVerticies faces:_copyFaces indicies:_copyIndices];
+    
+    [self changeVerticiesColor_Set:_original_verticies_copied toColor:Vec4uc(250, 89, 14, 255)];
+    
+    //    _pinPointLine = nil;
+    _modState = MODIFICATION_BRANCH_COPIED_BRANCH_FOR_CLONING;
+    return YES;
+}
+
+
 -(BOOL)copyBranchToBuffer:(GLKVector3)touchPoint {
+    
+    return [self newcopyBranchToBuffer:touchPoint];
+    
     if (_modState != MODIFICATION_PIN_POINT_SET) {
         NSLog(@"[WARNING][PolarAnnularMesh] Cant copy. Pin point is not chosen");
         return NO;
@@ -2789,7 +2888,7 @@ using namespace HMesh;
     _copyVerticies.clear();
     [self extractFromManifold:copyMani verticies:_copyVerticies faces:_copyFaces indicies:_copyIndices];
 
-    [self changeVerticiesColor_Set:_original_verticies_copied toSelected:YES];
+    [self changeVerticiesColor_Set:_original_verticies_copied toColor:Vec4uc(250, 89, 14, 255)];
     
 //    _pinPointLine = nil;
     _modState = MODIFICATION_BRANCH_COPIED_BRANCH_FOR_CLONING;
@@ -2881,7 +2980,7 @@ using namespace HMesh;
     
     [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
     [self changeVerticiesColor_Vector:_cloned_verticies toColor:Vec4uc(0,200,0,255)];
-    [self changeVerticiesColor_Set:_original_verticies_copied toSelected:YES];
+    [self changeVerticiesColor_Set:_original_verticies_copied toColor:Vec4uc(250, 89, 14,255)];
     
     [self setModState:MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE];
 
@@ -2925,7 +3024,7 @@ using namespace HMesh;
     }
     
     [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
-    [self changeVerticiesColor_Set:_original_verticies_copied toSelected:YES];
+    [self changeVerticiesColor_Set:_original_verticies_copied toColor:Vec4uc(250, 89, 14, 255)];
     _cloned_verticies.clear();
     [self setModState:MODIFICATION_BRANCH_COPIED_BRANCH_FOR_CLONING];
     return YES;
@@ -3103,8 +3202,96 @@ using namespace HMesh;
 
 #pragma mark - DELETING/REPOSITIONING BRANCH
 
+-(BOOL)newDetachBranch:(GLKVector3)touchPoint {
+    
+    if (_modState != MODIFICATION_PIN_POINT_SET) {
+        NSLog(@"[WARNING][PolarAnnularMesh] Cant detach. Pin point is not chosen");
+        return NO;
+    }
+
+    number_rib_edges(_manifold, _edgeInfo);
+    if (_edgeInfo[_pinHalfEdgeID].edge_type == RIB_JUNCTION) {
+        NSLog(@"Can't detach at a branch junction");
+        [self.delegate displayHint:@"Can't detach at a branch junction"];
+        return NO;
+    }
+    
+    [self saveState];
+
+    //Decide which side to delete
+    Walker up = _manifold.walker(_pinVertexID);
+    if (!_edgeInfo[up.halfedge()].is_spine()) {
+        up = up.prev().opp();
+    }
+    assert(_edgeInfo[up.halfedge()].is_spine());
+    Walker down = up.prev().opp().prev().opp();
+    assert(_edgeInfo[down.halfedge()].is_spine());
+    assert(up.opp().vertex() == down.opp().vertex());
+    
+    Vecf upCentr = centroid_for_rib(_manifold, up.next().halfedge(), _edgeInfo);
+    Vecf downCentr = centroid_for_rib(_manifold, down.next().halfedge(), _edgeInfo);
+    Vecf pinCentr = centroid_for_rib(_manifold, _pinHalfEdgeID);
+    
+    Vecf upVec = upCentr - pinCentr;
+    Vecf downVec = downCentr - pinCentr;
+    
+    GLKVector3 pinCentroidWorld = [Utilities matrix4:self.modelViewMatrix
+                                    multiplyVector3:GLKVector3Make(pinCentr[0], pinCentr[1], pinCentr[2])];
+    GLKVector3 touchPointWorld = [Utilities matrix4:self.modelViewMatrix
+                                    multiplyVector3:touchPoint];
+    touchPointWorld.z = pinCentroidWorld.z;
+    GLKVector3 touchPointModel = [Utilities invertVector3:touchPointWorld
+                                               withMatrix:self.modelViewMatrix];
+    
+    Vecf touchDir = Vecf(touchPointModel.x, touchPointModel.y, touchPointModel.z) - pinCentr;
+    
+    BOOL deletingBranchFromBody = NO;
+    Walker toWalker = up;
+    if (dot(touchDir, upVec) >= 0) {
+        toWalker = up;
+    } else if (dot(touchDir, downVec) >= 0) {
+        toWalker = down;
+    } else {
+        NSLog(@"Couldn't decide witch side to detach");
+        [self.delegate displayHint:@"Couldn't decide witch side to detach"];
+        return NO;
+    }
+    _deletingBranchFromBody = deletingBranchFromBody;
+    
+    //Start flooding and get all the verticies to delete/move
+    _detached_verticies = [self allVerticiesInDirection:toWalker];
+    
+    //Save info
+    _deleteBodyUpperRibEdge = toWalker.prev().halfedge(); //botton rib
+    _deleteDirectionSpineEdge = toWalker.halfedge(); //spine
+    _deleteBranchLowerRibEdge = toWalker.next().halfedge(); //top rib
+    _deleteBranchSecondRingEdge = toWalker.next().opp().next().next().opp().next().next().halfedge();
+    
+    //Delete all connecting boundary spine edges
+    vector<HalfEdgeID> edgesToDelete;
+    for (Walker boundaryW = _manifold.walker(_deleteBodyUpperRibEdge);
+         !boundaryW.full_circle();
+         boundaryW = boundaryW.next().opp().next())
+    {
+        edgesToDelete.push_back(boundaryW.next().halfedge());
+    }
+    _deleteBranchNumberOfBoundaryRibs = edgesToDelete.size();
+    for (HalfEdgeID hID: edgesToDelete) {
+        _manifold.remove_edge(hID);
+    }
+    
+    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
+    [self changeVerticiesColor_Set:_detached_verticies toSelected:YES];
+    
+    _pinPointLine = nil;
+    _modState = MODIFICATION_BRANCH_DETACHED;
+    return YES;
+}
+
 -(BOOL)detachBranch:(GLKVector3)touchPoint
 {
+    return [self newDetachBranch:touchPoint];
+    
     if (_modState != MODIFICATION_PIN_POINT_SET) {
         NSLog(@"[WARNING][PolarAnnularMesh] Cant detach. Pin point is not chosen");
         return NO;
@@ -3169,6 +3356,7 @@ using namespace HMesh;
     Walker down = up.prev().opp().prev().opp();
     assert(_edgeInfo[down.halfedge()].is_spine());
 
+    
     Vec downVec = _manifold.pos(down.vertex()) - pinPos;
     downVec.normalize();
     Vec upVec = _manifold.pos(up.vertex()) - pinPos;
@@ -3304,7 +3492,7 @@ using namespace HMesh;
         [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
     } else if (_modState == MODIFICATION_BRANCH_DETACHED_AN_MOVED) {
         Walker boundaryW = _manifold.walker(_deleteBodyUpperRibEdge);
-        float boundaryRadius = rib_radius(_manifold, _deleteBodyUpperRibEdge, _edgeInfo);
+        float boundaryRadius = rib_boundary_radius(_manifold, _deleteBodyUpperRibEdge, _edgeInfo);
         
         int numOfEdges;
         if (_deletingBranchFromBody) {
@@ -3321,7 +3509,7 @@ using namespace HMesh;
             [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
             
             [self smoothVerticies:vertexToSmooth iter:20 isSpine:YES brushSize:boundaryRadius edgeInfo:_edgeInfo];
-            [self smoothVerticies:vertexToSmooth iter:2 isSpine:NO brushSize:boundaryRadius/2 edgeInfo:_edgeInfo];
+            [self smoothVerticies:vertexToSmooth iter:2 isSpine:NO brushSize:boundaryRadius edgeInfo:_edgeInfo];
         } else {
             VertexID poleVID = pole_from_hole(_manifold, boundaryW.halfedge());
             numOfEdges = valency(_manifold, poleVID);
@@ -3361,7 +3549,7 @@ using namespace HMesh;
             verteciesToSmooth.push_back(w.vertex());
         }
         //        verteciesToSmooth = verticies_along_the_rib(_manifold, deleteBranchUpperOppRibEdge, _edgeInfo);
-        [self smoothVerticies:verteciesToSmooth iter:10 isSpine:YES brushSize:0.1 edgeInfo:_edgeInfo];
+        [self smoothVerticies:verteciesToSmooth iter:10 isSpine:YES brushSize:boundaryRadius edgeInfo:_edgeInfo];
         
         [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
     }

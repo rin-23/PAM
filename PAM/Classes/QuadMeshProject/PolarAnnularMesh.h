@@ -14,16 +14,23 @@ typedef enum {
     MODIFICATION_SCULPTING_SCALING,
     MODIFICATION_SCULPTING_ANISOTROPIC_SCALING,
     MODIFICATION_SCULPTING_BUMP_CREATION,
+    
     MODIFICATION_PIN_POINT_SET,
+    
     MODIFICATION_BRANCH_ROTATION,
     MODIFICATION_BRANCH_SCALING,
     MODIFICATION_BRANCH_TRANSLATION,
+    
     MODIFICATION_BRANCH_DETACHED,
     MODIFICATION_BRANCH_DETACHED_AN_MOVED,
     MODIFICATION_BRANCH_DETACHED_ROTATE,
+    
     MODIFICATION_BRANCH_COPIED_BRANCH_FOR_CLONING,
     MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE,
-    MODIFICATION_BRANCH_CLONE_ROTATION
+    MODIFICATION_BRANCH_CLONE_ROTATION,
+    
+    MODIFICATION_BRANCH_POSE_ROTATE,
+    MODIFICATION_BRANCH_POSE_TRANSLATE
 } CurrentModification;
 
 @protocol PolarAnnularMeshDelegate <NSObject>
@@ -102,6 +109,11 @@ typedef enum {
                                     translation:(GLKVector3)translation;
 -(void)continueTranslatingBranchTree:(GLKVector3)translation;
 -(void)endTranslatingBranchTree:(GLKVector3)translation;
+
+#pragma mark - POSING ROTATE
+-(void)statePosingRotateWithTouchPoint:(GLKVector3)touchPoint angle:(float)angle;
+-(void)continuePosingRotate:(float)angle;
+-(void)endPosingRotate:(float)angle;
 
 #pragma mark - SMOOTHING
 -(void)smoothAtPoint:(GLKVector3)touchPoint;

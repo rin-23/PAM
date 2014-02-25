@@ -893,7 +893,10 @@ typedef enum {
             } else if (sender.state == UIGestureRecognizerStateEnded) {
                 [_pMesh endRotateClonedBranch:rotGesture.rotation];
             }
+        } else if (_pMesh.modState == MODIFICATION_NONE) {
+            
         }
+        
     }
 }
 
@@ -1022,7 +1025,7 @@ typedef enum {
     }
 
     //Load obj file
-    NSString* objPath = [[NSBundle mainBundle] pathForResource:@"polarized_from_075_100_refit_simpl_600" ofType:@"obj"];
+    NSString* objPath = [[NSBundle mainBundle] pathForResource:@"PAM-spider-mid-res" ofType:@"obj"];
 //    NSString* objPath = [[NSBundle mainBundle] pathForResource:@"man-polar150-simpl420-refit34_0.5-subd-refit10_0.5" ofType:@"obj"];
     [_pMesh setMeshFromObjFile:objPath];
 

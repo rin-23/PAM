@@ -2713,6 +2713,42 @@ using namespace HMesh;
     }
 }
 
+#pragma mark - POSING ROTATE
+-(void)statePosingRotateWithTouchPoint:(GLKVector3)touchPoint angle:(float)angle {
+    if (![self isLoaded]) {
+        return;
+    }
+    
+    if ([self createPivotPoint:touchPoint]) {
+        HalfEdgeID pivotDir = [self toRibJunctionFromRib:_pivotHalfEdgeID];
+        _transformed_verticies = [self allVerticiesInDirectionHID:pivotDir];
+        [self changeVerticiesColor_Set:_transformed_verticies toSelected:YES];
+
+        if ([self setTransformedArea]) {
+            _rotAngle = angle;
+            [self setModState:MODIFICATION_BRANCH_POSE_ROTATE];
+            _current_rot_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
+        }
+    }
+}
+
+-(void)continuePosingRotate:(float)angle {
+    
+}
+
+-(void)endPosingRotate:(float)angle {
+    
+}
+
+
+//direction to the base of the branch from rib
+-(HalfEdgeID)toRibJunctionFromRib:(HalfEdgeID)hID edgeInfo:(HMesh::HalfEdgeAttributeVector<EdgeInfo>&)edge_info
+{
+    assert(edge_info[hID].is_rib());
+    number_rib_edges(_manifold, edge_info); // number rings
+    
+    
+}
 
 #pragma mark - TOUCHES: FACE PICKING
 
@@ -3657,6 +3693,11 @@ using namespace HMesh;
         p += _zRotatePos;
         _manifold.pos(vid) = p;
     }
+}
+
+-(set<VertexID>)allVerticiesInDirectionHID:(HalfEdgeID)hID {
+    Walker w = _manifold.walker(hID);
+    return [self allVerticiesInDirection:w];
 }
 
 -(set<VertexID>)allVerticiesInDirection:(Walker)deleteDir {

@@ -115,6 +115,11 @@ typedef enum {
 -(void)continuePosingRotate:(float)angle;
 -(void)endPosingRotate:(float)angle;
 
+#pragma mark - POSING_TRANSLATE
+-(void)statePosingTranslateWithTouchPoint:(GLKVector3)touchPoint translation:(GLKVector3)translation;
+-(void)continuePosingTranslate:(GLKVector3)translation;
+-(void)endPosingTranslate:(GLKVector3)translation;
+
 #pragma mark - SMOOTHING
 -(void)smoothAtPoint:(GLKVector3)touchPoint;
 

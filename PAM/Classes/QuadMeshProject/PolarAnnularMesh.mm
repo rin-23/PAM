@@ -2610,6 +2610,10 @@ using namespace HMesh;
 
 
 -(void)rotateRingsFrom:(HalfEdgeID)pivotDirHID toRingID:(HalfEdgeID)pivotHalfEdge  {
+
+    assert(_edgeInfo[pivotDirHID].is_spine());
+    assert(_edgeInfo[pivotHalfEdge].is_rib());
+    
     //Get all centroids
     vector<GLKVector3> centroids;
     vector<vector<VertexID>> allVerticies;
@@ -2719,34 +2723,201 @@ using namespace HMesh;
         return;
     }
     
+//    if ([self createPivotPoint:touchPoint]) {
+//        HalfEdgeID rib_junction_dir = [self toRibJunctionFromRib:_pivotHalfEdgeID edgeInfo:_edgeInfo];
+//        HalfEdgeID pole_dir = _manifold.walker(rib_junction_dir).opp().halfedge();
+//        _transformed_verticies = [self allVerticiesInDirectionHID:pole_dir];
+//        [self changeVerticiesColor_Set:_transformed_verticies toSelected:YES];
+//        
+//        [self setModState:MODIFICATION_BRANCH_POSE_ROTATE];
+//
+////        if ([self setTransformedArea]) {
+////            _rotAngle = angle;
+////            [self setModState:MODIFICATION_BRANCH_POSE_ROTATE];
+////            _current_rot_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
+////        }
+//    }    
+    
     if ([self createPivotPoint:touchPoint]) {
-        HalfEdgeID pivotDir = [self toRibJunctionFromRib:_pivotHalfEdgeID];
-        _transformed_verticies = [self allVerticiesInDirectionHID:pivotDir];
-        [self changeVerticiesColor_Set:_transformed_verticies toSelected:YES];
-
-        if ([self setTransformedArea]) {
-            _rotAngle = angle;
-            [self setModState:MODIFICATION_BRANCH_POSE_ROTATE];
-            _current_rot_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
+        Walker w1 = _manifold.walker(_pivotHalfEdgeID).next();
+        Walker w2 = _manifold.walker(_pivotHalfEdgeID).opp().next();
+        set<VertexID> side1 = [self allVerticiesInDirection:w1];
+        set<VertexID> side2 = [self allVerticiesInDirection:w2];
+        if (side1.size() > side2.size()) {
+            _transformed_verticies = side2;
+        }  else {
+            _transformed_verticies = side1;
         }
+        [self changeVerticiesColor_Set:_transformed_verticies toSelected:YES];
+        Vec3f centr = centroid_for_rib(_manifold, _pivotHalfEdgeID, _edgeInfo);
+        _centerOfRotation = GLKVector3Make(centr[0], centr[1], centr[2]);
+        _current_rot_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
+        
+        [self setModState:MODIFICATION_BRANCH_POSE_ROTATE];
+        
+        
+        //rotate rings around the pivot
+        
+        
     }
 }
 
 -(void)continuePosingRotate:(float)angle {
-    
+    if (_modState == MODIFICATION_BRANCH_POSE_ROTATE) {
+        _rotAngle = angle;
+    }
 }
 
 -(void)endPosingRotate:(float)angle {
+    if (_modState == MODIFICATION_BRANCH_POSE_ROTATE) {
+        
+        [self changeVerticiesColor_Set:_transformed_verticies toSelected:NO];
+        
+        _rotAngle = angle;
+        
+        GLKVector3 zAxis = GLKMatrix4MultiplyVector3(GLKMatrix4Invert(self.viewMatrix, NULL), GLKVector3Make(0, 0, -1));
+        GLKMatrix4 toOrigin = GLKMatrix4MakeTranslation(-_centerOfRotation.x, -_centerOfRotation.y, -_centerOfRotation.z);
+        GLKMatrix4 rotMatrix = GLKMatrix4MakeRotation(_rotAngle, zAxis.x, zAxis.y, zAxis.z);
+        GLKMatrix4 fromOrigin = GLKMatrix4MakeTranslation(_centerOfRotation.x, _centerOfRotation.y, _centerOfRotation.z);
+        GLKMatrix4 tMatrix = GLKMatrix4Multiply(GLKMatrix4Multiply(fromOrigin, rotMatrix), toOrigin);
+        
+        for (VertexID vID: _transformed_verticies) {
+            Vec pos = _manifold.pos(vID);
+            GLKVector3 posGLK = GLKVector3Make(pos[0], pos[1], pos[2]);
+            GLKVector3 newPosGLK = [Utilities matrix4:tMatrix multiplyVector3:posGLK];
+            Vec newPos = Vec(newPosGLK.x, newPosGLK.y, newPosGLK.z);
+            _manifold.pos(vID) = newPos;
+        }
+        
+        [self setModState:MODIFICATION_NONE];
+    }
+}
+
+#pragma mark - POSING TRANSLATE
+-(void)statePosingTranslateWithTouchPoint:(GLKVector3)touchPoint translation:(GLKVector3)translation {
+    if (![self isLoaded]) {
+        return;
+    }
     
+    //    if ([self createPivotPoint:touchPoint]) {
+    //        HalfEdgeID rib_junction_dir = [self toRibJunctionFromRib:_pivotHalfEdgeID edgeInfo:_edgeInfo];
+    //        HalfEdgeID pole_dir = _manifold.walker(rib_junction_dir).opp().halfedge();
+    //        _transformed_verticies = [self allVerticiesInDirectionHID:pole_dir];
+    //        [self changeVerticiesColor_Set:_transformed_verticies toSelected:YES];
+
+//            _translation = translation;
+//            _current_rot_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
+//
+//            [self setModState:MODIFICATION_BRANCH_POSE_TRANSLATE];
+
+
+    //    }
+    
+    
+    if ([self createPivotPoint:touchPoint]) {
+        Walker w1 = _manifold.walker(_pivotHalfEdgeID).next();
+        Walker w2 = _manifold.walker(_pivotHalfEdgeID).opp().next();
+        set<VertexID> side1 = [self allVerticiesInDirection:w1];
+        set<VertexID> side2 = [self allVerticiesInDirection:w2];
+        if (side1.size() > side2.size()) {
+            _transformed_verticies = side2;
+        }  else {
+            _transformed_verticies = side1;
+        }
+        [self changeVerticiesColor_Set:_transformed_verticies toSelected:YES];
+        _translation = translation;
+        _current_rot_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
+        
+        [self setModState:MODIFICATION_BRANCH_POSE_TRANSLATE];
+    }
+}
+
+-(void)continuePosingTranslate:(GLKVector3)translation {
+    if (_modState == MODIFICATION_BRANCH_POSE_TRANSLATE) {
+        _translation = translation;
+    }
+}
+
+-(void)endPosingTranslate:(GLKVector3)translation {
+    if (_modState == MODIFICATION_BRANCH_POSE_TRANSLATE) {
+        
+        [self changeVerticiesColor_Set:_transformed_verticies toSelected:NO];
+        
+        _translation = translation;
+        
+        GLKMatrix4 translationMatrix = GLKMatrix4MakeTranslation(_translation.x, _translation.y, _translation.z);
+        
+        for (VertexID vID: _transformed_verticies) {
+            Vec pos = _manifold.pos(vID);
+            GLKVector3 posGLK = GLKVector3Make(pos[0], pos[1], pos[2]);
+            GLKVector3 newPosGLK = [Utilities matrix4:translationMatrix multiplyVector3:posGLK];
+            Vec newPos = Vec(newPosGLK.x, newPosGLK.y, newPosGLK.z);
+            _manifold.pos(vID) = newPos;
+        }
+        [self setModState:MODIFICATION_NONE];
+    }
 }
 
 
+#pragma mark - COMMON POSING METHODS
 //direction to the base of the branch from rib
--(HalfEdgeID)toRibJunctionFromRib:(HalfEdgeID)hID edgeInfo:(HMesh::HalfEdgeAttributeVector<EdgeInfo>&)edge_info
+-(HalfEdgeID)toRibJunctionFromRib:(HalfEdgeID)startRibEdge edgeInfo:(HMesh::HalfEdgeAttributeVector<EdgeInfo>&)edge_info
 {
-    assert(edge_info[hID].is_rib());
+    assert(edge_info[startRibEdge].is_rib());
     number_rib_edges(_manifold, edge_info); // number rings
+    Walker w1 = _manifold.walker(startRibEdge).next();
     
+    int ring1Size = 0;
+    for (Walker w = _manifold.walker(startRibEdge); !w.full_circle(); w = w.next().opp().next())
+    {
+        ring1Size += 1;
+    }
+    
+    while (true) {
+        HalfEdgeID currentRibEdge = w1.next().halfedge();
+        
+        if (_edgeInfo[currentRibEdge].edge_type == RIB_JUNCTION) {
+            //find junction vertex, i.e. vertex with valency 6
+            Walker junction_vertex_walker = _manifold.walker(currentRibEdge);
+            for (;valency(_manifold, junction_vertex_walker.vertex()) != 6;
+                 junction_vertex_walker = junction_vertex_walker.next().opp().next());
+            
+            
+            //check size of other 2 rings at the junction
+            int ring2Size = 0, ring3Size = 0;
+            HalfEdgeID ring2HID = junction_vertex_walker.opp().halfedge();
+            HalfEdgeID ring3HID = junction_vertex_walker.next().opp().next().opp().halfedge();
+            assert(valency(_manifold, _manifold.walker(ring3HID).vertex()) == 6);
+            
+            for (Walker w = _manifold.walker(ring2HID); !w.full_circle(); w = w.next().opp().next())
+            {
+                ring2Size += 1;
+            }
+            
+            for (Walker w = _manifold.walker(ring3HID); !w.full_circle(); w = w.next().opp().next())
+            {
+                ring3Size += 1;
+            }
+            
+            if (ring2Size == ring3Size && ring1Size < ring2Size) {
+                //reached the base of the branch
+                return _manifold.walker(startRibEdge).next().halfedge();
+            } else if (ring1Size == ring2Size) {
+                //we are pointing at the child so avoid it
+                w1 = _manifold.walker(ring2HID).next();
+            } else if (ring1Size == ring3Size) {
+                w1 = _manifold.walker(ring3HID).next();
+            } else {
+                w1 = junction_vertex_walker.next().opp().next().prev();
+                assert(edge_info[w1.halfedge()].is_spine());
+            }
+        } else if (is_pole(_manifold, w1.vertex())) {
+            //pointing at the pole, so base rib junction is the opposite direction
+            return _manifold.walker(startRibEdge).opp().next().halfedge();
+        } else {
+            w1 = w1.next().opp().next();
+        }
+    }
     
 }
 
@@ -4200,6 +4371,53 @@ using namespace HMesh;
         
         unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
         for (VertexID vid: _cloned_verticies) {
+            Vecf pos = _current_rot_position[vid];
+            int index = vid.index;
+            memcpy(temp + index*VERTEX_SIZE, pos.get(), VERTEX_SIZE);
+        }
+        
+        glUnmapBufferOES(GL_ARRAY_BUFFER);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+    } else if (_modState == MODIFICATION_BRANCH_POSE_ROTATE) {
+        GLKVector3 zAxis = GLKMatrix4MultiplyVector3(GLKMatrix4Invert(self.viewMatrix, NULL), GLKVector3Make(0, 0, -1));
+        GLKMatrix4 toOrigin = GLKMatrix4MakeTranslation(-_centerOfRotation.x, -_centerOfRotation.y, -_centerOfRotation.z);
+        GLKMatrix4 rotMatrix = GLKMatrix4MakeRotation(_rotAngle, zAxis.x, zAxis.y, zAxis.z);
+        GLKMatrix4 fromOrigin = GLKMatrix4MakeTranslation(_centerOfRotation.x, _centerOfRotation.y, _centerOfRotation.z);
+        GLKMatrix4 tMatrix = GLKMatrix4Multiply(GLKMatrix4Multiply(fromOrigin, rotMatrix), toOrigin);
+        
+        for (VertexID vID: _transformed_verticies) {
+            Vec pos = _manifold.pos(vID);
+            GLKVector3 posGLK = GLKVector3Make(pos[0], pos[1], pos[2]);
+            GLKVector3 newPosGLK = [Utilities matrix4:tMatrix multiplyVector3:posGLK];
+            Vecf newPos = Vecf(newPosGLK.x, newPosGLK.y, newPosGLK.z);
+            _current_rot_position[vID] = newPos;
+        }
+        
+        [self.vertexDataBuffer bind];
+        unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
+        for (VertexID vid: _transformed_verticies) {
+            Vecf pos = _current_rot_position[vid];
+            int index = vid.index;
+            memcpy(temp + index*VERTEX_SIZE, pos.get(), VERTEX_SIZE);
+        }
+        
+        glUnmapBufferOES(GL_ARRAY_BUFFER);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+    } else if (_modState == MODIFICATION_BRANCH_POSE_TRANSLATE) {
+
+        GLKMatrix4 translationMatrix = GLKMatrix4MakeTranslation(_translation.x, _translation.y, _translation.z);
+        
+        for (VertexID vID: _transformed_verticies) {
+            Vec pos = _manifold.pos(vID);
+            GLKVector3 posGLK = GLKVector3Make(pos[0], pos[1], pos[2]);
+            GLKVector3 newPosGLK = [Utilities matrix4:translationMatrix multiplyVector3:posGLK];
+            Vecf newPos = Vecf(newPosGLK.x, newPosGLK.y, newPosGLK.z);
+            _current_rot_position[vID] = newPos;
+        }
+        
+        [self.vertexDataBuffer bind];
+        unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
+        for (VertexID vid: _transformed_verticies) {
             Vecf pos = _current_rot_position[vid];
             int index = vid.index;
             memcpy(temp + index*VERTEX_SIZE, pos.get(), VERTEX_SIZE);

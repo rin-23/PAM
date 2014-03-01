@@ -712,122 +712,141 @@ typedef enum {
     } else if ([SettingsManager sharedInstance].showSkeleton){
         return;
     } else {
-        if (_pMesh.modState == MODIFICATION_PIN_POINT_SET ||
-            _pMesh.modState == MODIFICATION_BRANCH_TRANSLATION )
-        {
+        if (![_pMesh isLoaded]) {
+            if (_pMesh.modState == MODIFICATION_NONE) {
+                if ([_pMesh isLoaded]) {
+                    return;
+                }
+                
+                if (sender.state == UIGestureRecognizerStateBegan) {
+                    _selectionLine  = nil;
+                    _selectionLine2 = nil;
+                    _selectionLine3 = nil;
+                    if (sender.numberOfTouches != 2) {
+                        return;
+                    }
+                    
+                    CGPoint touchPoint1 = [self scaleTouchPoint:[sender locationOfTouch:0 inView:(GLKView*)sender.view]
+                                                         inView:(GLKView*)sender.view];
+                    CGPoint touchPoint2 = [self scaleTouchPoint:[sender locationOfTouch:1 inView:(GLKView*)sender.view]
+                                                         inView:(GLKView*)sender.view];
+                    
+                    GLKVector3 rayOrigin1, rayDir1, rayOrigin2, rayDir2;
+                    BOOL result1 = [self rayOrigin:&rayOrigin1 rayDirection:&rayDir1 forTouchPoint:touchPoint1];
+                    BOOL result2 = [self rayOrigin:&rayOrigin2 rayDirection:&rayDir2 forTouchPoint:touchPoint2];
+                    if (!result1 || !result2) {
+                        NSLog(@"[WARNING] Couldn't determine touch area");
+                        return;
+                    }
+                    rayOrigin1 = GLKVector3Add(rayOrigin1, rayDir1);
+                    rayOrigin2 = GLKVector3Add(rayOrigin2, rayDir2);
+                    VertexRGBA vertex1 = {{rayOrigin1.x, rayOrigin1.y, rayOrigin1.z}, {255,0,0,255}};
+                    NSMutableData* lineData1 = [[NSMutableData alloc] initWithBytes:&vertex1 length:sizeof(VertexRGBA)];
+                    _selectionLine = [[Line alloc] initWithVertexData:lineData1];
+                    
+                    VertexRGBA vertex2 = {{rayOrigin2.x, rayOrigin2.y, rayOrigin2.z}, {255,0,0,255}};
+                    NSMutableData* lineData2 = [[NSMutableData alloc] initWithBytes:&vertex2 length:sizeof(VertexRGBA)];
+                    _selectionLine2 = [[Line alloc] initWithVertexData:lineData2];
+                    
+                    [_pMesh startCreateBodyFinger1:rayOrigin1 finger2:rayOrigin2];
+                    
+                } else if (sender.state == UIGestureRecognizerStateChanged) {
+                    if (sender.numberOfTouches!=2) {
+                        return;
+                    }
+                    CGPoint touchPoint1 = [self scaleTouchPoint:[sender locationOfTouch:0 inView:(GLKView*)sender.view]
+                                                         inView:(GLKView*)sender.view];
+                    CGPoint touchPoint2 = [self scaleTouchPoint:[sender locationOfTouch:1 inView:(GLKView*)sender.view]
+                                                         inView:(GLKView*)sender.view];
+                    
+                    GLKVector3 rayOrigin1, rayDir1, rayOrigin2, rayDir2;
+                    BOOL result1 = [self rayOrigin:&rayOrigin1 rayDirection:&rayDir1 forTouchPoint:touchPoint1];
+                    BOOL result2 = [self rayOrigin:&rayOrigin2 rayDirection:&rayDir2 forTouchPoint:touchPoint2];
+                    if (!result1 || !result2) {
+                        NSLog(@"[WARNING] Couldn't determine touch area");
+                        return;
+                    }
+                    rayOrigin1 = GLKVector3Add(rayOrigin1, rayDir1);
+                    rayOrigin2 = GLKVector3Add(rayOrigin2, rayDir2);
+                    [_selectionLine addVertex:rayOrigin1];
+                    [_selectionLine2 addVertex:rayOrigin2];
+                    [_pMesh continueCreateBodyFinger1:rayOrigin1 finger2:rayOrigin2];
+                } else if (sender.state == UIGestureRecognizerStateEnded) {
+                    _selectionLine = nil;
+                    _selectionLine2 = nil;
+                    //                std::vector<std::vector<GLKVector3>> allRibs =
+                    [_pMesh endCreateBody];
+                }
+                
+                //            _ribsLines = [[NSMutableArray alloc] initWithCapacity:allRibs.size()];
+                //            for (int i = 0; i <allRibs.size();i++) {
+                //                std::vector<GLKVector3> rib = allRibs[i];
+                //                NSMutableData* vData = [[NSMutableData alloc] init];
+                ////                for (GLKVector3 v: rib) {
+                //
+                //                for (int j = 0; j < rib.size(); j++) {
+                //                    GLKVector3 v = rib[j];
+                //                    GLubyte b = 0;
+                //                    GLubyte r = 0;
+                ////                                            GLubyte b = j * (255.0f/rib.size());
+                //                    if (j%2 ==0) {
+                //                        r = 255;
+                //                    } else {
+                //                        b = 255;
+                //                    }
+                //                    VertexRGBA vertex1 = {{v.x, v.y, v.z}, {r,b,0,255}};
+                //                    [vData appendBytes:&vertex1 length:sizeof(VertexRGBA)];
+                //                }
+                //                Line* line = [[Line alloc] initWithVertexData:vData];
+                //                [_ribsLines addObject:line];
+                //            }
+                
+                //            _bbox = _pMesh.boundingBox;
+                //            _translationManager.scaleFactor = _bbox.radius;
+                
+            }
+        } else {
             UIPanGestureRecognizer* pan = (UIPanGestureRecognizer*)sender;
             CGPoint point = [pan translationInView:pan.view];
             GLfloat ratio = pan.view.frame.size.height/pan.view.frame.size.width;
             GLfloat x_ndc = point.x/pan.view.frame.size.width;
             GLfloat y_ndc = -1*(point.y/pan.view.frame.size.height)*ratio;
-
+            
             GLKVector3 translation = GLKMatrix4MultiplyVector3(GLKMatrix4Invert(viewMatrix, NULL),
                                                                GLKVector3Make(_translationManager.scaleFactor*x_ndc, _translationManager.scaleFactor*y_ndc, 0));
-            
-            if (sender.state == UIGestureRecognizerStateBegan) {
-                GLKVector3 modelCoord;
-                if (![self modelCoordinates:&modelCoord forGesture:sender]) {
-                    NSLog(@"[WARNING] Touched background");
-                    return;
+            if (_pMesh.modState == MODIFICATION_PIN_POINT_SET ||
+                _pMesh.modState == MODIFICATION_BRANCH_TRANSLATION )
+            {
+                
+                if (sender.state == UIGestureRecognizerStateBegan) {
+                    GLKVector3 modelCoord;
+                    if (![self modelCoordinates:&modelCoord forGesture:sender]) {
+                        NSLog(@"[WARNING] Touched background");
+                        return;
+                    }
+                    [_pMesh startTranslatingBranchTreeWithTouchPoint:modelCoord translation:translation];
+                } else if (sender.state == UIGestureRecognizerStateChanged) {
+                    [_pMesh continueTranslatingBranchTree:translation];
+                } else if (sender.state == UIGestureRecognizerStateEnded) {
+                    [_pMesh endTranslatingBranchTree:translation];
                 }
-                [_pMesh startTranslatingBranchTreeWithTouchPoint:modelCoord translation:translation];
-            } else if (sender.state == UIGestureRecognizerStateChanged) {
-                [_pMesh continueTranslatingBranchTree:translation];
-            } else if (sender.state == UIGestureRecognizerStateEnded) {
-                [_pMesh endTranslatingBranchTree:translation];
+            } else if (_pMesh.modState == MODIFICATION_NONE ||
+                       _pMesh.modState == MODIFICATION_BRANCH_POSE_TRANSLATE)
+            {
+                if (sender.state == UIGestureRecognizerStateBegan) {
+                    GLKVector3 modelCoord;
+                    if (![self modelCoordinates:&modelCoord forGesture:sender]) {
+                        NSLog(@"[WARNING] Touched background");
+                        return;
+                    }
+                    [_pMesh statePosingTranslateWithTouchPoint:modelCoord translation:translation];
+                } else if (sender.state == UIGestureRecognizerStateChanged) {
+                    [_pMesh continuePosingTranslate:translation];
+                } else if (sender.state == UIGestureRecognizerStateEnded) {
+                    [_pMesh endPosingTranslate:translation];
+                }
             }
-        } else if (_pMesh.modState == MODIFICATION_NONE) {
-            if ([_pMesh isLoaded]) {
-                return;
-            }
-            
-            if (sender.state == UIGestureRecognizerStateBegan) {
-                _selectionLine  = nil;
-                _selectionLine2 = nil;
-                _selectionLine3 = nil;
-                if (sender.numberOfTouches != 2) {
-                    return;
-                }
-                
-                CGPoint touchPoint1 = [self scaleTouchPoint:[sender locationOfTouch:0 inView:(GLKView*)sender.view]
-                                                     inView:(GLKView*)sender.view];
-                CGPoint touchPoint2 = [self scaleTouchPoint:[sender locationOfTouch:1 inView:(GLKView*)sender.view]
-                                                     inView:(GLKView*)sender.view];
-                
-                GLKVector3 rayOrigin1, rayDir1, rayOrigin2, rayDir2;
-                BOOL result1 = [self rayOrigin:&rayOrigin1 rayDirection:&rayDir1 forTouchPoint:touchPoint1];
-                BOOL result2 = [self rayOrigin:&rayOrigin2 rayDirection:&rayDir2 forTouchPoint:touchPoint2];
-                if (!result1 || !result2) {
-                    NSLog(@"[WARNING] Couldn't determine touch area");
-                    return;
-                }
-                rayOrigin1 = GLKVector3Add(rayOrigin1, rayDir1);
-                rayOrigin2 = GLKVector3Add(rayOrigin2, rayDir2);
-                VertexRGBA vertex1 = {{rayOrigin1.x, rayOrigin1.y, rayOrigin1.z}, {255,0,0,255}};
-                NSMutableData* lineData1 = [[NSMutableData alloc] initWithBytes:&vertex1 length:sizeof(VertexRGBA)];
-                _selectionLine = [[Line alloc] initWithVertexData:lineData1];
-
-                VertexRGBA vertex2 = {{rayOrigin2.x, rayOrigin2.y, rayOrigin2.z}, {255,0,0,255}};
-                NSMutableData* lineData2 = [[NSMutableData alloc] initWithBytes:&vertex2 length:sizeof(VertexRGBA)];
-                _selectionLine2 = [[Line alloc] initWithVertexData:lineData2];
-
-                [_pMesh startCreateBodyFinger1:rayOrigin1 finger2:rayOrigin2];
-                
-            } else if (sender.state == UIGestureRecognizerStateChanged) {
-                if (sender.numberOfTouches!=2) {
-                    return;
-                }
-                CGPoint touchPoint1 = [self scaleTouchPoint:[sender locationOfTouch:0 inView:(GLKView*)sender.view]
-                                                     inView:(GLKView*)sender.view];
-                CGPoint touchPoint2 = [self scaleTouchPoint:[sender locationOfTouch:1 inView:(GLKView*)sender.view]
-                                                     inView:(GLKView*)sender.view];
-                
-                GLKVector3 rayOrigin1, rayDir1, rayOrigin2, rayDir2;
-                BOOL result1 = [self rayOrigin:&rayOrigin1 rayDirection:&rayDir1 forTouchPoint:touchPoint1];
-                BOOL result2 = [self rayOrigin:&rayOrigin2 rayDirection:&rayDir2 forTouchPoint:touchPoint2];
-                if (!result1 || !result2) {
-                    NSLog(@"[WARNING] Couldn't determine touch area");
-                    return;
-                }
-                rayOrigin1 = GLKVector3Add(rayOrigin1, rayDir1);
-                rayOrigin2 = GLKVector3Add(rayOrigin2, rayDir2);
-                [_selectionLine addVertex:rayOrigin1];
-                [_selectionLine2 addVertex:rayOrigin2];
-                [_pMesh continueCreateBodyFinger1:rayOrigin1 finger2:rayOrigin2];
-            } else if (sender.state == UIGestureRecognizerStateEnded) {
-                _selectionLine = nil;
-                _selectionLine2 = nil;
-//                std::vector<std::vector<GLKVector3>> allRibs =
-                [_pMesh endCreateBody];
-            }
-                
-    //            _ribsLines = [[NSMutableArray alloc] initWithCapacity:allRibs.size()];
-    //            for (int i = 0; i <allRibs.size();i++) {
-    //                std::vector<GLKVector3> rib = allRibs[i];
-    //                NSMutableData* vData = [[NSMutableData alloc] init];
-    ////                for (GLKVector3 v: rib) {
-    //                
-    //                for (int j = 0; j < rib.size(); j++) {
-    //                    GLKVector3 v = rib[j];
-    //                    GLubyte b = 0;
-    //                    GLubyte r = 0;
-    ////                                            GLubyte b = j * (255.0f/rib.size());
-    //                    if (j%2 ==0) {
-    //                        r = 255;
-    //                    } else {
-    //                        b = 255;
-    //                    }
-    //                    VertexRGBA vertex1 = {{v.x, v.y, v.z}, {r,b,0,255}};
-    //                    [vData appendBytes:&vertex1 length:sizeof(VertexRGBA)];
-    //                }
-    //                Line* line = [[Line alloc] initWithVertexData:vData];
-    //                [_ribsLines addObject:line];
-    //            }
-                
-    //            _bbox = _pMesh.boundingBox;
-    //            _translationManager.scaleFactor = _bbox.radius;
-            
-            }
+        }
     }
 }
 
@@ -893,8 +912,21 @@ typedef enum {
             } else if (sender.state == UIGestureRecognizerStateEnded) {
                 [_pMesh endRotateClonedBranch:rotGesture.rotation];
             }
-        } else if (_pMesh.modState == MODIFICATION_NONE) {
-            
+        } else if (_pMesh.modState == MODIFICATION_NONE ||
+                   _pMesh.modState == MODIFICATION_BRANCH_POSE_ROTATE)
+        {
+            if (sender.state == UIGestureRecognizerStateBegan) {
+                GLKVector3 modelCoord;
+                if (![self modelCoordinates:&modelCoord forGesture:sender]) {
+                    NSLog(@"[WARNING] Touched background");
+                    return;
+                }
+                [_pMesh statePosingRotateWithTouchPoint:modelCoord angle:rotGesture.rotation];
+            } else if (sender.state == UIGestureRecognizerStateChanged) {
+                [_pMesh continuePosingRotate:rotGesture.rotation];
+            } else if (sender.state == UIGestureRecognizerStateEnded) {
+                [_pMesh endPosingRotate:rotGesture.rotation];
+            }
         }
         
     }

@@ -36,8 +36,7 @@ static MeshLoader* instance = nil;
     
     HMesh::Manifold mani = HMesh::Manifold();
     
-    float tau = 0.0;
-    HMesh::volume_polygonize(xform, grid, mani, tau);
+    float tau = 0.0;    HMesh::volume_polygonize(xform, grid, mani, tau);
     
     //Triangulate
     shortest_edge_triangulate(mani);

@@ -838,7 +838,6 @@ using namespace HMesh;
     
     [self updateVertexPositionOnGPU_Set:_bump_verticies];
     [self updateVertexNormOnGPU_Set:_bump_verticies];
-
 }
 
 //-(void)createBumpAtPoint:(vector<GLKVector3>)tPoints
@@ -2608,6 +2607,90 @@ using namespace HMesh;
     [self changeVerticiesColor_Vector:_transition_verticies toSelected:NO];
 }
 
+-(void)rotateRibs:(vector<HalfEdgeID>&)ribs edgeInfo:(HalfEdgeAttributeVector<EdgeInfo>&) edgeInfo {
+    
+    if (ribs.size() < 3) {
+        return;
+    }
+    
+    //Get all centroids
+    vector<GLKVector3> centroids;
+    vector<vector<VertexID>> allVerticies;
+    vector<GLKVector3> currentNorms;
+    vector<GLKVector3> desiredNorms;
+    
+    for (HalfEdgeID hID: ribs) {
+        assert(edgeInfo[hID].is_rib());
+        Vec3f c = centroid_for_rib(_manifold, hID, edgeInfo);
+        
+        centroids.push_back(GLKVector3Make(c[0], c[1], c[2]));
+        vector<VertexID> verticies = verticies_along_the_rib(_manifold, hID, edgeInfo);
+        allVerticies.push_back(verticies);
+        
+        Mat3x3d cov(0);
+        for (int i = 0; i < verticies.size(); i++) {
+            VertexID vID = verticies[i];
+            Vec pos = _manifold.pos(vID);
+            Vec d = pos - Vec(c);
+            Mat3x3d m;
+            outer_product(d,d,m);
+            cov += m;
+        }
+        
+        Mat3x3d Q, L;
+        int sol = power_eigensolution(cov, Q, L);
+        
+        Vec3d n;
+        assert(sol>=2);
+        n = normalize(cross(Q[0],Q[1]));
+        currentNorms.push_back(GLKVector3Make(n[0], n[1], n[2]));
+    }
+    
+    assert(centroids.size() == currentNorms.size());
+
+    //Get desired norms
+    for (int i = 0; i < centroids.size(); i++) {
+        if (i == 0) {
+            desiredNorms.push_back(currentNorms[i]);
+        } else if (i == centroids.size() -1 ) {
+            desiredNorms.push_back(currentNorms[i]);
+        } else {
+            GLKVector3 v1, v2;
+            v1 = GLKVector3Subtract(centroids[i], centroids[i-1]);
+            v2 = GLKVector3Subtract(centroids[i+1], centroids[i]);
+            GLKVector3 n = GLKVector3Lerp(v1, v2, 0.5f);
+            desiredNorms.push_back(n);
+        }
+    }
+    
+    assert(desiredNorms.size() == currentNorms.size());
+    
+    //Rotate norms
+    for (int i = 1; i < centroids.size()-1; i++) {
+        GLKVector3 axisOfRotation = GLKVector3Normalize(GLKVector3CrossProduct(currentNorms[i], desiredNorms[i]));
+        float angle = [Utilities signedAngleBetweenReferenceVector3:currentNorms[i]
+                                                          andVector:desiredNorms[i]];
+        
+        if (angle > M_PI_2) {
+            angle = -1*(M_PI - angle);
+        }
+        NSLog(@"Angle:%f", angle);
+        
+        GLKMatrix4 toOrigin = GLKMatrix4MakeTranslation(-centroids[i].x, -centroids[i].y, -centroids[i].z);
+        GLKMatrix4 rotMatrix = GLKMatrix4MakeRotation(angle, axisOfRotation.x, axisOfRotation.y, axisOfRotation.z);
+        GLKMatrix4 fromOrigin = GLKMatrix4MakeTranslation(centroids[i].x, centroids[i].y, centroids[i].z);
+        GLKMatrix4 tMatrix = GLKMatrix4Multiply(GLKMatrix4Multiply(fromOrigin, rotMatrix), toOrigin);
+        
+        vector<VertexID> verticies = allVerticies[i];
+        for (VertexID vid: verticies) {
+            Vec pos = _manifold.pos(vid);
+            GLKVector3 posGLK = GLKVector3Make(pos[0], pos[1], pos[2]);
+            GLKVector3 newPosGLK = [Utilities matrix4:tMatrix multiplyVector3:posGLK];
+            Vec newPos = Vec(newPosGLK.x, newPosGLK.y, newPosGLK.z);
+            _manifold.pos(vid) = newPos;
+        }
+    }
+}
 
 -(void)rotateRingsFrom:(HalfEdgeID)pivotDirHID toRingID:(HalfEdgeID)pivotHalfEdge  {
 
@@ -2755,10 +2838,6 @@ using namespace HMesh;
         
         [self setModState:MODIFICATION_BRANCH_POSE_ROTATE];
         
-        
-        //rotate rings around the pivot
-        
-        
     }
 }
 
@@ -2769,29 +2848,110 @@ using namespace HMesh;
 }
 
 -(void)endPosingRotate:(float)angle {
-    if (_modState == MODIFICATION_BRANCH_POSE_ROTATE) {
-        
-        [self changeVerticiesColor_Set:_transformed_verticies toSelected:NO];
-        
-        _rotAngle = angle;
-        
-        GLKVector3 zAxis = GLKMatrix4MultiplyVector3(GLKMatrix4Invert(self.viewMatrix, NULL), GLKVector3Make(0, 0, -1));
-        GLKMatrix4 toOrigin = GLKMatrix4MakeTranslation(-_centerOfRotation.x, -_centerOfRotation.y, -_centerOfRotation.z);
-        GLKMatrix4 rotMatrix = GLKMatrix4MakeRotation(_rotAngle, zAxis.x, zAxis.y, zAxis.z);
-        GLKMatrix4 fromOrigin = GLKMatrix4MakeTranslation(_centerOfRotation.x, _centerOfRotation.y, _centerOfRotation.z);
-        GLKMatrix4 tMatrix = GLKMatrix4Multiply(GLKMatrix4Multiply(fromOrigin, rotMatrix), toOrigin);
-        
-        for (VertexID vID: _transformed_verticies) {
-            Vec pos = _manifold.pos(vID);
-            GLKVector3 posGLK = GLKVector3Make(pos[0], pos[1], pos[2]);
-            GLKVector3 newPosGLK = [Utilities matrix4:tMatrix multiplyVector3:posGLK];
-            Vec newPos = Vec(newPosGLK.x, newPosGLK.y, newPosGLK.z);
-            _manifold.pos(vID) = newPos;
-        }
-        
-        [self setModState:MODIFICATION_NONE];
+
+    if (_modState != MODIFICATION_BRANCH_POSE_ROTATE) {
+        return;
+    }
+
+    [self saveState];
+    
+    [self setModState:MODIFICATION_NONE];
+    
+    [self changeVerticiesColor_Set:_transformed_verticies toSelected:NO];
+    
+    _rotAngle = angle;
+    
+    GLKVector3 zAxis = GLKMatrix4MultiplyVector3(GLKMatrix4Invert(self.viewMatrix, NULL), GLKVector3Make(0, 0, -1));
+    GLKMatrix4 toOrigin = GLKMatrix4MakeTranslation(-_centerOfRotation.x, -_centerOfRotation.y, -_centerOfRotation.z);
+    GLKMatrix4 rotMatrix = GLKMatrix4MakeRotation(_rotAngle, zAxis.x, zAxis.y, zAxis.z);
+    GLKMatrix4 fromOrigin = GLKMatrix4MakeTranslation(_centerOfRotation.x, _centerOfRotation.y, _centerOfRotation.z);
+    GLKMatrix4 tMatrix = GLKMatrix4Multiply(GLKMatrix4Multiply(fromOrigin, rotMatrix), toOrigin);
+    
+    for (VertexID vID: _transformed_verticies) {
+        Vec pos = _manifold.pos(vID);
+        GLKVector3 posGLK = GLKVector3Make(pos[0], pos[1], pos[2]);
+        GLKVector3 newPosGLK = [Utilities matrix4:tMatrix multiplyVector3:posGLK];
+        Vec newPos = Vec(newPosGLK.x, newPosGLK.y, newPosGLK.z);
+        _manifold.pos(vID) = newPos;
+    }
+    
+    [self updateVertexPositionOnGPU_Set:_transformed_verticies];
+    [self updateVertexNormOnGPU_Set:_transformed_verticies];
+
+    //rotate rings around the pivot
+    vector<HalfEdgeID> ringsToRotate = [self ringsToRotateAfterPosing:_pivotHalfEdgeID numOfRingsOnEachSise:1];
+    [self rotateRibs:ringsToRotate edgeInfo:_edgeInfo];
+    
+    vector<VertexID> verticiesToUpdate;
+    int num_of_verticies;
+    for (HalfEdgeID hID: ringsToRotate) {
+        vector<VertexID> verticies = verticies_along_the_rib(_manifold, hID, _edgeInfo);
+        num_of_verticies = verticies.size();
+        verticiesToUpdate.insert(verticiesToUpdate.end(), verticies.begin(), verticies.end());
+    }
+    
+    float ribRadius = rib_radius(_manifold, _pivotHalfEdgeID, _edgeInfo);
+    float totalLength = 2*M_PI*ribRadius;
+    float single_arc_length = totalLength / num_of_verticies;
+    float arcAngle = single_arc_length / ribRadius;
+    NSLog(@"POSE ANGLE:%f",GLKMathRadiansToDegrees(arcAngle));
+    if (arcAngle < GLKMathDegreesToRadians(20)) {
+        set<VertexID> affectedVerticies = [self smoothVerticies:verticiesToUpdate iter:1 isSpine:NO brushSize:0.05 edgeInfo:_edgeInfo];
+        [self updateVertexPositionOnGPU_Set:affectedVerticies];
+        [self updateVertexNormOnGPU_Set:affectedVerticies];
+//            laplacian_smooth_verticies(_manifold, verticiesToUpdate, 1);
+    } else {
+        NSLog(@"Low poly");
+        [self updateVertexPositionOnGPU_Vector:verticiesToUpdate];
+        [self updateVertexNormOnGPU_Vector:verticiesToUpdate];
+//        laplacian_spine_smooth_verticies(_manifold, verticiesToUpdate, _edgeInfo, 1);
     }
 }
+
+-(vector<HalfEdgeID>)ringsToRotateAfterPosing:(HalfEdgeID)rib numOfRingsOnEachSise:(int)numRings {
+    
+    assert(_edgeInfo[rib].is_rib());
+    
+    number_rib_edges(_manifold, _edgeInfo);
+    Walker w = _manifold.walker(rib).next();
+    
+    //rotate rings around the pivot
+    vector<HalfEdgeID> bottomRibs;
+    vector<HalfEdgeID> uppersRibs;
+    vector<HalfEdgeID> ringsToRotate;
+    
+    for (int i = 0; i < numRings; i++) {
+        HalfEdgeID cur_rib = w.next().halfedge();
+        bottomRibs.push_back(cur_rib);
+        if (_edgeInfo[cur_rib].is_rib_junction() ||
+            is_pole(_manifold, w.vertex()) )
+        {
+            break;
+        }
+        w = w.next().opp().next();
+    }
+    
+    w = _manifold.walker(rib).opp().next();
+    for (int i = 0; i < numRings; i++) {
+        HalfEdgeID cur_rib = w.next().halfedge();
+        uppersRibs.push_back(cur_rib);
+        if (_edgeInfo[cur_rib].is_rib_junction() ||
+            is_pole(_manifold, w.vertex()) )
+        {
+            break;
+        }
+        w = w.next().opp().next();
+    }
+
+    std::reverse(bottomRibs.begin(), bottomRibs.end());
+    
+    ringsToRotate.insert(ringsToRotate.end(), bottomRibs.begin(), bottomRibs.end());
+    ringsToRotate.push_back(rib);
+    ringsToRotate.insert(ringsToRotate.end(), uppersRibs.begin(), uppersRibs.end());
+    
+    return ringsToRotate;
+}
+
 
 #pragma mark - POSING TRANSLATE
 -(void)statePosingTranslateWithTouchPoint:(GLKVector3)touchPoint translation:(GLKVector3)translation {
@@ -2821,13 +2981,15 @@ using namespace HMesh;
         set<VertexID> side2 = [self allVerticiesInDirection:w2];
         if (side1.size() > side2.size()) {
             _transformed_verticies = side2;
+            _deformDirHalfEdge = w2.halfedge();
         }  else {
             _transformed_verticies = side1;
+            _deformDirHalfEdge = w1.halfedge();
         }
         [self changeVerticiesColor_Set:_transformed_verticies toSelected:YES];
         _translation = translation;
         _current_rot_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
-        
+
         [self setModState:MODIFICATION_BRANCH_POSE_TRANSLATE];
     }
 }
@@ -2839,25 +3001,112 @@ using namespace HMesh;
 }
 
 -(void)endPosingTranslate:(GLKVector3)translation {
-    if (_modState == MODIFICATION_BRANCH_POSE_TRANSLATE) {
-        
-        [self changeVerticiesColor_Set:_transformed_verticies toSelected:NO];
-        
-        _translation = translation;
-        
-        GLKMatrix4 translationMatrix = GLKMatrix4MakeTranslation(_translation.x, _translation.y, _translation.z);
-        
-        for (VertexID vID: _transformed_verticies) {
-            Vec pos = _manifold.pos(vID);
-            GLKVector3 posGLK = GLKVector3Make(pos[0], pos[1], pos[2]);
-            GLKVector3 newPosGLK = [Utilities matrix4:translationMatrix multiplyVector3:posGLK];
-            Vec newPos = Vec(newPosGLK.x, newPosGLK.y, newPosGLK.z);
-            _manifold.pos(vID) = newPos;
-        }
-        [self setModState:MODIFICATION_NONE];
+    if (_modState != MODIFICATION_BRANCH_POSE_TRANSLATE) {
+        return;
     }
+    [self setModState:MODIFICATION_NONE];
+    
+    [self changeVerticiesColor_Set:_transformed_verticies toSelected:NO];
+    
+    _translation = translation;
+    
+    GLKMatrix4 translationMatrix = GLKMatrix4MakeTranslation(_translation.x, _translation.y, _translation.z);
+    
+    for (VertexID vID: _transformed_verticies) {
+        Vec pos = _manifold.pos(vID);
+        GLKVector3 posGLK = GLKVector3Make(pos[0], pos[1], pos[2]);
+        GLKVector3 newPosGLK = [Utilities matrix4:translationMatrix multiplyVector3:posGLK];
+        Vec newPos = Vec(newPosGLK.x, newPosGLK.y, newPosGLK.z);
+        _manifold.pos(vID) = newPos;
+    }
+
+    vector<HalfEdgeID> ringsToRotate = [self ringsToRotateAfterPosing:_pivotHalfEdgeID numOfRingsOnEachSise:2];
+    [self rotateRibs:ringsToRotate edgeInfo:_edgeInfo];
+    
+    Walker beforeDeform = _manifold.walker(_deformDirHalfEdge).opp().next().opp().next();
+    Walker toDeform = _manifold.walker(_deformDirHalfEdge);
+    Walker afterDeform = _manifold.walker(_deformDirHalfEdge).next().opp().next();
+    
+    HalfEdgeID beforeDeformRibHID = beforeDeform.prev().halfedge();
+    HalfEdgeID afterDeformRibHID = afterDeform.prev().halfedge();
+
+    HalfEdgeID beforeDeformSpineHID = beforeDeform.halfedge();
+    HalfEdgeID afterDeformSpineHID = afterDeform.halfedge();
+
+    Vecf c1 = centroid_for_rib(_manifold, beforeDeform.next().halfedge(), _edgeInfo);
+    Vecf c2 = centroid_for_rib(_manifold, beforeDeform.prev().halfedge(), _edgeInfo);
+    Vecf c3 = centroid_for_rib(_manifold, toDeform.next().halfedge(), _edgeInfo);
+    
+    float distToDeformed = (c1-c2).length();
+    float distToOppDeformed = (c1-c3).length();
+    float numOfRibsNeeded = distToOppDeformed/distToDeformed;
+    
+    int times = 0;
+    for (int lowPow = 1; ;lowPow++) {
+        int highPow = lowPow + 1;
+        int lowBound = pow(2, lowPow);
+        int highBound = pow(2, highPow);
+        if (numOfRibsNeeded <= highBound && numOfRibsNeeded >= lowBound) {
+            float diff1 = highBound - numOfRibsNeeded;
+            float diff2 = numOfRibsNeeded - lowBound;
+            
+            if (diff1 > diff2) {
+                times = lowPow;
+            } else {
+                times = highPow;
+            }
+            break;
+        }
+    }
+    
+    
+    //subdivide
+    [self subdivideEdge:_deformDirHalfEdge times:times];
+    [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
+    
+    //rotate ribs
+    vector<HalfEdgeID> ribsToAdjust1;
+    HalfEdgeID hID1 = _manifold.walker(beforeDeformSpineHID).next().halfedge();
+    assert(_edgeInfo[hID1].is_rib());
+    ribsToAdjust1.push_back(hID1);
+    hID1 = _manifold.walker(beforeDeformSpineHID).prev().halfedge();
+    assert(_edgeInfo[hID1].is_rib());
+    ribsToAdjust1.push_back(hID1);
+    hID1 = _manifold.walker(beforeDeformSpineHID).prev().opp().prev().prev().halfedge();
+    assert(_edgeInfo[hID1].is_rib());
+    ribsToAdjust1.push_back(hID1);
+    [self rotateRibs:ribsToAdjust1 edgeInfo:_edgeInfo];
+
+    vector<HalfEdgeID> ribsToAdjust2;
+    ribsToAdjust2.push_back(_manifold.walker(afterDeformSpineHID).next().halfedge());
+    ribsToAdjust2.push_back(_manifold.walker(afterDeformSpineHID).prev().halfedge());
+    ribsToAdjust2.push_back(_manifold.walker(afterDeformSpineHID).prev().opp().prev().prev().halfedge());
+    [self rotateRibs:ribsToAdjust2 edgeInfo:_edgeInfo];
+    
+    //smooth
+    vector<VertexID>verticiesToUpdate1 = verticies_along_the_rib(_manifold, beforeDeformRibHID, _edgeInfo);
+    vector<VertexID>verticiesToUpdate2 = verticies_along_the_rib(_manifold, afterDeformRibHID, _edgeInfo);
+    
+    int num_of_verticies = verticiesToUpdate2.size();
+    verticiesToUpdate1.insert(verticiesToUpdate1.end(), verticiesToUpdate2.begin(), verticiesToUpdate2.end());
+    
+    float ribRadius = rib_radius(_manifold, _pivotHalfEdgeID, _edgeInfo);
+    float totalLength = 2*M_PI*ribRadius;
+    float single_arc_length = totalLength / num_of_verticies;
+    float arcAngle = single_arc_length / ribRadius;
+    NSLog(@"POSE ANGLE:%f",GLKMathRadiansToDegrees(arcAngle));
+    if (arcAngle < GLKMathDegreesToRadians(20)) {
+        set<VertexID> affectedVerticies = [self smoothVerticies:verticiesToUpdate1 iter:1 isSpine:NO brushSize:0.05 edgeInfo:_edgeInfo];
+    } else {
+        NSLog(@"Low poly");
+    }
+    
+    [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
 }
 
+-(void)subdivideEdge:(HalfEdgeID)hID times:(int)times {
+    recursively_add_edge(_manifold, hID, times, _edgeInfo);
+}
 
 #pragma mark - COMMON POSING METHODS
 //direction to the base of the branch from rib

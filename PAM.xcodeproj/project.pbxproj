@@ -68,7 +68,6 @@
 		1A9438AD1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m in Sources */ = {isa = PBXBuildFile; fileRef = 1A9438AC1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m */; };
 		1A976FC0184683EF0022AC3D /* PAMUtilities.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1A976FBF184683EF0022AC3D /* PAMUtilities.mm */; };
 		1ABD4F401885D684001FA009 /* polarized_from_075_100_refit_simpl_600.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1ABD4F3F1885D684001FA009 /* polarized_from_075_100_refit_simpl_600.obj */; };
-		1AC36B5518F3A65A002B04D6 /* PAMMesh.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1AC36B5418F3A65A002B04D6 /* PAMMesh.mm */; };
 		1AF3EBBA188C5A8200AB0C09 /* man-polar150-simpl420-refit34_0.5-subd-refit10_0.5.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1AF3EBB9188C5A8200AB0C09 /* man-polar150-simpl420-refit34_0.5-subd-refit10_0.5.obj */; };
 /* End PBXBuildFile section */
 
@@ -208,8 +207,6 @@
 		1A976FBE184683EF0022AC3D /* PAMUtilities.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PAMUtilities.h; sourceTree = "<group>"; };
 		1A976FBF184683EF0022AC3D /* PAMUtilities.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = PAMUtilities.mm; sourceTree = "<group>"; };
 		1ABD4F3F1885D684001FA009 /* polarized_from_075_100_refit_simpl_600.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = polarized_from_075_100_refit_simpl_600.obj; sourceTree = "<group>"; };
-		1AC36B5318F3A65A002B04D6 /* PAMMesh.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PAMMesh.h; sourceTree = "<group>"; };
-		1AC36B5418F3A65A002B04D6 /* PAMMesh.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = PAMMesh.mm; sourceTree = "<group>"; };
 		1AF3EBB9188C5A8200AB0C09 /* man-polar150-simpl420-refit34_0.5-subd-refit10_0.5.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "man-polar150-simpl420-refit34_0.5-subd-refit10_0.5.obj"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -439,8 +436,6 @@
 				1553C23C183F00A100839072 /* PolarAnnularMesh.mm */,
 				1A976FBE184683EF0022AC3D /* PAMUtilities.h */,
 				1A976FBF184683EF0022AC3D /* PAMUtilities.mm */,
-				1AC36B5318F3A65A002B04D6 /* PAMMesh.h */,
-				1AC36B5418F3A65A002B04D6 /* PAMMesh.mm */,
 			);
 			name = QuadMeshProject;
 			path = Classes/QuadMeshProject;
@@ -674,7 +669,6 @@
 				153B4E3918206CC200962DB2 /* Mesh.m in Sources */,
 				153B4E3C18206CC200962DB2 /* ShaderProgram.m in Sources */,
 				1A9438AD1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m in Sources */,
-				1AC36B5518F3A65A002B04D6 /* PAMMesh.mm in Sources */,
 				153B4E3818206CC200962DB2 /* AGLKVertexAttribArrayBuffer.m in Sources */,
 				153B4E4018206CC200962DB2 /* ZoomManager.m in Sources */,
 				153B4E3B18206CC200962DB2 /* PolygonMesh.m in Sources */,

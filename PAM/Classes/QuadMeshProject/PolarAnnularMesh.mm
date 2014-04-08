@@ -2245,6 +2245,10 @@ using namespace HMesh;
 {
     VertexID vID = [self closestVertexID_3D:touchPoint];
     
+    if (is_pole(_manifold, vID)) {
+        return NO;
+    }
+    
     //find rib edge
     Walker walker = _manifold.walker(vID).opp();
     if (_edgeInfo[walker.halfedge()].is_spine()) {
@@ -2378,10 +2382,10 @@ using namespace HMesh;
 }
 
 -(BOOL)setTransformedAreaForPosingRotate:(Walker&)awayFromTransform {
+    
     Walker toTransform = awayFromTransform.opp().next().opp().next();
     number_rib_edges(_manifold, _edgeInfo); // number rings
-    HalfEdgeID awayFromTranformHID = awayFromTransform.halfedge();
-    assert(_edgeInfo[awayFromTranformHID].is_spine());
+    assert(_edgeInfo[awayFromTransform.halfedge()].is_spine());
     
     map<VertexID, int> vertexToLoop;
     vector<int> loopsToDeform;
@@ -2391,7 +2395,7 @@ using namespace HMesh;
     float cur_dist = 0;
     Walker curWalker = awayFromTransform;
     Vec3f lastCentr = centroid_for_rib(_manifold, _pivotHalfEdgeID, _edgeInfo);
-    while (cur_dist <= dist && !_edgeInfo[curWalker.next().halfedge()].is_rib_junction()) {
+    while (cur_dist <= dist && !is_pole(_manifold, curWalker.vertex()) && !_edgeInfo[curWalker.next().halfedge()].is_rib_junction()) {
         HalfEdgeID loopRib = curWalker.next().halfedge();
         int loopID = _edgeInfo[loopRib].id;
         loopsToDeform.push_back(loopID);
@@ -2422,7 +2426,7 @@ using namespace HMesh;
     cur_dist = 0;
     curWalker = toTransform;
     lastCentr = centroid_for_rib(_manifold, _pivotHalfEdgeID, _edgeInfo);
-    while (cur_dist <= dist && !_edgeInfo[curWalker.next().halfedge()].is_rib_junction()) {
+    while (cur_dist <= dist && !is_pole(_manifold, curWalker.vertex()) && !_edgeInfo[curWalker.next().halfedge()].is_rib_junction()) {
         HalfEdgeID loopRib = curWalker.next().halfedge();
         int loopID = _edgeInfo[loopRib].id;
         loopsToDeform.push_back(loopID);
@@ -2909,27 +2913,95 @@ using namespace HMesh;
     }
 }
 
+#pragma mark - POSING UTILITIES
+//Checks with direction from to the left or right of the rib loop is smaller
+-(Walker)biggerSide:(HalfEdgeID)ribLoop transformSet:(set<VertexID>&)returnSet{
+    Walker dir = _manifold.walker(ribLoop).next();
+    Walker oppDir = dir.opp().next().opp().next();
+    
+    //Flood rotational area in both ways
+    HalfEdgeAttributeVector<EdgeInfo> sEdgeInfo(_manifold.allocated_halfedges());
+    Walker bWalker = _manifold.walker(dir.next().halfedge()); //Walk along pivot boundary loop
+    Walker opp_bWalker = _manifold.walker(oppDir.next().halfedge()); //Walk along pivot boundary loop
+    queue<HalfEdgeID> hq;
+    queue<HalfEdgeID> opp_hq;
+    
+    for (;!bWalker.full_circle(); bWalker = bWalker.next().opp().next()) {
+        HalfEdgeID hID = bWalker.next().halfedge();
+        HalfEdgeID opp_hID = bWalker.next().opp().halfedge();
+        sEdgeInfo[hID] = EdgeInfo(SPINE, 0);
+        sEdgeInfo[opp_hID] = EdgeInfo(SPINE, 0);
+        hq.push(hID);
+    }
+
+    for (;!opp_bWalker.full_circle(); opp_bWalker = opp_bWalker.next().opp().next()) {
+        HalfEdgeID hID = opp_bWalker.next().halfedge();
+        HalfEdgeID opp_hID = opp_bWalker.next().opp().halfedge();
+        sEdgeInfo[hID] = EdgeInfo(SPINE, 0);
+        sEdgeInfo[opp_hID] = EdgeInfo(SPINE, 0);
+        opp_hq.push(hID);
+    }
+    
+    set<VertexID> floodVerticiesSet;
+    set<VertexID> opp_floodVerticiesSet;
+
+    while(!hq.empty() && !opp_hq.empty())
+    {
+        HalfEdgeID h = hq.front();
+        Walker w = _manifold.walker(h);
+        hq.pop();
+        bool is_spine = _edgeInfo[h].edge_type == SPINE;
+        for (;!w.full_circle(); w=w.circulate_vertex_ccw(),is_spine = !is_spine) {
+            if(sEdgeInfo[w.halfedge()].edge_type == UNKNOWN)
+            {
+                EdgeInfo ei = is_spine ? EdgeInfo(SPINE,0) : EdgeInfo(RIB,0);
+                
+                floodVerticiesSet.insert(w.vertex());
+                floodVerticiesSet.insert(w.opp().vertex());
+                
+                sEdgeInfo[w.halfedge()] = ei;
+                sEdgeInfo[w.opp().halfedge()] = ei;
+                hq.push(w.opp().halfedge());
+            }
+        }
+        
+        h = opp_hq.front();
+        w = _manifold.walker(h);
+        opp_hq.pop();
+        is_spine = _edgeInfo[h].edge_type == SPINE;
+        for (;!w.full_circle(); w=w.circulate_vertex_ccw(),is_spine = !is_spine) {
+            if(sEdgeInfo[w.halfedge()].edge_type == UNKNOWN)
+            {
+                EdgeInfo ei = is_spine ? EdgeInfo(SPINE,0) : EdgeInfo(RIB,0);
+                
+                opp_floodVerticiesSet.insert(w.vertex());
+                opp_floodVerticiesSet.insert(w.opp().vertex());
+                
+                sEdgeInfo[w.halfedge()] = ei;
+                sEdgeInfo[w.opp().halfedge()] = ei;
+                opp_hq.push(w.opp().halfedge());
+            }
+        }
+    }
+
+    if (hq.empty()) {
+        returnSet = floodVerticiesSet;
+        return oppDir;
+    } else {
+        returnSet = opp_floodVerticiesSet;
+        return dir;
+    }
+}
+
 #pragma mark - POSING ROTATE
 -(void)statePosingRotateWithTouchPoint:(GLKVector3)touchPoint angle:(float)angle {
-    if (![self isLoaded]) {
-        return;
-    }
-  
     if ([self createPivotPoint:touchPoint]) {
-
-        Walker w1 = _manifold.walker(_pivotHalfEdgeID).next();
-        Walker w2 = _manifold.walker(_pivotHalfEdgeID).opp().next();
-        set<VertexID> side1 = [self allVerticiesInDirection:w1];
-        set<VertexID> side2 = [self allVerticiesInDirection:w2];
         _transformed_verticies.clear();
         _transition_verticies.clear();
-        
-        if (side1.size() > side2.size()) {
-            [self setTransformedAreaForPosingRotate:w1];
-        }  else {
-            [self setTransformedAreaForPosingRotate:w2];
-        }
         _current_rot_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
+        set<VertexID> returnSet;
+        Walker bigger = [self biggerSide:_pivotHalfEdgeID transformSet:returnSet];
+        [self setTransformedAreaForPosingRotate:bigger];
         [self setModState:MODIFICATION_BRANCH_POSE_ROTATE];
     }
 }
@@ -3075,27 +3147,15 @@ using namespace HMesh;
 
 #pragma mark - POSING TRANSLATE
 -(void)statePosingTranslateWithTouchPoint:(GLKVector3)touchPoint translation:(GLKVector3)translation {
-    if (![self isLoaded]) {
-        return;
-    }
-    
-    
-    
     if ([self createPivotPoint:touchPoint]) {
-        Walker w1 = _manifold.walker(_pivotHalfEdgeID).next();
-        Walker w2 = _manifold.walker(_pivotHalfEdgeID).opp().next();
-        set<VertexID> side1 = [self allVerticiesInDirection:w1];
-        set<VertexID> side2 = [self allVerticiesInDirection:w2];
-        if (side1.size() > side2.size()) {
-            _transformed_verticies = side2;
-            _deformDirHalfEdge = w2.halfedge();
-        }  else {
-            _transformed_verticies = side1;
-            _deformDirHalfEdge = w1.halfedge();
-        }
-        [self changeVerticiesColor_Set:_transformed_verticies toSelected:YES];
-        _translation = translation;
+        _transformed_verticies.clear();
+        _transition_verticies.clear();
         _current_rot_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
+        _translation = translation;
+   
+        Walker bigger = [self biggerSide:_pivotHalfEdgeID transformSet:_transformed_verticies];
+        _deformDirHalfEdge = bigger.opp().next().opp().next().halfedge();
+        [self changeVerticiesColor_Set:_transformed_verticies toSelected:YES];
 
         [self setModState:MODIFICATION_BRANCH_POSE_TRANSLATE];
     }
@@ -3166,9 +3226,8 @@ using namespace HMesh;
         }
     }
     
-    
     //subdivide
-    [self subdivideEdge:_deformDirHalfEdge times:times];
+    recursively_add_edge(_manifold, _deformDirHalfEdge, times, _edgeInfo);
     [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
     
     //rotate ribs
@@ -3211,71 +3270,67 @@ using namespace HMesh;
     [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
 }
 
--(void)subdivideEdge:(HalfEdgeID)hID times:(int)times {
-    recursively_add_edge(_manifold, hID, times, _edgeInfo);
-}
-
-#pragma mark - COMMON POSING METHODS
-//direction to the base of the branch from rib
--(HalfEdgeID)toRibJunctionFromRib:(HalfEdgeID)startRibEdge edgeInfo:(HMesh::HalfEdgeAttributeVector<EdgeInfo>&)edge_info
-{
-    assert(edge_info[startRibEdge].is_rib());
-    number_rib_edges(_manifold, edge_info); // number rings
-    Walker w1 = _manifold.walker(startRibEdge).next();
-    
-    int ring1Size = 0;
-    for (Walker w = _manifold.walker(startRibEdge); !w.full_circle(); w = w.next().opp().next())
-    {
-        ring1Size += 1;
-    }
-    
-    while (true) {
-        HalfEdgeID currentRibEdge = w1.next().halfedge();
-        
-        if (_edgeInfo[currentRibEdge].edge_type == RIB_JUNCTION) {
-            //find junction vertex, i.e. vertex with valency 6
-            Walker junction_vertex_walker = _manifold.walker(currentRibEdge);
-            for (;valency(_manifold, junction_vertex_walker.vertex()) != 6;
-                 junction_vertex_walker = junction_vertex_walker.next().opp().next());
-            
-            
-            //check size of other 2 rings at the junction
-            int ring2Size = 0, ring3Size = 0;
-            HalfEdgeID ring2HID = junction_vertex_walker.opp().halfedge();
-            HalfEdgeID ring3HID = junction_vertex_walker.next().opp().next().opp().halfedge();
-            assert(valency(_manifold, _manifold.walker(ring3HID).vertex()) == 6);
-            
-            for (Walker w = _manifold.walker(ring2HID); !w.full_circle(); w = w.next().opp().next())
-            {
-                ring2Size += 1;
-            }
-            
-            for (Walker w = _manifold.walker(ring3HID); !w.full_circle(); w = w.next().opp().next())
-            {
-                ring3Size += 1;
-            }
-            
-            if (ring2Size == ring3Size && ring1Size < ring2Size) {
-                //reached the base of the branch
-                return _manifold.walker(startRibEdge).next().halfedge();
-            } else if (ring1Size == ring2Size) {
-                //we are pointing at the child so avoid it
-                w1 = _manifold.walker(ring2HID).next();
-            } else if (ring1Size == ring3Size) {
-                w1 = _manifold.walker(ring3HID).next();
-            } else {
-                w1 = junction_vertex_walker.next().opp().next().prev();
-                assert(edge_info[w1.halfedge()].is_spine());
-            }
-        } else if (is_pole(_manifold, w1.vertex())) {
-            //pointing at the pole, so base rib junction is the opposite direction
-            return _manifold.walker(startRibEdge).opp().next().halfedge();
-        } else {
-            w1 = w1.next().opp().next();
-        }
-    }
-    
-}
+//#pragma mark - COMMON POSING METHODS
+////direction to the base of the branch from rib
+//-(HalfEdgeID)toRibJunctionFromRib:(HalfEdgeID)startRibEdge edgeInfo:(HMesh::HalfEdgeAttributeVector<EdgeInfo>&)edge_info
+//{
+//    assert(edge_info[startRibEdge].is_rib());
+//    number_rib_edges(_manifold, edge_info); // number rings
+//    Walker w1 = _manifold.walker(startRibEdge).next();
+//    
+//    int ring1Size = 0;
+//    for (Walker w = _manifold.walker(startRibEdge); !w.full_circle(); w = w.next().opp().next())
+//    {
+//        ring1Size += 1;
+//    }
+//    
+//    while (true) {
+//        HalfEdgeID currentRibEdge = w1.next().halfedge();
+//        
+//        if (_edgeInfo[currentRibEdge].edge_type == RIB_JUNCTION) {
+//            //find junction vertex, i.e. vertex with valency 6
+//            Walker junction_vertex_walker = _manifold.walker(currentRibEdge);
+//            for (;valency(_manifold, junction_vertex_walker.vertex()) != 6;
+//                 junction_vertex_walker = junction_vertex_walker.next().opp().next());
+//            
+//            
+//            //check size of other 2 rings at the junction
+//            int ring2Size = 0, ring3Size = 0;
+//            HalfEdgeID ring2HID = junction_vertex_walker.opp().halfedge();
+//            HalfEdgeID ring3HID = junction_vertex_walker.next().opp().next().opp().halfedge();
+//            assert(valency(_manifold, _manifold.walker(ring3HID).vertex()) == 6);
+//            
+//            for (Walker w = _manifold.walker(ring2HID); !w.full_circle(); w = w.next().opp().next())
+//            {
+//                ring2Size += 1;
+//            }
+//            
+//            for (Walker w = _manifold.walker(ring3HID); !w.full_circle(); w = w.next().opp().next())
+//            {
+//                ring3Size += 1;
+//            }
+//            
+//            if (ring2Size == ring3Size && ring1Size < ring2Size) {
+//                //reached the base of the branch
+//                return _manifold.walker(startRibEdge).next().halfedge();
+//            } else if (ring1Size == ring2Size) {
+//                //we are pointing at the child so avoid it
+//                w1 = _manifold.walker(ring2HID).next();
+//            } else if (ring1Size == ring3Size) {
+//                w1 = _manifold.walker(ring3HID).next();
+//            } else {
+//                w1 = junction_vertex_walker.next().opp().next().prev();
+//                assert(edge_info[w1.halfedge()].is_spine());
+//            }
+//        } else if (is_pole(_manifold, w1.vertex())) {
+//            //pointing at the pole, so base rib junction is the opposite direction
+//            return _manifold.walker(startRibEdge).opp().next().halfedge();
+//        } else {
+//            w1 = w1.next().opp().next();
+//        }
+//    }
+//    
+//}
 
 #pragma mark - TOUCHES: FACE PICKING
 
@@ -4228,6 +4283,13 @@ using namespace HMesh;
 }
 
 -(set<VertexID>)allVerticiesInDirection:(Walker)deleteDir {
+    
+    if (is_pole(_manifold, deleteDir.vertex())) {
+        set<VertexID> floodVerticiesSet;
+        floodVerticiesSet.insert(deleteDir.vertex());
+        return floodVerticiesSet;
+    }
+    
     //Flood rotational area
     HalfEdgeAttributeVector<EdgeInfo> sEdgeInfo(_manifold.allocated_halfedges());
     Walker bWalker = _manifold.walker(deleteDir.next().halfedge()); //Walk along pivot boundary loop

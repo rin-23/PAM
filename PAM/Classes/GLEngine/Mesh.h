@@ -15,14 +15,6 @@
 #import "TranslationManager.h"
 
 enum {
-    OSSAPositionMask = 0,
-    OSSATextureMask = 1 << 1,
-    OSSANormalMask = 1 << 2,
-    OSSARGBAColorMask = 1 << 3,
-    OSSAMonochromeColorMask  = 1 << 4
-};
-
-enum {
     UNIFORM_MODELVIEWPROJECTION_MATRIX,
     UNIFORM_MODELVIEW_MATRIX,
     UNIFORM_MODEL_MATRIX,
@@ -79,8 +71,7 @@ typedef struct _BoundingBox {
 
 @property (nonatomic) AGLKVertexAttribArrayBuffer *vertexDataBuffer;
 @property (nonatomic) AGLKVertexAttribArrayBuffer *indexDataBuffer;
-@property (nonatomic) AGLKVertexAttribArrayBuffer *doubleVertexBuffer;
-
+@property (nonatomic) AGLKVertexAttribArrayBuffer *doubleVertexBuffer; 
 
 @property (nonatomic) RotationManager* rotationManager;
 @property (nonatomic) TranslationManager* translationManager;

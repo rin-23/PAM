@@ -68,6 +68,7 @@
 		1A9438AD1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m in Sources */ = {isa = PBXBuildFile; fileRef = 1A9438AC1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m */; };
 		1A976FC0184683EF0022AC3D /* PAMUtilities.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1A976FBF184683EF0022AC3D /* PAMUtilities.mm */; };
 		1ABD4F401885D684001FA009 /* polarized_from_075_100_refit_simpl_600.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1ABD4F3F1885D684001FA009 /* polarized_from_075_100_refit_simpl_600.obj */; };
+		1AC36B5518F3A65A002B04D6 /* PAMMesh.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1AC36B5418F3A65A002B04D6 /* PAMMesh.mm */; };
 		1AF3EBBA188C5A8200AB0C09 /* man-polar150-simpl420-refit34_0.5-subd-refit10_0.5.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1AF3EBB9188C5A8200AB0C09 /* man-polar150-simpl420-refit34_0.5-subd-refit10_0.5.obj */; };
 /* End PBXBuildFile section */
 
@@ -207,6 +208,8 @@
 		1A976FBE184683EF0022AC3D /* PAMUtilities.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PAMUtilities.h; sourceTree = "<group>"; };
 		1A976FBF184683EF0022AC3D /* PAMUtilities.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = PAMUtilities.mm; sourceTree = "<group>"; };
 		1ABD4F3F1885D684001FA009 /* polarized_from_075_100_refit_simpl_600.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = polarized_from_075_100_refit_simpl_600.obj; sourceTree = "<group>"; };
+		1AC36B5318F3A65A002B04D6 /* PAMMesh.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PAMMesh.h; sourceTree = "<group>"; };
+		1AC36B5418F3A65A002B04D6 /* PAMMesh.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = PAMMesh.mm; sourceTree = "<group>"; };
 		1AF3EBB9188C5A8200AB0C09 /* man-polar150-simpl420-refit34_0.5-subd-refit10_0.5.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "man-polar150-simpl420-refit34_0.5-subd-refit10_0.5.obj"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -436,6 +439,8 @@
 				1553C23C183F00A100839072 /* PolarAnnularMesh.mm */,
 				1A976FBE184683EF0022AC3D /* PAMUtilities.h */,
 				1A976FBF184683EF0022AC3D /* PAMUtilities.mm */,
+				1AC36B5318F3A65A002B04D6 /* PAMMesh.h */,
+				1AC36B5418F3A65A002B04D6 /* PAMMesh.mm */,
 			);
 			name = QuadMeshProject;
 			path = Classes/QuadMeshProject;
@@ -669,6 +674,7 @@
 				153B4E3918206CC200962DB2 /* Mesh.m in Sources */,
 				153B4E3C18206CC200962DB2 /* ShaderProgram.m in Sources */,
 				1A9438AD1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m in Sources */,
+				1AC36B5518F3A65A002B04D6 /* PAMMesh.mm in Sources */,
 				153B4E3818206CC200962DB2 /* AGLKVertexAttribArrayBuffer.m in Sources */,
 				153B4E4018206CC200962DB2 /* ZoomManager.m in Sources */,
 				153B4E3B18206CC200962DB2 /* PolygonMesh.m in Sources */,
@@ -769,7 +775,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 6.0;
 				ONLY_ACTIVE_ARCH = YES;
-				PROVISIONING_PROFILE = "5F422754-4526-4807-81C2-924B5FC1CF12";
+				PROVISIONING_PROFILE = "9694F30D-F143-4C3A-AFB9-2A455EF785DD";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -804,7 +810,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 6.0;
-				PROVISIONING_PROFILE = "5F422754-4526-4807-81C2-924B5FC1CF12";
+				PROVISIONING_PROFILE = "9694F30D-F143-4C3A-AFB9-2A455EF785DD";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALIDATE_PRODUCT = YES;
@@ -816,15 +822,15 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = LaunchImage;
-				CODE_SIGN_IDENTITY = "iPhone Developer: Riant Abdrashitov (ZB3W7CDQH4)";
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer: Riant Abdrashitov (ZB3W7CDQH4)";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "PAM/PAM-Prefix.pch";
 				INFOPLIST_FILE = "PAM/PAM-Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE = "5F422754-4526-4807-81C2-924B5FC1CF12";
+				PROVISIONING_PROFILE = "";
 				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/GEL-iOS/**";
 				WRAPPER_EXTENSION = app;
 			};
@@ -835,15 +841,15 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = LaunchImage;
-				CODE_SIGN_IDENTITY = "iPhone Distribution: Rinat Abdrashitov";
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution: Rinat Abdrashitov";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "PAM/PAM-Prefix.pch";
 				INFOPLIST_FILE = "PAM/PAM-Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE = "5F422754-4526-4807-81C2-924B5FC1CF12";
+				PROVISIONING_PROFILE = "";
 				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/GEL-iOS/**";
 				WRAPPER_EXTENSION = app;
 			};

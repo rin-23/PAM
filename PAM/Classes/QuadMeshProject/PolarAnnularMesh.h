@@ -6,7 +6,7 @@
 //  Copyright (c) 2013 Rinat Abdrashitov. All rights reserved.
 //
 
-#import "Mesh.h"
+#import "PAMMesh.h"
 
 
 typedef enum {
@@ -40,7 +40,7 @@ typedef enum {
 
 @end
 
-@interface PolarAnnularMesh : Mesh
+@interface PolarAnnularMesh : PAMMesh
 
 @property (nonatomic, assign) CurrentModification modState;
 @property (nonatomic, weak) id<PolarAnnularMeshDelegate> delegate;

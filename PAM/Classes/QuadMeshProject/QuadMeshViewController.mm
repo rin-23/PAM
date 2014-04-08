@@ -867,8 +867,6 @@ typedef enum {
     }
 }
 
-
-
 -(void)handleRotationGesture:(UIGestureRecognizer*)sender {
     if ([SettingsManager sharedInstance].transform) {
         [_rotationManager handleRotationGesture:sender withViewMatrix:GLKMatrix4Identity];

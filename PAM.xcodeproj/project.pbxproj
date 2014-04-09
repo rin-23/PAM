@@ -65,6 +65,7 @@
 		1A408F3918357A8D0044E48E /* sphere.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1A408F3818357A8D0044E48E /* sphere.obj */; };
 		1A408F3E18357BAB0044E48E /* quad_sphere.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1A408F3D18357BAB0044E48E /* quad_sphere.obj */; };
 		1A408F4018357CAA0044E48E /* quad_sphere_high_res.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1A408F3F18357CAA0044E48E /* quad_sphere_high_res.obj */; };
+		1A92223818F5ABDA009FB464 /* PAM-scorpion-high-res.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1A92223718F5ABDA009FB464 /* PAM-scorpion-high-res.obj */; };
 		1A9438AD1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m in Sources */ = {isa = PBXBuildFile; fileRef = 1A9438AC1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m */; };
 		1A976FC0184683EF0022AC3D /* PAMUtilities.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1A976FBF184683EF0022AC3D /* PAMUtilities.mm */; };
 		1ABD4F401885D684001FA009 /* polarized_from_075_100_refit_simpl_600.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1ABD4F3F1885D684001FA009 /* polarized_from_075_100_refit_simpl_600.obj */; };
@@ -202,6 +203,7 @@
 		1A408F3818357A8D0044E48E /* sphere.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = sphere.obj; sourceTree = "<group>"; };
 		1A408F3D18357BAB0044E48E /* quad_sphere.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = quad_sphere.obj; sourceTree = "<group>"; };
 		1A408F3F18357CAA0044E48E /* quad_sphere_high_res.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = quad_sphere_high_res.obj; sourceTree = "<group>"; };
+		1A92223718F5ABDA009FB464 /* PAM-scorpion-high-res.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "PAM-scorpion-high-res.obj"; sourceTree = "<group>"; };
 		1A9438AB1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = UITwoFingerHoldGestureRecognizer.h; path = Classes/QuadMeshProject/UITwoFingerHoldGestureRecognizer.h; sourceTree = "<group>"; };
 		1A9438AC1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = UITwoFingerHoldGestureRecognizer.m; path = Classes/QuadMeshProject/UITwoFingerHoldGestureRecognizer.m; sourceTree = "<group>"; };
 		1A976FBE184683EF0022AC3D /* PAMUtilities.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PAMUtilities.h; sourceTree = "<group>"; };
@@ -444,6 +446,7 @@
 		15646602182033920000B985 /* ObjFiles */ = {
 			isa = PBXGroup;
 			children = (
+				1A92223718F5ABDA009FB464 /* PAM-scorpion-high-res.obj */,
 				1A04EE1718BBBB8900C1849F /* PAM-spider-mid-res.obj */,
 				1AF3EBB9188C5A8200AB0C09 /* man-polar150-simpl420-refit34_0.5-subd-refit10_0.5.obj */,
 				1ABD4F3F1885D684001FA009 /* polarized_from_075_100_refit_simpl_600.obj */,
@@ -640,6 +643,7 @@
 				15646610182033920000B985 /* 3DFile.obj in Resources */,
 				15646611182033920000B985 /* mesh.obj in Resources */,
 				15646614182033920000B985 /* teapot.obj in Resources */,
+				1A92223818F5ABDA009FB464 /* PAM-scorpion-high-res.obj in Resources */,
 				15646612182033920000B985 /* newPolars.obj in Resources */,
 				1A04EE1818BBBB8900C1849F /* PAM-spider-mid-res.obj in Resources */,
 				156463FD1820266E0000B985 /* Images.xcassets in Resources */,

@@ -533,12 +533,13 @@ using namespace HMesh;
     //touchPoint to world coordinates
     touchPoint = [Utilities matrix4:self.viewMatrix multiplyVector3:touchPoint];
     GLKVector2 touchPoint2D = GLKVector2Make(touchPoint.x, touchPoint.y);
+    GLKMatrix4 modelViewMatrix = self.modelViewMatrix;
     
     for (VertexIDIterator vID = _manifold.vertices_begin(); vID != _manifold.vertices_end(); vID++) {
         Vec vertexPos = _manifold.pos(*vID);
         
         GLKVector4 glkVertextPos = GLKVector4Make(vertexPos[0], vertexPos[1], vertexPos[2], 1.0f);
-        GLKVector4 glkVertextPosModelView = GLKMatrix4MultiplyVector4(self.modelViewMatrix, glkVertextPos);
+        GLKVector4 glkVertextPosModelView = GLKMatrix4MultiplyVector4(modelViewMatrix, glkVertextPos);
         GLKVector2 glkVertextPosModelView_2 = GLKVector2Make(glkVertextPosModelView.x, glkVertextPosModelView.y);
         float cur_distance = GLKVector2Distance(touchPoint2D, glkVertextPosModelView_2);
         
@@ -583,6 +584,8 @@ using namespace HMesh;
     //rayDirection in View coordinates is pointing down the z axis. Original rayDirection doesnt preserve translation
     rayDirection = GLKVector3Make(0, 0, -1);
     
+    GLKMatrix4 modelViewMatrix = self.modelViewMatrix;
+    
     //Iterate over every face and see if ray hits any
     for (FaceIDIterator fid = _manifold.faces_begin(); fid != _manifold.faces_end(); ++fid) {
         GLKVector3 faceVerticies[4];
@@ -592,7 +595,7 @@ using namespace HMesh;
         for(Walker w = _manifold.walker(*fid); !w.full_circle(); w = w.circulate_face_cw()) {
             Vec v = _manifold.pos(w.vertex());
             //bring manifold vertex coordinates to world space
-            GLKVector3 glV_world = [Utilities matrix4:self.modelViewMatrix multiplyVector3:GLKVector3Make(v[0], v[1], v[2])];
+            GLKVector3 glV_world = [Utilities matrix4:modelViewMatrix multiplyVector3:GLKVector3Make(v[0], v[1], v[2])];
 
             centroid = GLKVector3Add(centroid, glV_world);
             faceVerticies[num_edges] = glV_world;
@@ -780,9 +783,7 @@ using namespace HMesh;
                       brushSize:(float)brushSize
                      brushDepth:(float)brushDepth
 {
-    if (![self isLoaded]) {
-        return;
-    }
+    NSDate* startDate = [NSDate date];
     
     VertexID touchedVID = [self closestVertexID_3D:touchPoint];
     Vec touchedPos = _manifold.pos(touchedVID);
@@ -814,6 +815,9 @@ using namespace HMesh;
 //    [self changeVerticiesColor_Set:_bump_verticies toSelected:YES];
     [self setModState:MODIFICATION_SCULPTING_BUMP_CREATION];
     
+    NSDate* endDate = [NSDate date];
+    NSTimeInterval interval = [endDate timeIntervalSinceDate:startDate];
+    NSLog(@"[INFO][TIMING][BODY CREATION] verticies:%zu time %f", _bump_verticies.size(), interval);
 }
 
 -(void)continueBumpCreationWithBrushDepth:(float)brushDepth
@@ -824,11 +828,9 @@ using namespace HMesh;
 
 -(void)endBumpCreation
 {
-    
-    if (![self isLoaded])
-        return;
-    
     [self saveState];
+    
+    NSDate* startDate = [NSDate date];
     
     [self setModState:MODIFICATION_NONE];
     
@@ -837,8 +839,13 @@ using namespace HMesh;
         _manifold.pos(vid) = Vec(_bump_current_displacement[vid]);
     }
     
+    
     [self updateVertexPositionOnGPU_Set:_bump_verticies];
     [self updateVertexNormOnGPU_Set:_bump_verticies];
+    
+    NSDate* endDate = [NSDate date];
+    NSTimeInterval interval = [endDate timeIntervalSinceDate:startDate];
+    NSLog(@"[INFO][TIMING][BUMP CREATION] updated verticies:%zu time %f", _bump_verticies.size(), interval);
 }
 
 //-(void)createBumpAtPoint:(vector<GLKVector3>)tPoints
@@ -1022,6 +1029,8 @@ using namespace HMesh;
     
     if ([SettingsManager sharedInstance].sculptScalingType == SilhouetteScaling) {
         _anisotropic_projections = VertexAttributeVector<Vecf>(_manifold.no_vertices());
+        GLKMatrix4 modelViewMatrix = self.modelViewMatrix;
+
         for(int i = 0; i < _centroids.size(); i++)
         {
             Vec center = Vec(_centroids[i]);
@@ -1045,7 +1054,7 @@ using namespace HMesh;
             n = normalize(cross(Q[0],Q[1]));
             
             GLKVector3 nGLK = GLKVector3Make(n[0], n[1], n[2]);
-            GLKVector3 nGLKWorld = [Utilities matrix4:self.modelViewMatrix multiplyVector3NoTranslation:nGLK];
+            GLKVector3 nGLKWorld = [Utilities matrix4:modelViewMatrix multiplyVector3NoTranslation:nGLK];
             GLKVector3 zWorld = GLKVector3Make(0, 0, 1);
             GLKVector3 to_silhouette_axis_world = GLKVector3CrossProduct(zWorld, nGLKWorld);
             
@@ -1058,7 +1067,7 @@ using namespace HMesh;
 //            touchPoint2World.z = to_silhouette_axis_world.z;
 //            GLKVector3 touchPoint2
             
-            GLKVector3 to_silhouette_axis_model = [Utilities invertVector3NoTranslation:to_silhouette_axis_world withMatrix:self.modelViewMatrix];
+            GLKVector3 to_silhouette_axis_model = [Utilities invertVector3NoTranslation:to_silhouette_axis_world withMatrix:modelViewMatrix];
             to_silhouette_axis_model = GLKVector3Normalize(to_silhouette_axis_model);
             Vec to_silhouette_axis = Vec(to_silhouette_axis_model.x,
                                          to_silhouette_axis_model.y,
@@ -1102,11 +1111,12 @@ using namespace HMesh;
         return;
 
     [self saveState];
-    
-    
+    NSDate* startDate = [NSDate date];
+
+    [self setModState:MODIFICATION_NONE];
+    vector<VertexID> allAffectedVerticies;
     if (_modState == MODIFICATION_SCULPTING_SCALING) {
-        [self setModState:MODIFICATION_NONE];
-        vector<VertexID> allAffectedVerticies;
+
         for (int i = 0; i < _edges_to_scale.size(); i++) {
             vector<VertexID> affected = change_rib_radius(_manifold, _edges_to_scale[i], _centroids[i], _edgeInfo, 1 + (_scaleFactor - 1)*_scale_weight_vector[i]); //update _manifold
             allAffectedVerticies.insert(allAffectedVerticies.end(), affected.begin(), affected.end());
@@ -1117,9 +1127,8 @@ using namespace HMesh;
         _sculpt_verticies_to_scale.clear();
         [self updateVertexPositionOnGPU_Vector:allAffectedVerticies];
         [self updateVertexNormOnGPU_Vector:allAffectedVerticies];
+        
     } else if (_modState == MODIFICATION_SCULPTING_ANISOTROPIC_SCALING) {
-        [self setModState:MODIFICATION_NONE];
-        vector<VertexID> allAffectedVerticies;
         for (int i = 0; i < _edges_to_scale.size(); i ++) {
             
             HalfEdgeID ribID = _edges_to_scale[i];
@@ -1138,6 +1147,10 @@ using namespace HMesh;
         [self updateVertexPositionOnGPU_Vector:allAffectedVerticies];
         [self updateVertexNormOnGPU_Vector:allAffectedVerticies];
     }
+    
+    NSDate* endDate = [NSDate date];
+    NSTimeInterval interval = [endDate timeIntervalSinceDate:startDate];
+    NSLog(@"[INFO][TIMING][SCALING CREATION] updated verticies:%zu time %f", allAffectedVerticies.size(), interval);
    
 }
 
@@ -1367,10 +1380,7 @@ using namespace HMesh;
                    touchSize:(float)touchSize
            averageTouchSpeed:(float)touchSpeed
 {
-    if (![self isLoaded]) {
-        return;
-    }
-    
+
     VertexID touchedVID;
     if (touchedModelStart) {
         touchedVID = [self closestVertexID_3D:_startPoint];
@@ -1383,6 +1393,8 @@ using namespace HMesh;
         [self extendBranchAtPole:poleID];
         return;
     }
+    
+    NSDate* startDate = [NSDate date];
     
     if (_touchPoints.size() < 6) {
         if (_touchPoints.size() >= 2) {
@@ -1553,16 +1565,18 @@ using namespace HMesh;
     vector<GLKVector3> skeletonModel;
     vector<GLKVector3> skeletonNormalsModel;
     
+    GLKMatrix4 modelViewMatrix = self.modelViewMatrix;
+    
     for (int i = 0; i < skeleton.size(); i++) {
         GLKVector3 sModel = [Utilities invertVector3:skeleton[i]
-                                          withMatrix:self.modelViewMatrix];
+                                          withMatrix:modelViewMatrix];
         
         //dont preserve translation for norma and tangent
         float ribWidth = bWidth;
         GLKVector3 nModel = [Utilities invertVector4:GLKVector4Make(skeletonNormals[i].x, skeletonNormals[i].y, skeletonNormals[i].z, 0)
-                                          withMatrix:self.modelViewMatrix];
+                                          withMatrix:modelViewMatrix];
         GLKVector3 tModel = [Utilities invertVector4:GLKVector4Make(skeletonTangents[i].x, skeletonTangents[i].y, skeletonTangents[i].z, 0)
-                                          withMatrix:self.modelViewMatrix];
+                                          withMatrix:modelViewMatrix];
         
         tModel = GLKVector3MultiplyScalar(GLKVector3Normalize(tModel), ribWidth);
         nModel = GLKVector3MultiplyScalar(GLKVector3Normalize(nModel), ribWidth);
@@ -1699,7 +1713,14 @@ using namespace HMesh;
         }
     }
     
+    NSDate* endDate = [NSDate date];
+    NSTimeInterval interval = [endDate timeIntervalSinceDate:startDate];
+    NSLog(@"[INFO][TIMING][BRANCH CREATION] verticies:%zu time %f", newVerticies.size(), interval);
+    
     [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
+    
+
+    
 //    return allRibs;
 }
 
@@ -1708,6 +1729,8 @@ using namespace HMesh;
 
 {
     assert(is_pole(_manifold, poleID));
+    
+    NSDate* startDate = [NSDate date];
     
     Vec polePos = _manifold.pos(poleID);
     Walker fromPoleWalker = _manifold.walker(poleID);
@@ -1815,14 +1838,15 @@ using namespace HMesh;
     vector<GLKVector3> skeletonModel;
     vector<GLKVector3> skeletonNormalsModel;
     
+    GLKMatrix4 modelViewMatrix = self.modelViewMatrix;
     for (int i = 0; i < skeleton.size(); i++) {
         GLKVector3 sModel = [Utilities invertVector3:skeleton[i]
-                                          withMatrix:self.modelViewMatrix];
+                                          withMatrix:modelViewMatrix];
         //dont preserve translation for norma and tangent
         GLKVector3 nModel = [Utilities invertVector4:GLKVector4Make(skeletonNormals[i].x, skeletonNormals[i].y, skeletonNormals[i].z, 0)
-                                          withMatrix:self.modelViewMatrix];
+                                          withMatrix:modelViewMatrix];
         GLKVector3 tModel = [Utilities invertVector4:GLKVector4Make(skeletonTangents[i].x, skeletonTangents[i].y, skeletonTangents[i].z, 0)
-                                          withMatrix:self.modelViewMatrix];
+                                          withMatrix:modelViewMatrix];
         
         tModel = GLKVector3MultiplyScalar(GLKVector3Normalize(tModel), ribWidth);
         nModel = GLKVector3MultiplyScalar(GLKVector3Normalize(nModel), ribWidth);
@@ -1906,8 +1930,13 @@ using namespace HMesh;
     
     [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
     [self smoothAlongRib:lowerRibID iter:2 isSpine:YES brushSize:ribWidth edgeInfo:_edgeInfo];
+
+    NSDate* endDate = [NSDate date];
+    NSTimeInterval interval = [endDate timeIntervalSinceDate:startDate];
+    NSLog(@"[INFO][TIMING][EXTEND BRANCH] verticies:%zu time %f", newLimbVerticies.size(), interval);
     
     [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
+
 }
 
 
@@ -2009,6 +2038,8 @@ using namespace HMesh;
         return;
     }
     
+    NSDate* startDate = [NSDate date];
+    
     if (_touchPoints.size() < 8 || _touchPoints.size() % 2 != 0) {
         NSLog(@"[PolarAnnularMesh][WARNING] Garbage point data");
         return;
@@ -2050,17 +2081,18 @@ using namespace HMesh;
     vector<vector<GLKVector3>> allRibs(skeleton.size());
     vector<GLKVector3> skeletonModel;
     vector<GLKVector3> skeletonNormalsModel;
+    GLKMatrix4 modelViewMatrix = self.modelViewMatrix;
     for (int i = 0; i < skeleton.size(); i++) {
         GLKVector3 sModel = [Utilities invertVector3:GLKVector3Make(skeleton[i].x, skeleton[i].y, 0)
-                                          withMatrix:self.modelViewMatrix];
+                                          withMatrix:modelViewMatrix];
         
         //dont preserve translation for norma and tangent
         float ribWidth = skeletonWidth[i];
         GLKVector2 stretchedNorm = GLKVector2MultiplyScalar(skeletonNormals[i], ribWidth);
         GLKVector3 nModel = [Utilities invertVector4:GLKVector4Make(stretchedNorm.x, stretchedNorm.y, 0, 0)
-                                          withMatrix:self.modelViewMatrix];
+                                          withMatrix:modelViewMatrix];
         GLKVector3 tModel = [Utilities invertVector4:GLKVector4Make(skeletonTangents[i].x, skeletonTangents[i].y, 0, 0)
-                                          withMatrix:self.modelViewMatrix];
+                                          withMatrix:modelViewMatrix];
 
         
         if (i == 0) {
@@ -2089,13 +2121,13 @@ using namespace HMesh;
 
 //    allRibs.push_back(skeletonNormalsModel);
     
-    [self populateManifold:allRibs];
+    [self populateManifold:allRibs startDate:startDate];
     allRibs.push_back(skeletonModel);
     
 //    return allRibs;
 }
 
--(void)populateManifold:(std::vector<vector<GLKVector3>>)allRibs {
+-(void)populateManifold:(std::vector<vector<GLKVector3>>)allRibs startDate:(NSDate*)startDate {
     vector<Vecf> vertices;
     vector<int> faces;
     vector<int> indices;
@@ -2187,6 +2219,12 @@ using namespace HMesh;
     
     [self setModState:MODIFICATION_NONE];
     laplacian_smooth(_manifold, 1.0, 3);
+    
+    NSDate* endDate = [NSDate date];
+    NSTimeInterval interval = [endDate timeIntervalSinceDate:startDate];
+    NSLog(@"[INFO][TIMING][BODY CREATION] verticies:%zu time %f", _manifold.no_vertices(), interval);
+
+    
     [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
 }
 
@@ -2500,13 +2538,13 @@ using namespace HMesh;
 
 -(void)endTranslatingBranchTree:(GLKVector3)translation
 {
-    if (![self isLoaded])
-        return;
     
     if (_modState != MODIFICATION_BRANCH_TRANSLATION) {
         return;
     }
     [self saveState];
+    
+    NSDate* startDate = [NSDate date];
     
     _translation = translation;
     
@@ -2547,6 +2585,11 @@ using namespace HMesh;
     
     [self rotateRingsFrom:_deformDirHalfEdge toRingID:_pivotHalfEdgeID smooth:0];
     
+    
+    NSDate* endDate = [NSDate date];
+    NSTimeInterval interval = [endDate timeIntervalSinceDate:startDate];
+    NSLog(@"[INFO][TIMING][BRANCH TRANSLATION] transform verticies:%zu translation verticies:%zu time %f", _transformed_verticies.size(), _transition_verticies.size(),interval);
+    
     [self updateVertexPositionOnGPU_Set:_transformed_verticies];
     [self updateVertexPositionOnGPU_Vector:_transition_verticies];
     [self changeVerticiesColor_Set:_transformed_verticies toSelected:NO];
@@ -2574,14 +2617,15 @@ using namespace HMesh;
 }
 
 -(void)endScalingBranchTreeWithScale:(float)scale {
-    if (![self isLoaded])
-        return;
+    
     
     if (_modState != MODIFICATION_BRANCH_SCALING) {
         return;
     }
     
     [self saveState];
+
+    NSDate* startDate = [NSDate date];
     
     _scaleFactor = scale;
     
@@ -2623,6 +2667,10 @@ using namespace HMesh;
     
     [self setModState:MODIFICATION_PIN_POINT_SET];
     
+    NSDate* endDate = [NSDate date];
+    NSTimeInterval interval = [endDate timeIntervalSinceDate:startDate];
+    NSLog(@"[INFO][TIMING][BRANCH SCALING] transform verticies:%zu translation verticies:%zu time %f", _transformed_verticies.size(), _transition_verticies.size(),interval);
+    
     [self updateVertexPositionOnGPU_Set:_transformed_verticies];
     [self updateVertexPositionOnGPU_Vector:_transition_verticies];
     [self changeVerticiesColor_Set:_transformed_verticies toSelected:NO];
@@ -2632,9 +2680,8 @@ using namespace HMesh;
 #pragma mark - ROTATION THE BRANCH TREE
 
 -(void)startBendingWithTouhcPoint:(GLKVector3)touchPoint angle:(float)angle {
-    if (![self isLoaded]) {
-        return;
-    }
+
+    NSDate* startDate = [NSDate date];
     
     if ([self createPivotPoint:touchPoint]) {
         if ([self setTransformedArea]) {
@@ -2643,6 +2690,10 @@ using namespace HMesh;
             _current_rot_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
         }
     }
+    
+    NSDate* endDate = [NSDate date];
+    NSTimeInterval interval = [endDate timeIntervalSinceDate:startDate];
+    NSLog(@"[INFO][TIMING][BENDING INITIALIZATION] transition verticies:%zu transform verticies:%zu time %f", _transition_verticies.size(), _transformed_verticies.size(), interval);
 }
 
 -(void)continueBendingWithWithAngle:(float)angle {
@@ -2658,6 +2709,8 @@ using namespace HMesh;
     }
 
     [self saveState];
+    
+    NSDate* startDate = [NSDate date];
     
     GLKVector3 zAxis = GLKMatrix4MultiplyVector3(GLKMatrix4Invert(self.viewMatrix, NULL), GLKVector3Make(0, 0, -1));
     GLKMatrix4 toOrigin = GLKMatrix4MakeTranslation(-_centerOfRotation.x, -_centerOfRotation.y, -_centerOfRotation.z);
@@ -2698,6 +2751,10 @@ using namespace HMesh;
     [self rotateRingsFrom:_deformDirHalfEdge toRingID:_pivotHalfEdgeID smooth:0];
     
     [self setModState:MODIFICATION_PIN_POINT_SET];
+    
+    NSDate* endDate = [NSDate date];
+    NSTimeInterval interval = [endDate timeIntervalSinceDate:startDate];
+    NSLog(@"[INFO][TIMING][BRANCH ROTATION] transform verticies:%zu translation verticies:%zu time %f", _transformed_verticies.size(), _transition_verticies.size(),interval);
     
     [self updateVertexPositionOnGPU_Set:_transformed_verticies];
     [self updateVertexPositionOnGPU_Vector:_transition_verticies];
@@ -3019,6 +3076,8 @@ using namespace HMesh;
 
     [self saveState];
     
+    NSDate* startDate = [NSDate date];
+    
     [self setModState:MODIFICATION_NONE];
     
     _rotAngle = angle;
@@ -3061,6 +3120,10 @@ using namespace HMesh;
     }
     
 //    [self rotateRingsFrom:_deformDirHalfEdge toRingID:_deformDirHalfEdgeEnd smooth:0];
+    
+    NSDate* endDate = [NSDate date];
+    NSTimeInterval interval = [endDate timeIntervalSinceDate:startDate];
+    NSLog(@"[INFO][TIMING][POSING ROTATE] transform verticies:%zu translation verticies:%zu time %f", _transformed_verticies.size(), _transition_verticies.size(),interval);
     
     [self updateVertexPositionOnGPU_Set:_transformed_verticies];
     [self updateVertexNormOnGPU_Set:_transformed_verticies];
@@ -3173,6 +3236,10 @@ using namespace HMesh;
     }
     [self setModState:MODIFICATION_NONE];
     
+    [self saveState];
+    
+    NSDate* startDate = [NSDate date];
+    
     [self changeVerticiesColor_Set:_transformed_verticies toSelected:NO];
     
     _translation = translation;
@@ -3266,6 +3333,10 @@ using namespace HMesh;
     } else {
         NSLog(@"Low poly");
     }
+
+    NSDate* endDate = [NSDate date];
+    NSTimeInterval interval = [endDate timeIntervalSinceDate:startDate];
+    NSLog(@"[INFO][TIMING][POSING TRANSLATE] transform verticies:%zu time %f", _transformed_verticies.size(), interval);
     
     [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
 }

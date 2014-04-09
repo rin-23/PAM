@@ -29,6 +29,7 @@
     [super viewDidLoad];
 	// Do any additional setup after loading the view.
     self.navigationController.navigationBarHidden = YES;
+    self.preferredFramesPerSecond = 60;
 
     GLKView* view = [[GLKView alloc] initWithFrame:CGRectMake(0, 0, self.view.frame.size.width, self.view.frame.size.height)];
     view.multipleTouchEnabled = YES;

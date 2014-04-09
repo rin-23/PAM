@@ -21,7 +21,7 @@
     if (self) {
         self.translationMatrix = GLKMatrix4Identity;
         accumulatedTranslation = GLKMatrix4Identity;
-        _scaleFactor = 1.0;
+        _scaleFactor = 2.0;
     }
     return self;
 } 

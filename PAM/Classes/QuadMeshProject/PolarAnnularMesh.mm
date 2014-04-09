@@ -4083,7 +4083,7 @@ using namespace HMesh;
         
         [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
         
-        [self smoothVerticies:vertexToSmooth iter:20 isSpine:YES brushSize:boundaryRadius edgeInfo:_edgeInfo];
+        [self smoothVerticies:vertexToSmooth iter:5 isSpine:YES brushSize:boundaryRadius/2 edgeInfo:_edgeInfo];
         [self smoothVerticies:vertexToSmooth iter:2 isSpine:NO brushSize:boundaryRadius/2 edgeInfo:_edgeInfo];
     } else {
         VertexID poleVID = pole_from_hole(_manifold, boundaryW.halfedge());

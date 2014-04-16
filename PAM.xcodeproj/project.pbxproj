@@ -7,6 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1530BFE718F709740066F165 /* PAM.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1530BFDF18F709740066F165 /* PAM.obj */; };
+		1530BFE818F709740066F165 /* PAM2.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1530BFE018F709740066F165 /* PAM2.obj */; };
+		1530BFE918F709740066F165 /* PAM3.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1530BFE118F709740066F165 /* PAM3.obj */; };
+		1530BFEA18F709740066F165 /* PAM4.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1530BFE218F709740066F165 /* PAM4.obj */; };
+		1530BFEB18F709740066F165 /* PAM5.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1530BFE318F709740066F165 /* PAM5.obj */; };
+		1530BFEC18F709740066F165 /* PAM6.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1530BFE418F709740066F165 /* PAM6.obj */; };
+		1530BFED18F709740066F165 /* PAM7.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1530BFE518F709740066F165 /* PAM7.obj */; };
+		1530BFEE18F709740066F165 /* PAM8.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1530BFE618F709740066F165 /* PAM8.obj */; };
 		153B4E3618206CC200962DB2 /* PlateStartPoint.m in Sources */ = {isa = PBXBuildFile; fileRef = 153B4E0A18206CC100962DB2 /* PlateStartPoint.m */; };
 		153B4E3718206CC200962DB2 /* AGLKContext.m in Sources */ = {isa = PBXBuildFile; fileRef = 153B4E0E18206CC100962DB2 /* AGLKContext.m */; };
 		153B4E3818206CC200962DB2 /* AGLKVertexAttribArrayBuffer.m in Sources */ = {isa = PBXBuildFile; fileRef = 153B4E1018206CC100962DB2 /* AGLKVertexAttribArrayBuffer.m */; };
@@ -27,6 +35,7 @@
 		153B4E5818206CF400962DB2 /* PointCloudRGBAShader.vsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E3318206CC200962DB2 /* PointCloudRGBAShader.vsh */; };
 		153B4E5918206CF400962DB2 /* TextureShader.fsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E3418206CC200962DB2 /* TextureShader.fsh */; };
 		153B4E5A18206CF400962DB2 /* TextureShader.vsh in Resources */ = {isa = PBXBuildFile; fileRef = 153B4E3518206CC200962DB2 /* TextureShader.vsh */; };
+		1547918618F5DE2A008F2C21 /* PAMPinchGestureRecognizer.m in Sources */ = {isa = PBXBuildFile; fileRef = 1547918518F5DE2A008F2C21 /* PAMPinchGestureRecognizer.m */; };
 		1551ED6E18348F7F00855993 /* Line.m in Sources */ = {isa = PBXBuildFile; fileRef = 1551ED6D18348F7F00855993 /* Line.m */; };
 		1553C239183EFFB300839072 /* simpleshader.vsh in Resources */ = {isa = PBXBuildFile; fileRef = 1553C232183EFF9300839072 /* simpleshader.vsh */; };
 		1553C23A183EFFB300839072 /* simpleshader.fsh in Resources */ = {isa = PBXBuildFile; fileRef = 1553C237183EFF9B00839072 /* simpleshader.fsh */; };
@@ -58,6 +67,7 @@
 		15646615182033920000B985 /* QuadMeshViewController.mm in Sources */ = {isa = PBXBuildFile; fileRef = 15646609182033920000B985 /* QuadMeshViewController.mm */; };
 		15646617182033920000B985 /* WireFrame.m in Sources */ = {isa = PBXBuildFile; fileRef = 1564660D182033920000B985 /* WireFrame.m */; };
 		158D8BB51841765C00FA8AFB /* sphere_mid_res.obj in Resources */ = {isa = PBXBuildFile; fileRef = 158D8BB41841765C00FA8AFB /* sphere_mid_res.obj */; };
+		15B245EB18FF0D150083800F /* PAMTapGestureRecongnizer.m in Sources */ = {isa = PBXBuildFile; fileRef = 15B245EA18FF0D150083800F /* PAMTapGestureRecongnizer.m */; };
 		15BB316E186ABC6D001EE9E9 /* SettingsViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 15BB316D186ABC6D001EE9E9 /* SettingsViewController.m */; };
 		15BB3172186ABF1B001EE9E9 /* SettingsManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 15BB3171186ABF1B001EE9E9 /* SettingsManager.m */; };
 		15BB3176186E5AFC001EE9E9 /* PAMPanGestureRecognizer.m in Sources */ = {isa = PBXBuildFile; fileRef = 15BB3175186E5AFC001EE9E9 /* PAMPanGestureRecognizer.m */; };
@@ -118,6 +128,14 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		1530BFDF18F709740066F165 /* PAM.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = PAM.obj; sourceTree = "<group>"; };
+		1530BFE018F709740066F165 /* PAM2.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = PAM2.obj; sourceTree = "<group>"; };
+		1530BFE118F709740066F165 /* PAM3.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = PAM3.obj; sourceTree = "<group>"; };
+		1530BFE218F709740066F165 /* PAM4.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = PAM4.obj; sourceTree = "<group>"; };
+		1530BFE318F709740066F165 /* PAM5.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = PAM5.obj; sourceTree = "<group>"; };
+		1530BFE418F709740066F165 /* PAM6.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = PAM6.obj; sourceTree = "<group>"; };
+		1530BFE518F709740066F165 /* PAM7.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = PAM7.obj; sourceTree = "<group>"; };
+		1530BFE618F709740066F165 /* PAM8.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = PAM8.obj; sourceTree = "<group>"; };
 		153B4E0918206CC100962DB2 /* PlateStartPoint.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PlateStartPoint.h; sourceTree = "<group>"; };
 		153B4E0A18206CC100962DB2 /* PlateStartPoint.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PlateStartPoint.m; sourceTree = "<group>"; };
 		153B4E0D18206CC100962DB2 /* AGLKContext.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AGLKContext.h; sourceTree = "<group>"; };
@@ -151,6 +169,8 @@
 		153B4E3318206CC200962DB2 /* PointCloudRGBAShader.vsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = PointCloudRGBAShader.vsh; sourceTree = "<group>"; };
 		153B4E3418206CC200962DB2 /* TextureShader.fsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = TextureShader.fsh; sourceTree = "<group>"; };
 		153B4E3518206CC200962DB2 /* TextureShader.vsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = TextureShader.vsh; sourceTree = "<group>"; };
+		1547918418F5DE2A008F2C21 /* PAMPinchGestureRecognizer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PAMPinchGestureRecognizer.h; sourceTree = "<group>"; };
+		1547918518F5DE2A008F2C21 /* PAMPinchGestureRecognizer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PAMPinchGestureRecognizer.m; sourceTree = "<group>"; };
 		1551ED6C18348F7F00855993 /* Line.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Line.h; sourceTree = "<group>"; };
 		1551ED6D18348F7F00855993 /* Line.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = Line.m; sourceTree = "<group>"; };
 		1553C232183EFF9300839072 /* simpleshader.vsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; path = simpleshader.vsh; sourceTree = "<group>"; };
@@ -193,6 +213,8 @@
 		1564660C182033920000B985 /* WireFrame.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WireFrame.h; sourceTree = "<group>"; };
 		1564660D182033920000B985 /* WireFrame.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WireFrame.m; sourceTree = "<group>"; };
 		158D8BB41841765C00FA8AFB /* sphere_mid_res.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = sphere_mid_res.obj; sourceTree = "<group>"; };
+		15B245E918FF0D150083800F /* PAMTapGestureRecongnizer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = PAMTapGestureRecongnizer.h; path = "Gesture Recongnizers/PAMTapGestureRecongnizer.h"; sourceTree = "<group>"; };
+		15B245EA18FF0D150083800F /* PAMTapGestureRecongnizer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = PAMTapGestureRecongnizer.m; path = "Gesture Recongnizers/PAMTapGestureRecongnizer.m"; sourceTree = "<group>"; };
 		15BB316C186ABC6D001EE9E9 /* SettingsViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SettingsViewController.h; sourceTree = "<group>"; };
 		15BB316D186ABC6D001EE9E9 /* SettingsViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SettingsViewController.m; sourceTree = "<group>"; };
 		15BB3170186ABF1B001EE9E9 /* SettingsManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SettingsManager.h; sourceTree = "<group>"; };
@@ -446,6 +468,14 @@
 		15646602182033920000B985 /* ObjFiles */ = {
 			isa = PBXGroup;
 			children = (
+				1530BFDF18F709740066F165 /* PAM.obj */,
+				1530BFE018F709740066F165 /* PAM2.obj */,
+				1530BFE118F709740066F165 /* PAM3.obj */,
+				1530BFE218F709740066F165 /* PAM4.obj */,
+				1530BFE318F709740066F165 /* PAM5.obj */,
+				1530BFE418F709740066F165 /* PAM6.obj */,
+				1530BFE518F709740066F165 /* PAM7.obj */,
+				1530BFE618F709740066F165 /* PAM8.obj */,
 				1A92223718F5ABDA009FB464 /* PAM-scorpion-high-res.obj */,
 				1A04EE1718BBBB8900C1849F /* PAM-spider-mid-res.obj */,
 				1AF3EBB9188C5A8200AB0C09 /* man-polar150-simpl420-refit34_0.5-subd-refit10_0.5.obj */,
@@ -491,6 +521,10 @@
 			children = (
 				15BB3174186E5AFC001EE9E9 /* PAMPanGestureRecognizer.h */,
 				15BB3175186E5AFC001EE9E9 /* PAMPanGestureRecognizer.m */,
+				1547918418F5DE2A008F2C21 /* PAMPinchGestureRecognizer.h */,
+				1547918518F5DE2A008F2C21 /* PAMPinchGestureRecognizer.m */,
+				15B245E918FF0D150083800F /* PAMTapGestureRecongnizer.h */,
+				15B245EA18FF0D150083800F /* PAMTapGestureRecongnizer.m */,
 			);
 			name = "Gesture Recognizers";
 			sourceTree = "<group>";
@@ -624,16 +658,21 @@
 				155746931840052700401921 /* Shader.fsh in Resources */,
 				155746941840052700401921 /* Shader.vsh in Resources */,
 				1553C239183EFFB300839072 /* simpleshader.vsh in Resources */,
+				1530BFEA18F709740066F165 /* PAM4.obj in Resources */,
+				1530BFEB18F709740066F165 /* PAM5.obj in Resources */,
 				1AF3EBBA188C5A8200AB0C09 /* man-polar150-simpl420-refit34_0.5-subd-refit10_0.5.obj in Resources */,
 				1553C23A183EFFB300839072 /* simpleshader.fsh in Resources */,
 				153B4E4F18206CF400962DB2 /* DirectionalLight.fsh in Resources */,
+				1530BFE718F709740066F165 /* PAM.obj in Resources */,
 				153B4E5018206CF400962DB2 /* DirectionalLight.vsh in Resources */,
 				153B4E5318206CF400962DB2 /* DepthShader.fsh in Resources */,
 				153B4E5418206CF400962DB2 /* DepthShader.vsh in Resources */,
 				153B4E5718206CF400962DB2 /* PointCloudRGBAShader.fsh in Resources */,
 				153B4E5818206CF400962DB2 /* PointCloudRGBAShader.vsh in Resources */,
+				1530BFED18F709740066F165 /* PAM7.obj in Resources */,
 				153B4E5918206CF400962DB2 /* TextureShader.fsh in Resources */,
 				1A408F3E18357BAB0044E48E /* quad_sphere.obj in Resources */,
+				1530BFEE18F709740066F165 /* PAM8.obj in Resources */,
 				153B4E5A18206CF400962DB2 /* TextureShader.vsh in Resources */,
 				1ABD4F401885D684001FA009 /* polarized_from_075_100_refit_simpl_600.obj in Resources */,
 				15646613182033920000B985 /* newTEST.obj in Resources */,
@@ -642,9 +681,12 @@
 				1A408F4018357CAA0044E48E /* quad_sphere_high_res.obj in Resources */,
 				15646610182033920000B985 /* 3DFile.obj in Resources */,
 				15646611182033920000B985 /* mesh.obj in Resources */,
+				1530BFE918F709740066F165 /* PAM3.obj in Resources */,
+				1530BFEC18F709740066F165 /* PAM6.obj in Resources */,
 				15646614182033920000B985 /* teapot.obj in Resources */,
 				1A92223818F5ABDA009FB464 /* PAM-scorpion-high-res.obj in Resources */,
 				15646612182033920000B985 /* newPolars.obj in Resources */,
+				1530BFE818F709740066F165 /* PAM2.obj in Resources */,
 				1A04EE1818BBBB8900C1849F /* PAM-spider-mid-res.obj in Resources */,
 				156463FD1820266E0000B985 /* Images.xcassets in Resources */,
 				158D8BB51841765C00FA8AFB /* sphere_mid_res.obj in Resources */,
@@ -671,8 +713,10 @@
 				15BB316E186ABC6D001EE9E9 /* SettingsViewController.m in Sources */,
 				153B4E3D18206CC200962DB2 /* GyroRotationManager.m in Sources */,
 				153B4E3918206CC200962DB2 /* Mesh.m in Sources */,
+				1547918618F5DE2A008F2C21 /* PAMPinchGestureRecognizer.m in Sources */,
 				153B4E3C18206CC200962DB2 /* ShaderProgram.m in Sources */,
 				1A9438AD1832F3D40081F188 /* UITwoFingerHoldGestureRecognizer.m in Sources */,
+				15B245EB18FF0D150083800F /* PAMTapGestureRecongnizer.m in Sources */,
 				153B4E3818206CC200962DB2 /* AGLKVertexAttribArrayBuffer.m in Sources */,
 				153B4E4018206CC200962DB2 /* ZoomManager.m in Sources */,
 				153B4E3B18206CC200962DB2 /* PolygonMesh.m in Sources */,
@@ -828,7 +872,7 @@
 				INFOPLIST_FILE = "PAM/PAM-Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE = "";
+				PROVISIONING_PROFILE = "20D7F38B-838F-438B-95C9-982DC70C4233";
 				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/GEL-iOS/**";
 				WRAPPER_EXTENSION = app;
 			};
@@ -839,15 +883,15 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = LaunchImage;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				CODE_SIGN_IDENTITY = "iPhone Distribution";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "PAM/PAM-Prefix.pch";
 				INFOPLIST_FILE = "PAM/PAM-Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE = "";
+				PROVISIONING_PROFILE = "20D7F38B-838F-438B-95C9-982DC70C4233";
 				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/GEL-iOS/**";
 				WRAPPER_EXTENSION = app;
 			};

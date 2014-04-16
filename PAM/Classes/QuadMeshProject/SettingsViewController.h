@@ -11,6 +11,7 @@
 #import "SettingsManager.h"
 
 @protocol SettingsViewControllerDelegate <NSObject>
+-(void)globalSmoothing;
 -(void)showRibJunctions;
 -(void)showSkeleton:(BOOL)show;
 //-(void)transformModeIsOn:(BOOL)isOn;
@@ -30,6 +31,9 @@
 -(void)largeBranchWidth:(float)width;
 -(void)baseSmoothingIterations:(float)iter;
 
+//SMOOTHING
+-(void)tapSmoothing:(float)value;
+
 //SCULPTING
 -(void)scalingSculptTypeChanged:(ScultpScalingType)type;
 -(void)silhouetteScalingBrushSize:(float)width;
@@ -41,6 +45,7 @@
     UISwitch* _skeletonSwitch;
     UIButton* _clearModelBtn;
     UIButton* _resetBtn;
+    UIButton* _globalSmoothingBtn;
     UIButton* _showRibJunctionsBtn;
     UIButton* _loadArmadillo;
     UIButton* _subdivide;
@@ -54,6 +59,7 @@
     UISlider* _thinBranchWidth;
     UISlider* _mediumBranchWidth;
     UISlider* _largeBranchWidth;
+    UISlider* _tapSmoothing;
     
     //Sculpting
     UIButton* _circularScalingSculpt;

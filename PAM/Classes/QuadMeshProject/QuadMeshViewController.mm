@@ -18,6 +18,8 @@
 #include <vector>
 #import "SettingsManager.h"
 #import "PAMPanGestureRecognizer.h"
+#import "PAMPinchGestureRecognizer.h"
+#import "PAMTapGestureRecongnizer.h"
 
 typedef enum {
     TOUCHED_NONE,
@@ -63,9 +65,6 @@ typedef enum {
     //Auto backup
     NSTimer* _autoSave;
     UIAlertView* _restorSessionAlert;
-    
-
-    
 }
 @end
 
@@ -181,7 +180,7 @@ typedef enum {
     [view addGestureRecognizer:twoFingerTap];
     
     //Pinch To Zoom. Scaling along X,Y,Z
-    UIPinchGestureRecognizer* pinchToZoom = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(handlePinchGesture:)];
+    PAMPinchGestureRecognizer* pinchToZoom = [[PAMPinchGestureRecognizer alloc] initWithTarget:self action:@selector(handlePinchGesture:)];
     [view addGestureRecognizer:pinchToZoom];
     
 //    _twoFingerSwipeUpGesture = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(handleTwoFingerSwipeUpGesture:)];
@@ -223,7 +222,7 @@ typedef enum {
     [view addGestureRecognizer:oneFingerPanning];
     
     //Double tap to smooth
-    UITapGestureRecognizer* doubleTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleDoubleTapGesture:)];
+    PAMTapGestureRecongnizer* doubleTap = [[PAMTapGestureRecongnizer alloc] initWithTarget:self action:@selector(handleDoubleTapGesture:)];
     doubleTap.numberOfTouchesRequired = 1;
     doubleTap.numberOfTapsRequired = 2;
     [view addGestureRecognizer:doubleTap];
@@ -394,12 +393,18 @@ typedef enum {
 }
 
 -(void)handleDoubleTapGesture:(UIGestureRecognizer*)sender {
-    GLKVector3 modelCoord;
-    if (![self modelCoordinates:&modelCoord forGesture:sender]) {
-        NSLog(@"[WARNING] Touched background");
-        return;
-    }
-    [_pMesh smoothAtPoint:modelCoord];
+//    @synchronized(self) {
+        GLKVector3 modelCoord;
+        if (![self modelCoordinates:&modelCoord forGesture:sender]) {
+            NSLog(@"[WARNING] Touched background");
+            return;
+        }
+        int iter = [SettingsManager sharedInstance].tapSmoothing;
+        float wrong_radius = 3*[self touchSizeForGesture:sender];
+        float radius = 3*[self touchSizeForFingerSize:8.0f];
+
+        [_pMesh smoothAtPoint:modelCoord radius:radius iterations:iter];
+//    }
 }
 
 -(void)handleTwoFingeTapGesture:(UIGestureRecognizer*)sender {
@@ -441,8 +446,7 @@ typedef enum {
         if (_pMesh.modState == MODIFICATION_PIN_POINT_SET ||
             _pMesh.modState == MODIFICATION_BRANCH_SCALING)
         {
-            
-            UIPinchGestureRecognizer* pinch = (UIPinchGestureRecognizer*) sender;
+            PAMPinchGestureRecognizer* pinch = (PAMPinchGestureRecognizer*) sender;
             if (sender.state == UIGestureRecognizerStateBegan) {
                 GLKVector3 modelCoord;
                 if (![self modelCoordinates:&modelCoord forGesture:pinch]) {
@@ -455,13 +459,27 @@ typedef enum {
             } else if (sender.state == UIGestureRecognizerStateEnded) {
                 [_pMesh endScalingBranchTreeWithScale:pinch.scale];
             }
-        } else if (_pMesh.modState == MODIFICATION_NONE ||
-                   _pMesh.modState == MODIFICATION_SCULPTING_SCALING ||
-                   _pMesh.modState == MODIFICATION_SCULPTING_ANISOTROPIC_SCALING ||
-                   _pMesh.modState == MODIFICATION_SCULPTING_BUMP_CREATION)
+        }
+        else if (_pMesh.modState == MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE ||
+                 _pMesh.modState == MODIFICATION_BRANCH_CLONE_SCALING )
+        {
+            PAMPinchGestureRecognizer* pinch = (PAMPinchGestureRecognizer*) sender;
+            if (sender.state == UIGestureRecognizerStateBegan) {
+                [_pMesh startScaleClonedBranch:pinch.scale];
+            } else if (sender.state == UIGestureRecognizerStateChanged) {
+                [_pMesh continueScaleClonedBranch:pinch.scale];
+            } else if (sender.state == UIGestureRecognizerStateEnded) {
+                [_pMesh endScaleClonedBranch:pinch.scale];
+            }
+        }
+        
+        else if (_pMesh.modState == MODIFICATION_NONE ||
+                 _pMesh.modState == MODIFICATION_SCULPTING_SCALING ||
+                 _pMesh.modState == MODIFICATION_SCULPTING_ANISOTROPIC_SCALING ||
+                 _pMesh.modState == MODIFICATION_SCULPTING_BUMP_CREATION)
         {
             //sculpting
-            UIPinchGestureRecognizer* pinch = (UIPinchGestureRecognizer*) sender;
+            PAMPinchGestureRecognizer* pinch = (PAMPinchGestureRecognizer*) sender;
 //            NSLog(@"Scale %f", pinch.velocity);
             if (sender.state == UIGestureRecognizerStateBegan) {
                 CGPoint touchPoint1 = [self scaleTouchPoint:[sender locationOfTouch:0 inView:(GLKView*)sender.view]
@@ -473,6 +491,8 @@ typedef enum {
                 float depth1 = [self depthForPoint:touchPoint1 depthBuffer:pixelData];
                 float depth2 = [self depthForPoint:touchPoint2 depthBuffer:pixelData];
                 
+                float touchSize = 2 * [self touchSizeForGesture:sender];
+                
                 if (depth1 < 0 || depth2 < 0) {
                     //on of the fingers touched background. Start scaling.
                     if (depth1 < 0 && depth2 < 0) {
@@ -481,21 +501,21 @@ typedef enum {
                             NSLog(@"[WARNING] Couldn't determine touch area");
                             return;
                         }
-                        [_pMesh startScalingSingleRibWithTouchPoint:rayOrigin secondPointOnTheModel:NO scale:pinch.scale velocity:pinch.velocity];
-                    } else if ( depth1 < 0) {
+                        [_pMesh startScalingSingleRibWithTouchPoint:rayOrigin secondPointOnTheModel:NO scale:pinch.scale velocity:pinch.velocity touchSize:touchSize];
+                    } else if (depth1 < 0) {
                         GLKVector3 rayOrigin, rayDir;
                         if (![self rayOrigin:&rayOrigin rayDirection:&rayDir forTouchPoint:touchPoint1]) {
                             NSLog(@"[WARNING] Couldn't determine touch area");
                             return;
                         }
-                        [_pMesh startScalingSingleRibWithTouchPoint:rayOrigin secondPointOnTheModel:YES scale:pinch.scale velocity:pinch.velocity];
+                        [_pMesh startScalingSingleRibWithTouchPoint:rayOrigin secondPointOnTheModel:YES scale:pinch.scale velocity:pinch.velocity touchSize:touchSize];
                     } else {
                         GLKVector3 rayOrigin, rayDir;
                         if (![self rayOrigin:&rayOrigin rayDirection:&rayDir forTouchPoint:touchPoint2]) {
                             NSLog(@"[WARNING] Couldn't determine touch area");
                             return;
                         }
-                        [_pMesh startScalingSingleRibWithTouchPoint:rayOrigin secondPointOnTheModel:YES scale:pinch.scale velocity:pinch.velocity];
+                        [_pMesh startScalingSingleRibWithTouchPoint:rayOrigin secondPointOnTheModel:YES scale:pinch.scale velocity:pinch.velocity touchSize:touchSize];
                     }
                 } else if (depth1 >= 0 && depth2 >= 0) {
                     //touched the model so start bump creation
@@ -530,6 +550,7 @@ typedef enum {
                 }
             }
         }
+        
     }
 }
 
@@ -833,18 +854,18 @@ typedef enum {
             } else if (_pMesh.modState == MODIFICATION_NONE ||
                        _pMesh.modState == MODIFICATION_BRANCH_POSE_TRANSLATE)
             {
-                if (sender.state == UIGestureRecognizerStateBegan) {
-                    GLKVector3 modelCoord;
-                    if (![self modelCoordinates:&modelCoord forGesture:sender]) {
-                        NSLog(@"[WARNING] Touched background");
-                        return;
-                    }
-                    [_pMesh statePosingTranslateWithTouchPoint:modelCoord translation:translation];
-                } else if (sender.state == UIGestureRecognizerStateChanged) {
-                    [_pMesh continuePosingTranslate:translation];
-                } else if (sender.state == UIGestureRecognizerStateEnded) {
-                    [_pMesh endPosingTranslate:translation];
-                }
+//                if (sender.state == UIGestureRecognizerStateBegan) {
+//                    GLKVector3 modelCoord;
+//                    if (![self modelCoordinates:&modelCoord forGesture:sender]) {
+//                        NSLog(@"[WARNING] Touched background");
+//                        return;
+//                    }
+//                    [_pMesh statePosingTranslateWithTouchPoint:modelCoord translation:translation];
+//                } else if (sender.state == UIGestureRecognizerStateChanged) {
+//                    [_pMesh continuePosingTranslate:translation];
+//                } else if (sender.state == UIGestureRecognizerStateEnded) {
+//                    [_pMesh endPosingTranslate:translation];
+//                }
             }
         }
     }
@@ -901,7 +922,7 @@ typedef enum {
                 [_pMesh endRotateDetachedBranch:rotGesture.rotation];
             }
         } else if (_pMesh.modState == MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE ||
-                   _pMesh.modState == MODIFICATION_BRANCH_CLONE_ROTATION)
+                   _pMesh.modState == MODIFICATION_BRANCH_CLONE_ROTATION )
         {
             if (sender.state == UIGestureRecognizerStateBegan) {
                 [_pMesh startRotateClonedBranch:rotGesture.rotation];
@@ -930,16 +951,16 @@ typedef enum {
     }
 }
 
--(void)handleTwoFingerSwipeUpGesture:(UIGestureRecognizer*)sender {
-    if (_pMesh.modState == MODIFICATION_PIN_POINT_SET) {
-        GLKVector3 modelCoord;
-        if (![self modelCoordinates:&modelCoord forGesture:sender]) {
-            NSLog(@"[WARNING] Touched background");
-            return;
-        }
-        [_pMesh copyBranchToBuffer:modelCoord];
-    }
-}
+//-(void)handleTwoFingerSwipeUpGesture:(UIGestureRecognizer*)sender {
+//    if (_pMesh.modState == MODIFICATION_PIN_POINT_SET) {
+//        GLKVector3 modelCoord;
+//        if (![self modelCoordinates:&modelCoord forGesture:sender]) {
+//            NSLog(@"[WARNING] Touched background");
+//            return;
+//        }
+//        [_pMesh copyBranchToBuffer:modelCoord];
+//    }
+//}
 
 -(void)handleTwoFingerSwipeDownGesture:(UIGestureRecognizer*)sender {
     if (_pMesh.modState == MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE) {
@@ -1222,7 +1243,28 @@ typedef enum {
     return [self rayOrigin:rayOrigin rayDirection:rayDirection forTouchPoint:touchPoint];
 }
 
-#pragma mark - UIAlertView Delegate 
+-(float)touchSizeForGesture:(UIGestureRecognizer*)gesture {
+    if ([gesture respondsToSelector:@selector(touchSize)]) {
+        float touchSizeMM = [[gesture valueForKey:@"touchSize"] floatValue];
+        float touchSize = [self touchSizeForFingerSize:touchSizeMM];
+        return touchSize;
+    }
+    return 0;
+}
+
+-(float)touchSizeForFingerSize:(float)touchSizeMM {
+    const float mmToPx = 2048.0f/240.0f; //2048 px for 240 mm for retina display
+    float touchSizePx = touchSizeMM * mmToPx;
+    
+    GLKVector3 modelCoord, modelCoord2, rayDir, rayDir2;
+    [self rayOrigin:&modelCoord rayDirection:&rayDir forTouchPoint:CGPointMake(touchSizePx, 0)];
+    [self rayOrigin:&modelCoord2 rayDirection:&rayDir2 forTouchPoint:CGPointMake(0, 0)];
+    
+    float touchSize = GLKVector3Distance(modelCoord, modelCoord2);
+    return touchSize;
+}
+
+#pragma mark - UIAlertView Delegate
 - (void)alertView:(UIAlertView *)alertView clickedButtonAtIndex:(NSInteger)buttonIndex {
     if ([alertView.title isEqualToString:@"Undo?"]) {
         if (buttonIndex == 0) {
@@ -1262,9 +1304,11 @@ typedef enum {
             MFMailComposeViewController *picker = [[MFMailComposeViewController alloc] init];
             picker.mailComposeDelegate = self;
             [picker setSubject:@"PAM obj"];
+            [picker setToRecipients:@[@"rindopuz23@gmail.com"]];
             // Attach an image to the email
             NSData *myData = [NSData dataWithContentsOfFile:filePath];
             if (myData != nil) {
+
                 [picker addAttachmentData:myData mimeType:@"text/plain" fileName:@"PAM.obj"];
                 [self presentViewController:picker animated:YES completion:nil];
             } else {
@@ -1287,6 +1331,10 @@ typedef enum {
 
 -(void)showRibJunctions {
     [_pMesh showRibJunctions];
+}
+
+-(void)globalSmoothing {
+    [_pMesh globalSmoothing];
 }
 
 -(void)showSkeleton:(BOOL)show {
@@ -1339,6 +1387,11 @@ typedef enum {
 -(void)largeBranchWidth:(float)width {
     [SettingsManager sharedInstance].largeBranchWidth = width;
 }
+
+-(void)tapSmoothing:(float)power {
+    [SettingsManager sharedInstance].tapSmoothing = power;
+}
+
 
 -(void)spineSmoothing:(BOOL)spineSmoothin {
     [SettingsManager sharedInstance].spineSmoothing = spineSmoothin;

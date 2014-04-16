@@ -46,6 +46,11 @@ typedef CGLA::Vec3f Vecf;
 
 using namespace HMesh;
 
+//TODO: for debugging delete
+@interface PolarAnnularMesh() {
+    vector<VertexID> prevAffectedVerticies;
+}
+@end
 @interface PolarAnnularMesh() {
     HMesh::Manifold _manifold;
     HMesh::Manifold _skeletonMani;
@@ -130,6 +135,8 @@ using namespace HMesh;
     //Modification mode
     CurrentModification _prevMod;
 }
+
+
 
 @property (nonatomic) AGLKVertexAttribArrayBuffer* normalDataBuffer;
 @property (nonatomic) AGLKVertexAttribArrayBuffer* colorDataBuffer;
@@ -455,11 +462,13 @@ using namespace HMesh;
 }
 
 -(void)undo {
-    if (!_undoQueue.empty()) {
-    	_manifold = _undoQueue.back();
-        _undoQueue.pop_back();
-        [self deleteCurrentPinPoint];
-        [self rebufferWithCleanup:NO bufferData:YES edgeTrace:YES];
+    @synchronized(self) {
+        if (!_undoQueue.empty()) {
+            _manifold = _undoQueue.back();
+            _undoQueue.pop_back();
+            [self deleteCurrentPinPoint];
+            [self rebufferWithCleanup:NO bufferData:YES edgeTrace:YES];
+        }
     }
 }
 
@@ -487,6 +496,11 @@ using namespace HMesh;
     [self changeWireFrameColor:verticies toSelected:YES];
 }
 
+-(void)globalSmoothing {
+    laplacian_smooth(_manifold, 1.0, 2);
+    [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
+}
+
 -(BOOL)isLoaded; {
     return _manifold.no_vertices() != 0;
 }
@@ -499,6 +513,7 @@ using namespace HMesh;
 -(void)subdivide {
     polar_subdivide(_manifold, 1);
     [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
+    NSLog(@"Subdivided %zu", _manifold.no_vertices());
 }
 
 -(BOOL)saveAsObj:(NSString*)path {
@@ -511,7 +526,8 @@ using namespace HMesh;
         _modState == MODIFICATION_BRANCH_DETACHED_AN_MOVED ||
         _modState == MODIFICATION_BRANCH_DETACHED_ROTATE ||
         _modState == MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE ||
-        _modState == MODIFICATION_BRANCH_CLONE_ROTATION)
+        _modState == MODIFICATION_BRANCH_CLONE_ROTATION ||
+        _modState == MODIFICATION_BRANCH_CLONE_SCALING)
     {
         return NO;
     }
@@ -702,6 +718,63 @@ using namespace HMesh;
     }
 }
 
+//get all neighbouring points for the given verticies
+-(void)neighbours:(vector<VertexID>&)neighbours
+        forVertex:(VertexID)vID
+           weight:(vector<float>&)weights
+        brushSize:(float)brush_size
+{
+    HalfEdgeAttributeVector<EdgeInfo> edge_info(_manifold.allocated_halfedges());
+    
+
+        Vec originPos = _manifold.pos(vID);
+        queue<HalfEdgeID> hq;
+        edge_info.clear();
+    
+    
+
+        neighbours.push_back(vID);
+        weights.push_back(1.0);
+        circulate_vertex_ccw(_manifold, vID, [&](Walker w) {
+            neighbours.push_back(w.vertex());
+            weights.push_back(1.0);
+            edge_info[w.halfedge()] = EdgeInfo(SPINE, 0);
+            edge_info[w.opp().halfedge()] = EdgeInfo(SPINE, 0);
+            hq.push(w.opp().halfedge());
+        });
+        
+        while(!hq.empty())
+        {
+            HalfEdgeID h = hq.front();
+            Walker w = _manifold.walker(h);
+            hq.pop();
+            
+            for (;!w.full_circle(); w = w.circulate_vertex_ccw()) {
+                if(edge_info[w.halfedge()].edge_type == UNKNOWN)
+                {
+                    Vec pos = _manifold.pos(w.vertex());
+                    float d = (pos - originPos).length();
+                    if (d <= brush_size) {
+                        float d = (pos - originPos).length();
+                        float x = d/brush_size;
+                        float weight = pow(pow(x, 2) - 1, 2);
+                        
+                        weights.push_back(weight);
+                        neighbours.push_back(w.vertex());
+                        //                        neighbours.insert(w.opp().vertex());
+                        
+                        edge_info[w.halfedge()] = EdgeInfo(SPINE,0);
+                        edge_info[w.opp().halfedge()] = EdgeInfo(SPINE,0);
+                        
+                        hq.push(w.opp().halfedge());
+                    }
+                }
+            }
+        }
+    
+}
+
+
 //Smooth according to number of edges from the vertex
 -(void)smoothPole:(VertexID)vID edgeDepth:(int)depth iter:(int)iter {
     assert(is_pole(_manifold, vID));
@@ -752,29 +825,19 @@ using namespace HMesh;
 }
 
 //Smooth at a touch point
--(void)smoothAtPoint:(GLKVector3)touchPoint {
+-(void)smoothAtPoint:(GLKVector3)touchPoint radius:(float)radius iterations:(int)iter {
     VertexID closestPoint = [self closestVertexID_3D:touchPoint];
-    vector<VertexID> oneVID;
-    oneVID.push_back(closestPoint);
-    set<VertexID> affectedVerticies = [self smoothVerticies:oneVID iter:1 isSpine:NO brushSize:0.1 edgeInfo:_edgeInfo];
-    [self updateVertexPositionOnGPU_Set:affectedVerticies];
-    [self updateVertexNormOnGPU_Set:affectedVerticies];
-    
-//    if (is_pole(_manifold, closestPoint)) {
-//        Walker wBaseEnd = _manifold.walker(closestPoint);
-//        HalfEdgeID pole_rib = wBaseEnd.next().halfedge();
-//        float radius = rib_radius(_manifold, pole_rib, _edgeInfo);
-//        vector<HMesh::VertexID> verticiesToSmooth;
-//        for (Walker w = _manifold.walker(pole_rib); !w.full_circle(); w = w.next().opp().next()) {
-//            verticiesToSmooth.push_back(w.vertex());
-//        }
-//        verticiesToSmooth.push_back(closestPoint);
-//        set<VertexID> vSet = [self smoothVerticies:verticiesToSmooth iter:10 isSpine:YES brushSize:radius edgeInfo:_edgeInfo];
-//        [self changeVerticiesColor_Set:vSet toSelected:YES];
-//        [self changeVerticiesColor_Vector:verticiesToSmooth toColor:Vec4uc(0,0,255,255)];
-////        [self smoothVerticies:verticiesToSmooth iter:1 isSpine:NO brushSize:radius*0.7 edgeInfo:_edgeInfo];
-//
-//    }
+
+    vector<VertexID> affectedVerticies;
+    vector<float> weights;
+    [self neighbours:affectedVerticies forVertex:closestPoint weight:weights brushSize:radius];
+    laplacian_smooth_verticies(_manifold, affectedVerticies, weights, iter);
+
+    [self updateVertexPositionOnGPU_Vector:affectedVerticies];
+    [self updateVertexNormOnGPU_Vector:affectedVerticies];
+//    [self changeVerticiesColor_Vector:prevAffectedVerticies toSelected:NO];
+//    [self changeVerticiesColor_Vector:affectedVerticies toSelected:YES];
+    prevAffectedVerticies = affectedVerticies;
 }
 
 #pragma mark - SCULPTING BUMPS AND RINGS
@@ -817,7 +880,7 @@ using namespace HMesh;
     
     NSDate* endDate = [NSDate date];
     NSTimeInterval interval = [endDate timeIntervalSinceDate:startDate];
-    NSLog(@"[INFO][TIMING][BODY CREATION] verticies:%zu time %f", _bump_verticies.size(), interval);
+    NSLog(@"[INFO][TIMING][BUMP CREATION START] verticies:%zu time %f", _bump_verticies.size(), interval);
 }
 
 -(void)continueBumpCreationWithBrushDepth:(float)brushDepth
@@ -830,8 +893,6 @@ using namespace HMesh;
 {
     [self saveState];
     
-    NSDate* startDate = [NSDate date];
-    
     [self setModState:MODIFICATION_NONE];
     
     for (VertexID vid: _bump_verticies)
@@ -842,10 +903,6 @@ using namespace HMesh;
     
     [self updateVertexPositionOnGPU_Set:_bump_verticies];
     [self updateVertexNormOnGPU_Set:_bump_verticies];
-    
-    NSDate* endDate = [NSDate date];
-    NSTimeInterval interval = [endDate timeIntervalSinceDate:startDate];
-    NSLog(@"[INFO][TIMING][BUMP CREATION] updated verticies:%zu time %f", _bump_verticies.size(), interval);
 }
 
 //-(void)createBumpAtPoint:(vector<GLKVector3>)tPoints
@@ -916,10 +973,9 @@ using namespace HMesh;
                       secondPointOnTheModel:(BOOL)secondPointOnTheModel
                                       scale:(float)scale
                                    velocity:(float)velocity
+                                  touchSize:(float)touchSize
 {
-    if (![self isLoaded]) {
-        return;
-    }
+    NSDate* startDate = [NSDate date];
     
     VertexID vID;
     vID = [self closestVertexID_2D:touchPoint];
@@ -949,7 +1005,7 @@ using namespace HMesh;
     assert(upWalker.opp().vertex() == downWalker.opp().vertex());
     
     Vec origin = _manifold.pos(vID);
-    float brushSize = 0.1;
+    float brushSize = touchSize;
     vector<float> allDistances;
     vector<Vec> silhouette_Verticies;
     vector<VertexID> vector_vid;
@@ -1099,6 +1155,10 @@ using namespace HMesh;
     } else {
         [self setModState:MODIFICATION_SCULPTING_SCALING];
     }
+    
+    NSDate* endDate = [NSDate date];
+    NSTimeInterval interval = [endDate timeIntervalSinceDate:startDate];
+    NSLog(@"[INFO][TIMING][RIB SCALING CREATION START] verticies:%zu time %f", _sculpt_verticies_to_scale.size(), interval);
 }
 
 -(void)changeScalingSingleRibWithScaleFactor:(float)scale {
@@ -1113,10 +1173,10 @@ using namespace HMesh;
     [self saveState];
     NSDate* startDate = [NSDate date];
 
-    [self setModState:MODIFICATION_NONE];
-    vector<VertexID> allAffectedVerticies;
-    if (_modState == MODIFICATION_SCULPTING_SCALING) {
 
+    if (_modState == MODIFICATION_SCULPTING_SCALING) {
+        [self setModState:MODIFICATION_NONE];
+        vector<VertexID> allAffectedVerticies;
         for (int i = 0; i < _edges_to_scale.size(); i++) {
             vector<VertexID> affected = change_rib_radius(_manifold, _edges_to_scale[i], _centroids[i], _edgeInfo, 1 + (_scaleFactor - 1)*_scale_weight_vector[i]); //update _manifold
             allAffectedVerticies.insert(allAffectedVerticies.end(), affected.begin(), affected.end());
@@ -1129,6 +1189,9 @@ using namespace HMesh;
         [self updateVertexNormOnGPU_Vector:allAffectedVerticies];
         
     } else if (_modState == MODIFICATION_SCULPTING_ANISOTROPIC_SCALING) {
+        [self setModState:MODIFICATION_NONE];
+        vector<VertexID> allAffectedVerticies;
+
         for (int i = 0; i < _edges_to_scale.size(); i ++) {
             
             HalfEdgeID ribID = _edges_to_scale[i];
@@ -1148,9 +1211,9 @@ using namespace HMesh;
         [self updateVertexNormOnGPU_Vector:allAffectedVerticies];
     }
     
-    NSDate* endDate = [NSDate date];
-    NSTimeInterval interval = [endDate timeIntervalSinceDate:startDate];
-    NSLog(@"[INFO][TIMING][SCALING CREATION] updated verticies:%zu time %f", allAffectedVerticies.size(), interval);
+//    NSDate* endDate = [NSDate date];
+//    NSTimeInterval interval = [endDate timeIntervalSinceDate:startDate];
+//    NSLog(@"[INFO][TIMING][SCALING CREATION] updated verticies:%zu time %f", allAffectedVerticies.size(), interval);
    
 }
 
@@ -3417,6 +3480,9 @@ using namespace HMesh;
 #pragma mark - CLONING BRANCHES
 
 -(BOOL)newcopyBranchToBuffer:(GLKVector3)touchPoint {
+    
+    NSDate* startDate = [NSDate date];
+    
     if (_modState != MODIFICATION_PIN_POINT_SET) {
         NSLog(@"[WARNING][PolarAnnularMesh] Cant copy. Pin point is not chosen");
         return NO;
@@ -3492,7 +3558,6 @@ using namespace HMesh;
     }
     copyMani.cleanup();
     
-    
     _copyFaces.clear();
     _copyIndices.clear();
     _copyVerticies.clear();
@@ -3502,9 +3567,13 @@ using namespace HMesh;
     
     //    _pinPointLine = nil;
     _modState = MODIFICATION_BRANCH_COPIED_BRANCH_FOR_CLONING;
+    
+    NSDate* endDate = [NSDate date];
+    NSTimeInterval interval = [endDate timeIntervalSinceDate:startDate];
+    NSLog(@"[INFO][TIMING][COPIED verticies for cloning] verticies:%zu time %f", _original_verticies_copied.size(), interval);
+    
     return YES;
 }
-
 
 -(BOOL)copyBranchToBuffer:(GLKVector3)touchPoint {
     
@@ -3677,6 +3746,8 @@ using namespace HMesh;
 }
 
 -(BOOL)attachClonedBranch {
+    NSDate* startDate = [NSDate date];
+    
     if (_modState != MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE)
     {
         NSLog(@"[WARNING][PolarAnnularMesh] Cant attach. Havent cloned");
@@ -3711,6 +3782,10 @@ using namespace HMesh;
         [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
         [self smoothVerticies:verteciesToSmooth iter:10 isSpine:YES brushSize:0.1 edgeInfo:_edgeInfo];
     }
+    
+    NSDate* endDate = [NSDate date];
+    NSTimeInterval interval = [endDate timeIntervalSinceDate:startDate];
+    NSLog(@"[INFO][TIMING][CLONED BRANCH] time %f", interval);
     
     [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
     [self changeVerticiesColor_Set:_original_verticies_copied toColor:Vec4uc(250, 89, 14, 255)];
@@ -3756,6 +3831,49 @@ using namespace HMesh;
         p = q.apply(p);
         p += _zRotatePos;
         _manifold.pos(vid) = p;
+    }
+    [self setModState:MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE];
+}
+
+-(BOOL)startScaleClonedBranch:(float)scale {
+    if (_modState != MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE)
+    {
+        NSLog(@"[WARNING][PolarAnnularMesh] Cant rotate non cloned branch");
+        return NO;
+    }
+    
+    _scaleFactor = scale;
+    
+    Vec touchPos = _manifold.pos(_newClonedVertexID);
+
+    _centerOfRotation = GLKVector3Make(touchPos[0], touchPos[1], touchPos[2]);
+    _prevMod = _modState;
+    _current_rot_position = VertexAttributeVector<Vecf>(_manifold.no_vertices());
+    
+    [self setModState:MODIFICATION_BRANCH_CLONE_SCALING];
+    return YES;
+}
+
+-(void)continueScaleClonedBranch:(float)scale {
+    _scaleFactor = scale;
+}
+
+-(void)endScaleClonedBranch:(float)scale {
+    _scaleFactor = scale;
+    _modState = _prevMod;
+    
+    
+    GLKMatrix4 toOrigin = GLKMatrix4MakeTranslation(-_centerOfRotation.x, -_centerOfRotation.y, -_centerOfRotation.z);
+    GLKMatrix4 fromOrigin = GLKMatrix4MakeTranslation(_centerOfRotation.x, _centerOfRotation.y, _centerOfRotation.z);
+    GLKMatrix4 scaleMatrix = GLKMatrix4MakeScale(_scaleFactor, _scaleFactor, _scaleFactor);
+    GLKMatrix4 tMatrix = GLKMatrix4Multiply(GLKMatrix4Multiply(fromOrigin, scaleMatrix), toOrigin);
+    
+    for (VertexID vid: _cloned_verticies) {
+        Vec pos = _manifold.pos(vid);
+        GLKVector3 posGLK = GLKVector3Make(pos[0], pos[1], pos[2]);
+        GLKVector3 newPosGLK = [Utilities matrix4:tMatrix multiplyVector3:posGLK];
+        Vec newPos = Vec(newPosGLK.x, newPosGLK.y, newPosGLK.z);
+        _manifold.pos(vid) = newPos;
     }
     [self setModState:MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE];
 }
@@ -3892,7 +4010,7 @@ using namespace HMesh;
 #pragma mark - DELETING/REPOSITIONING BRANCH
 
 -(BOOL)newDetachBranch:(GLKVector3)touchPoint {
-    
+    NSDate* startDate = [NSDate date];
     if (_modState != MODIFICATION_PIN_POINT_SET) {
         NSLog(@"[WARNING][PolarAnnularMesh] Cant detach. Pin point is not chosen");
         return NO;
@@ -3967,7 +4085,11 @@ using namespace HMesh;
     _deleteBranchNumberOfBoundaryRibs = edgesToDelete.size();
     for (HalfEdgeID hID: edgesToDelete) {
         _manifold.remove_edge(hID);
-    }
+    } 
+    
+    NSDate* endDate = [NSDate date];
+    NSTimeInterval interval = [endDate timeIntervalSinceDate:startDate];
+    NSLog(@"[INFO][TIMING][DETACHING BRANCH] verticies:%zu time %f", _detached_verticies.size(), interval);
     
     [self rebufferWithCleanup:NO bufferData:YES edgeTrace:NO];
     [self changeVerticiesColor_Set:_detached_verticies toSelected:YES];
@@ -4133,6 +4255,7 @@ using namespace HMesh;
         return NO;
     }
     
+    NSDate* startDate = [NSDate date];
     //Delete verticies
     for (VertexID vID: _detached_verticies) {
         _manifold.remove_vertex(vID);
@@ -4154,13 +4277,18 @@ using namespace HMesh;
         
         [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
         
-        [self smoothVerticies:vertexToSmooth iter:5 isSpine:YES brushSize:boundaryRadius/2 edgeInfo:_edgeInfo];
-        [self smoothVerticies:vertexToSmooth iter:2 isSpine:NO brushSize:boundaryRadius/2 edgeInfo:_edgeInfo];
+        [self smoothVerticies:vertexToSmooth iter:1 isSpine:YES brushSize:boundaryRadius/3 edgeInfo:_edgeInfo];
+        [self smoothVerticies:vertexToSmooth iter:1 isSpine:NO brushSize:boundaryRadius/3 edgeInfo:_edgeInfo];
     } else {
         VertexID poleVID = pole_from_hole(_manifold, boundaryW.halfedge());
         [self rebufferWithCleanup:NO bufferData:NO edgeTrace:YES];
 //        [self smoothPole:poleVID edgeDepth:3 iter:2];
     }
+    
+    NSDate* endDate = [NSDate date];
+    NSTimeInterval interval = [endDate timeIntervalSinceDate:startDate];
+    NSLog(@"[INFO][TIMING][DELETING BRANCH] verticies:%zu time %f", _detached_verticies.size(), interval);
+    
     [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
     [self deleteCurrentPinPoint];
     
@@ -4169,6 +4297,8 @@ using namespace HMesh;
 
 -(BOOL)attachDetachedBranch
 {
+    
+    NSDate* startDate = [NSDate date];
     if (_modState != MODIFICATION_BRANCH_DETACHED &&
         _modState != MODIFICATION_BRANCH_DETACHED_AN_MOVED)
     {
@@ -4178,6 +4308,10 @@ using namespace HMesh;
     
     if (_modState == MODIFICATION_BRANCH_DETACHED) {
         [self stitchBranch:_deleteBodyUpperRibEdge toBody:_deleteBranchLowerRibEdge];
+        NSDate* endDate = [NSDate date];
+        NSTimeInterval interval = [endDate timeIntervalSinceDate:startDate];
+        NSLog(@"[INFO][TIMING][ATTACH BRANCH BACK]  time %f",  interval);
+        
         [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
     } else if (_modState == MODIFICATION_BRANCH_DETACHED_AN_MOVED) {
         Walker boundaryW = _manifold.walker(_deleteBodyUpperRibEdge);
@@ -4239,6 +4373,10 @@ using namespace HMesh;
         }
         //        verteciesToSmooth = verticies_along_the_rib(_manifold, deleteBranchUpperOppRibEdge, _edgeInfo);
         [self smoothVerticies:verteciesToSmooth iter:10 isSpine:YES brushSize:boundaryRadius edgeInfo:_edgeInfo];
+        
+        NSDate* endDate = [NSDate date];
+        NSTimeInterval interval = [endDate timeIntervalSinceDate:startDate];
+        NSLog(@"[INFO][TIMING][ATTACH BRANCH TO NEW PLACE]  time %f", interval);
         
         [self rebufferWithCleanup:YES bufferData:YES edgeTrace:YES];
     }
@@ -4867,7 +5005,32 @@ using namespace HMesh;
         
         glUnmapBufferOES(GL_ARRAY_BUFFER);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
-    } else if (_modState == MODIFICATION_BRANCH_POSE_ROTATE) {
+    } else if (_modState == MODIFICATION_BRANCH_CLONE_SCALING) {
+        GLKMatrix4 toOrigin = GLKMatrix4MakeTranslation(-_centerOfRotation.x, -_centerOfRotation.y, -_centerOfRotation.z);
+        GLKMatrix4 fromOrigin = GLKMatrix4MakeTranslation(_centerOfRotation.x, _centerOfRotation.y, _centerOfRotation.z);
+        GLKMatrix4 scaleMatrix = GLKMatrix4MakeScale(_scaleFactor, _scaleFactor, _scaleFactor);
+        GLKMatrix4 tMatrix = GLKMatrix4Multiply(GLKMatrix4Multiply(fromOrigin, scaleMatrix), toOrigin);
+        
+        for (VertexID vid: _cloned_verticies) {
+            Vec pos = _manifold.pos(vid);
+            GLKVector3 posGLK = GLKVector3Make(pos[0], pos[1], pos[2]);
+            GLKVector3 newPosGLK = [Utilities matrix4:tMatrix multiplyVector3:posGLK];
+            Vec newPos = Vec(newPosGLK.x, newPosGLK.y, newPosGLK.z);
+            _current_rot_position[vid] = Vecf(newPos);
+        }
+        [self.vertexDataBuffer bind];
+        
+        unsigned char* temp = (unsigned char*) glMapBufferOES(GL_ARRAY_BUFFER, GL_WRITE_ONLY_OES);
+        for (VertexID vid: _cloned_verticies) {
+            Vecf pos = _current_rot_position[vid];
+            int index = vid.index;
+            memcpy(temp + index*VERTEX_SIZE, pos.get(), VERTEX_SIZE);
+        }
+        
+        glUnmapBufferOES(GL_ARRAY_BUFFER);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+    }
+    else if (_modState == MODIFICATION_BRANCH_POSE_ROTATE) {
         GLKVector3 zAxis = GLKMatrix4MultiplyVector3(GLKMatrix4Invert(self.viewMatrix, NULL), GLKVector3Make(0, 0, -1));
         GLKMatrix4 toOrigin = GLKMatrix4MakeTranslation(-_centerOfRotation.x, -_centerOfRotation.y, -_centerOfRotation.z);
         GLKMatrix4 rotMatrix = GLKMatrix4MakeRotation(_rotAngle, zAxis.x, zAxis.y, zAxis.z);

@@ -78,7 +78,16 @@
     [_showRibJunctionsBtn setFrame:CGRectMake(15, nextY + 10, 200, 30)];
     [contentView addSubview:_showRibJunctionsBtn];
     
+    
     nextY = CGRectGetMaxY(_showRibJunctionsBtn.frame);
+    _globalSmoothingBtn = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+    [_globalSmoothingBtn setContentHorizontalAlignment:UIControlContentHorizontalAlignmentLeft];
+    [_globalSmoothingBtn setTitle:@"Global Smoothing" forState:UIControlStateNormal];
+    [_globalSmoothingBtn addTarget:self action:@selector(globalSmoothing:) forControlEvents:UIControlEventTouchUpInside];
+    [_globalSmoothingBtn setFrame:CGRectMake(15, nextY + 10, 200, 30)];
+    [contentView addSubview:_globalSmoothingBtn];
+    
+    nextY = CGRectGetMaxY(_globalSmoothingBtn.frame);
     _loadArmadillo = [UIButton buttonWithType:UIButtonTypeRoundedRect];
     [_loadArmadillo setContentHorizontalAlignment:UIControlContentHorizontalAlignmentLeft];
     [_loadArmadillo setTitle:@"Load Armadillo" forState:UIControlStateNormal];
@@ -208,12 +217,29 @@
     [_largeBranchWidth setFrame:CGRectMake(15, nextY + 10, 200, 30)];
     [contentView addSubview:_largeBranchWidth];
     
+    /*
+     * TAP SMOOTHING
+     */
+    
+    nextY = CGRectGetMaxY(_largeBranchWidth.frame);
+    UILabel* tapSmoothingLabel = [[UILabel alloc] initWithFrame:CGRectMake(15, nextY + 10, 300, 30)];
+    [tapSmoothingLabel setText:@"Tap Smoothing"];
+    tapSmoothingLabel.adjustsFontSizeToFitWidth = YES;
+    [contentView addSubview:tapSmoothingLabel];
+    
+    nextY = CGRectGetMaxY(tapSmoothingLabel.frame);
+    _tapSmoothing = [[UISlider alloc] init];
+    _tapSmoothing.minimumValue = 1;
+    _tapSmoothing.maximumValue = 8;
+    [_tapSmoothing addTarget:self action:@selector(tapSmoothing:) forControlEvents:UIControlEventValueChanged];
+    [_tapSmoothing setFrame:CGRectMake(15, nextY + 10, 200, 30)];
+    [contentView addSubview:_tapSmoothing];
     
     /*
      * SCULPTING
      */
     
-    nextY = CGRectGetMaxY(_largeBranchWidth.frame);
+    nextY = CGRectGetMaxY(_tapSmoothing.frame);
     UILabel* suclptingHeader = [[UILabel alloc] initWithFrame:CGRectMake(15, nextY + 10, 300, 30)];
     [suclptingHeader setText:@"SCULPTING SETTINGS"];
     suclptingHeader.font = [UIFont boldSystemFontOfSize:15.0f];
@@ -273,6 +299,7 @@
     _thinBranchWidth.value = [SettingsManager sharedInstance].thinBranchWidth;
     _mediumBranchWidth.value = [SettingsManager sharedInstance].mediumBranchWidth;
     _largeBranchWidth.value = [SettingsManager sharedInstance].largeBranchWidth;
+    _tapSmoothing.value = [SettingsManager sharedInstance].tapSmoothing;
     _baseSmoothingIterationsSlider.value = [SettingsManager sharedInstance].baseSmoothingIterations;
     [_spineSmoothing setOn:[SettingsManager sharedInstance].spineSmoothing];
     [_poleSmoothing setOn:[SettingsManager sharedInstance].poleSmoothing];
@@ -305,6 +332,9 @@
     [self.delegate showRibJunctions];
 }
 
+-(void)globalSmoothing:(UIControl*)sender {
+    [self.delegate globalSmoothing];
+}
 -(void)loadArmadillo:(UIControl*)sender {
     [self.delegate loadArmadillo];
 }
@@ -350,7 +380,10 @@
     UISlider* slider = (UISlider*)sender;
     [self.delegate largeBranchWidth:slider.value];
 }
-
+-(void)tapSmoothing:(UIControl*)sender {
+    UISlider* slider = (UISlider*)sender;
+    [self.delegate tapSmoothing:slider.value];
+}
 -(void)dismissButtonClicked:(UIControl*)sender {
     [self.delegate dismiss];
 }

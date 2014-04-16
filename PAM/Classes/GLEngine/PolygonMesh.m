@@ -64,7 +64,7 @@
     [AGLKVertexAttribArrayBuffer drawPreparedArraysWithMode:GL_TRIANGLES
                                            startVertexIndex:0
                                            numberOfVertices:self.numVertices];
-}
+} 
 
 -(void)drawToDepthBuffer {
     if (self.depthShaderProgram == nil) {

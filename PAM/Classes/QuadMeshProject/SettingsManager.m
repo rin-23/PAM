@@ -26,6 +26,7 @@ static SettingsManager* instance = nil;
         _poleSmoothing = YES;
         _sculptScalingType = SilhouetteScaling;
         _silhouetteScalingBrushSize = 90;
+        _tapSmoothing = 1;
     }
     return self;
 }

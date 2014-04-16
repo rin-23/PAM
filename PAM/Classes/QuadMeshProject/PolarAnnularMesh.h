@@ -28,6 +28,7 @@ typedef enum {
     MODIFICATION_BRANCH_COPIED_BRANCH_FOR_CLONING,
     MODIFICATION_BRANCH_COPIED_AND_MOVED_THE_CLONE,
     MODIFICATION_BRANCH_CLONE_ROTATION,
+    MODIFICATION_BRANCH_CLONE_SCALING,
     
     MODIFICATION_BRANCH_POSE_ROTATE,
     MODIFICATION_BRANCH_POSE_TRANSLATE
@@ -85,7 +86,8 @@ typedef enum {
 -(void)startScalingSingleRibWithTouchPoint:(GLKVector3)touchPoint
                       secondPointOnTheModel:(BOOL)secondPointOnTheModel
                                       scale:(float)scale
-                                   velocity:(float)velocity;
+                                  velocity:(float)velocity
+                                 touchSize:(float)touchSize;
 
 -(void)changeScalingSingleRibWithScaleFactor:(float)scale;
 -(void)endScalingSingleRibWithScaleFactor:(float)scale;
@@ -121,7 +123,7 @@ typedef enum {
 -(void)endPosingTranslate:(GLKVector3)translation;
 
 #pragma mark - SMOOTHING
--(void)smoothAtPoint:(GLKVector3)touchPoint;
+-(void)smoothAtPoint:(GLKVector3)touchPoint radius:(float)radius iterations:(int)iter;
 
 #pragma mark - DELETING/REPOSITIONING BRANCH
 /*
@@ -155,6 +157,11 @@ typedef enum {
 -(void)continueRotateDetachedBranch:(float)angle;
 -(void)endRotateDetachedBranch:(float)angle;
 
+
+-(BOOL)startScaleClonedBranch:(float)scale;
+-(void)continueScaleClonedBranch:(float)scale;
+-(void)endScaleClonedBranch:(float)scale;
+
 #pragma mark - CLONING
 -(BOOL)copyBranchToBuffer:(GLKVector3)touchPoint;
 -(BOOL)cloneBranchTo:(GLKVector3)touchPoint;
@@ -169,6 +176,7 @@ typedef enum {
 -(void)undo;
 -(void)showSkeleton:(BOOL)show;
 -(void)showRibJunctions;
+-(void)globalSmoothing;
 -(BOOL)isLoaded;
 -(void)subdivide;
 -(BOOL)saveAsObj:(NSString*)filePath;

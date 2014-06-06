@@ -71,6 +71,17 @@
 		15BB316E186ABC6D001EE9E9 /* SettingsViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 15BB316D186ABC6D001EE9E9 /* SettingsViewController.m */; };
 		15BB3172186ABF1B001EE9E9 /* SettingsManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 15BB3171186ABF1B001EE9E9 /* SettingsManager.m */; };
 		15BB3176186E5AFC001EE9E9 /* PAMPanGestureRecognizer.m in Sources */ = {isa = PBXBuildFile; fileRef = 15BB3175186E5AFC001EE9E9 /* PAMPanGestureRecognizer.m */; };
+		15C3253D19001D2100D4AF0E /* HAND PAM 6.obj in Resources */ = {isa = PBXBuildFile; fileRef = 15C3253319001D2100D4AF0E /* HAND PAM 6.obj */; };
+		15C3253E19001D2100D4AF0E /* HAND PAM 7.obj in Resources */ = {isa = PBXBuildFile; fileRef = 15C3253419001D2100D4AF0E /* HAND PAM 7.obj */; };
+		15C3253F19001D2100D4AF0E /* HAND PAM 8.obj in Resources */ = {isa = PBXBuildFile; fileRef = 15C3253519001D2100D4AF0E /* HAND PAM 8.obj */; };
+		15C3254019001D2100D4AF0E /* HAND PAM 9.obj in Resources */ = {isa = PBXBuildFile; fileRef = 15C3253619001D2100D4AF0E /* HAND PAM 9.obj */; };
+		15C3254119001D2100D4AF0E /* HAND PAM 10.obj in Resources */ = {isa = PBXBuildFile; fileRef = 15C3253719001D2100D4AF0E /* HAND PAM 10.obj */; };
+		15C3254219001D2100D4AF0E /* HAND PAM 11.obj in Resources */ = {isa = PBXBuildFile; fileRef = 15C3253819001D2100D4AF0E /* HAND PAM 11.obj */; };
+		15C3254319001D2100D4AF0E /* HAND PAM 12.obj in Resources */ = {isa = PBXBuildFile; fileRef = 15C3253919001D2100D4AF0E /* HAND PAM 12.obj */; };
+		15C3254419001D2100D4AF0E /* HAND PAM 13.obj in Resources */ = {isa = PBXBuildFile; fileRef = 15C3253A19001D2100D4AF0E /* HAND PAM 13.obj */; };
+		15C3254519001D2100D4AF0E /* HAND PAM 14.obj in Resources */ = {isa = PBXBuildFile; fileRef = 15C3253B19001D2100D4AF0E /* HAND PAM 14.obj */; };
+		15C3254619001D2100D4AF0E /* HAND PAM 15.obj in Resources */ = {isa = PBXBuildFile; fileRef = 15C3253C19001D2100D4AF0E /* HAND PAM 15.obj */; };
+		15EC82301902F5950005F8AC /* sculpted_arma.obj in Resources */ = {isa = PBXBuildFile; fileRef = 15EC822F1902F5950005F8AC /* sculpted_arma.obj */; };
 		1A04EE1818BBBB8900C1849F /* PAM-spider-mid-res.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1A04EE1718BBBB8900C1849F /* PAM-spider-mid-res.obj */; };
 		1A408F3918357A8D0044E48E /* sphere.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1A408F3818357A8D0044E48E /* sphere.obj */; };
 		1A408F3E18357BAB0044E48E /* quad_sphere.obj in Resources */ = {isa = PBXBuildFile; fileRef = 1A408F3D18357BAB0044E48E /* quad_sphere.obj */; };
@@ -221,6 +232,17 @@
 		15BB3171186ABF1B001EE9E9 /* SettingsManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SettingsManager.m; sourceTree = "<group>"; };
 		15BB3174186E5AFC001EE9E9 /* PAMPanGestureRecognizer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = PAMPanGestureRecognizer.h; path = "Gesture Recongnizers/PAMPanGestureRecognizer.h"; sourceTree = "<group>"; };
 		15BB3175186E5AFC001EE9E9 /* PAMPanGestureRecognizer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = PAMPanGestureRecognizer.m; path = "Gesture Recongnizers/PAMPanGestureRecognizer.m"; sourceTree = "<group>"; };
+		15C3253319001D2100D4AF0E /* HAND PAM 6.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "HAND PAM 6.obj"; sourceTree = "<group>"; };
+		15C3253419001D2100D4AF0E /* HAND PAM 7.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "HAND PAM 7.obj"; sourceTree = "<group>"; };
+		15C3253519001D2100D4AF0E /* HAND PAM 8.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "HAND PAM 8.obj"; sourceTree = "<group>"; };
+		15C3253619001D2100D4AF0E /* HAND PAM 9.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "HAND PAM 9.obj"; sourceTree = "<group>"; };
+		15C3253719001D2100D4AF0E /* HAND PAM 10.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "HAND PAM 10.obj"; sourceTree = "<group>"; };
+		15C3253819001D2100D4AF0E /* HAND PAM 11.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "HAND PAM 11.obj"; sourceTree = "<group>"; };
+		15C3253919001D2100D4AF0E /* HAND PAM 12.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "HAND PAM 12.obj"; sourceTree = "<group>"; };
+		15C3253A19001D2100D4AF0E /* HAND PAM 13.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "HAND PAM 13.obj"; sourceTree = "<group>"; };
+		15C3253B19001D2100D4AF0E /* HAND PAM 14.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "HAND PAM 14.obj"; sourceTree = "<group>"; };
+		15C3253C19001D2100D4AF0E /* HAND PAM 15.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "HAND PAM 15.obj"; sourceTree = "<group>"; };
+		15EC822F1902F5950005F8AC /* sculpted_arma.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = sculpted_arma.obj; sourceTree = "<group>"; };
 		1A04EE1718BBBB8900C1849F /* PAM-spider-mid-res.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "PAM-spider-mid-res.obj"; sourceTree = "<group>"; };
 		1A408F3818357A8D0044E48E /* sphere.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = sphere.obj; sourceTree = "<group>"; };
 		1A408F3D18357BAB0044E48E /* quad_sphere.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = quad_sphere.obj; sourceTree = "<group>"; };
@@ -468,6 +490,8 @@
 		15646602182033920000B985 /* ObjFiles */ = {
 			isa = PBXGroup;
 			children = (
+				15EC822F1902F5950005F8AC /* sculpted_arma.obj */,
+				15C3252F19001D1400D4AF0E /* Hand */,
 				1530BFDF18F709740066F165 /* PAM.obj */,
 				1530BFE018F709740066F165 /* PAM2.obj */,
 				1530BFE118F709740066F165 /* PAM3.obj */,
@@ -527,6 +551,23 @@
 				15B245EA18FF0D150083800F /* PAMTapGestureRecongnizer.m */,
 			);
 			name = "Gesture Recognizers";
+			sourceTree = "<group>";
+		};
+		15C3252F19001D1400D4AF0E /* Hand */ = {
+			isa = PBXGroup;
+			children = (
+				15C3253319001D2100D4AF0E /* HAND PAM 6.obj */,
+				15C3253419001D2100D4AF0E /* HAND PAM 7.obj */,
+				15C3253519001D2100D4AF0E /* HAND PAM 8.obj */,
+				15C3253619001D2100D4AF0E /* HAND PAM 9.obj */,
+				15C3253719001D2100D4AF0E /* HAND PAM 10.obj */,
+				15C3253819001D2100D4AF0E /* HAND PAM 11.obj */,
+				15C3253919001D2100D4AF0E /* HAND PAM 12.obj */,
+				15C3253A19001D2100D4AF0E /* HAND PAM 13.obj */,
+				15C3253B19001D2100D4AF0E /* HAND PAM 14.obj */,
+				15C3253C19001D2100D4AF0E /* HAND PAM 15.obj */,
+			);
+			name = Hand;
 			sourceTree = "<group>";
 		};
 		1A9438AA1832F39F0081F188 /* Helpers */ = {
@@ -661,9 +702,12 @@
 				1530BFEA18F709740066F165 /* PAM4.obj in Resources */,
 				1530BFEB18F709740066F165 /* PAM5.obj in Resources */,
 				1AF3EBBA188C5A8200AB0C09 /* man-polar150-simpl420-refit34_0.5-subd-refit10_0.5.obj in Resources */,
+				15C3254519001D2100D4AF0E /* HAND PAM 14.obj in Resources */,
+				15C3254019001D2100D4AF0E /* HAND PAM 9.obj in Resources */,
 				1553C23A183EFFB300839072 /* simpleshader.fsh in Resources */,
 				153B4E4F18206CF400962DB2 /* DirectionalLight.fsh in Resources */,
 				1530BFE718F709740066F165 /* PAM.obj in Resources */,
+				15C3254119001D2100D4AF0E /* HAND PAM 10.obj in Resources */,
 				153B4E5018206CF400962DB2 /* DirectionalLight.vsh in Resources */,
 				153B4E5318206CF400962DB2 /* DepthShader.fsh in Resources */,
 				153B4E5418206CF400962DB2 /* DepthShader.vsh in Resources */,
@@ -672,9 +716,12 @@
 				1530BFED18F709740066F165 /* PAM7.obj in Resources */,
 				153B4E5918206CF400962DB2 /* TextureShader.fsh in Resources */,
 				1A408F3E18357BAB0044E48E /* quad_sphere.obj in Resources */,
+				15C3253E19001D2100D4AF0E /* HAND PAM 7.obj in Resources */,
 				1530BFEE18F709740066F165 /* PAM8.obj in Resources */,
+				15C3253D19001D2100D4AF0E /* HAND PAM 6.obj in Resources */,
 				153B4E5A18206CF400962DB2 /* TextureShader.vsh in Resources */,
 				1ABD4F401885D684001FA009 /* polarized_from_075_100_refit_simpl_600.obj in Resources */,
+				15C3254619001D2100D4AF0E /* HAND PAM 15.obj in Resources */,
 				15646613182033920000B985 /* newTEST.obj in Resources */,
 				156463F51820266E0000B985 /* InfoPlist.strings in Resources */,
 				1A408F3918357A8D0044E48E /* sphere.obj in Resources */,
@@ -685,10 +732,15 @@
 				1530BFEC18F709740066F165 /* PAM6.obj in Resources */,
 				15646614182033920000B985 /* teapot.obj in Resources */,
 				1A92223818F5ABDA009FB464 /* PAM-scorpion-high-res.obj in Resources */,
+				15C3254319001D2100D4AF0E /* HAND PAM 12.obj in Resources */,
+				15C3254419001D2100D4AF0E /* HAND PAM 13.obj in Resources */,
+				15EC82301902F5950005F8AC /* sculpted_arma.obj in Resources */,
 				15646612182033920000B985 /* newPolars.obj in Resources */,
+				15C3254219001D2100D4AF0E /* HAND PAM 11.obj in Resources */,
 				1530BFE818F709740066F165 /* PAM2.obj in Resources */,
 				1A04EE1818BBBB8900C1849F /* PAM-spider-mid-res.obj in Resources */,
 				156463FD1820266E0000B985 /* Images.xcassets in Resources */,
+				15C3253F19001D2100D4AF0E /* HAND PAM 8.obj in Resources */,
 				158D8BB51841765C00FA8AFB /* sphere_mid_res.obj in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

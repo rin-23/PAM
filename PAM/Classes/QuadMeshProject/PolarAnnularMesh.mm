@@ -4017,11 +4017,11 @@ using namespace HMesh;
     }
 
     number_rib_edges(_manifold, _edgeInfo);
-    if (_edgeInfo[_pinHalfEdgeID].edge_type == RIB_JUNCTION) {
-        NSLog(@"Can't detach at a branch junction");
-        [self.delegate displayHint:@"Can't detach at a branch junction"];
-        return NO;
-    }
+//    if (_edgeInfo[_pinHalfEdgeID].edge_type == RIB_JUNCTION) {
+//        NSLog(@"Can't detach at a branch junction");
+//        [self.delegate displayHint:@"Can't detach at a branch junction"];
+//        return NO;
+//    }
     
     [self saveState];
 
@@ -4052,7 +4052,7 @@ using namespace HMesh;
     
     Vecf touchDir = Vecf(touchPointModel.x, touchPointModel.y, touchPointModel.z) - pinCentr;
     
-    BOOL deletingBranchFromBody = NO;
+    BOOL deletingBranchFromBody = YES;
     Walker toWalker = up;
     if (dot(touchDir, upVec) >= 0) {
         toWalker = up;

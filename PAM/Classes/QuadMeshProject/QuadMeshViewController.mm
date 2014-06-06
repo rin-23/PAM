@@ -1076,7 +1076,7 @@ typedef enum {
     }
 
     //Load obj file
-    NSString* objPath = [[NSBundle mainBundle] pathForResource:@"newPolars" ofType:@"obj"];
+    NSString* objPath = [[NSBundle mainBundle] pathForResource:@"HAND PAM 15" ofType:@"obj"];
 //    NSString* objPath = [[NSBundle mainBundle] pathForResource:@"man-polar150-simpl420-refit34_0.5-subd-refit10_0.5" ofType:@"obj"];
     [_pMesh setMeshFromObjFile:objPath];
 

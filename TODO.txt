@@ -1,0 +1,5 @@
+1. Scaling when cloning the piece
+2. Better zoom
+3. No roll for camera when you rotate
+4. Better smoothing
+5. Scale based on the finger size
